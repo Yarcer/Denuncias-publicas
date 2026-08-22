@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CIUDADANO
+  ENTE_PUBLICO
+  ADMINISTRADOR
+}
+
+enum UserStatus {
+  ACTIVO
+  INACTIVO
+  BANEADO
+}
+
+enum ReportType {
+  URBANO
+  BOMBEROS
+  POLICIAL
+}
+
+enum ReportPriority {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum ReportStatus {
+  PENDIENTE
+  EN_REVISION
+  ASIGNADO
+  EN_PROCESO
+  RESUELTO
+  RECHAZADO
+  CERRADO
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  role         Role       @default(CIUDADANO)
+  status       UserStatus @default(ACTIVO)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  firstName    String?
+  lastName     String?
+  phone        String?
+  entityName   String?
+  jurisdiction String?
+
+  reports         Report[] @relation("reportedBy")
+  assignedReports Report[] @relation("assignedTo")
+  comments        Comment[]
+}
+
+model Category {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  type        ReportType
+  active      Boolean     @default(true)
+  reports     Report[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Report {
+  id          String         @id @default(uuid())
+  title       String
+  description String
+  type        ReportType
+  priority    ReportPriority @default(MEDIA)
+  status      ReportStatus   @default(PENDIENTE)
+
+  latitude  Float
+  longitude Float
+  address   String?
+  reference String?
+
+  reporterId String
+  reporter   User   @relation("reportedBy", fields: [reporterId], references: [id])
+
+  assigneeId String?
+  assignee   User?   @relation("assignedTo", fields: [assigneeId], references: [id])
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  evidence    Evidence[]
+  comments    Comment[]
+  history     ReportHistory[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  resolvedAt  DateTime?
+
+  @@index([reporterId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([type])
+}
+
+model Evidence {
+  id        String   @id @default(uuid())
+  url       String
+  type      String
+  reportId  String
+  report    Report   @relation(fields: [reportId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  content    String
+  reportId   String
+  report     Report   @relation(fields: [reportId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model ReportHistory {
+  id         String       @id @default(uuid())
+  reportId   String
+  report     Report       @relation(fields: [reportId], references: [id])
+  fromStatus ReportStatus
+  toStatus   ReportStatus
+  changedBy  String
+  comment    String?
+  createdAt  DateTime     @default(now())
+}

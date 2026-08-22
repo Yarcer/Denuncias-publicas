@@ -1,0 +1,12 @@
+node_modules
+.pnpm
+.env
+.env.*
+.DS_Store
+coverage
+backend/dist
+frontend/dist
+backend/generated
+backend/prisma/dev.db
+backend/prisma/*.db
+pnpm-lock.yaml
