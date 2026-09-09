@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CategoriasService } from './categorias.service';
+import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 
 @Controller('categorias')
 export class CategoriasController {
@@ -20,14 +21,14 @@ export class CategoriasController {
 
   @Post()
   @UseGuards(AuthGuard('jwt'))
-  create(@Body() body: Record<string, unknown>) {
-    return this.categoriasService.create(body);
+  create(@Body() dto: CreateCategoryDto) {
+    return this.categoriasService.create(dto);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'))
-  update(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.categoriasService.update(id, body);
+  update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+    return this.categoriasService.update(id, dto);
   }
 
   @Delete(':id')

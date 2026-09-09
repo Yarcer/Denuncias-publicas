@@ -1,46 +1,146 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ReportStatus } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
+import { ManageReportDto } from './dto/manage-report.dto';
+
+type AuthenticatedUser = { sub: string; role: string };
+const managementRoles = ['ENTE_PUBLICO', 'ADMINISTRADOR'];
+const terminalStatuses: ReportStatus[] = [ReportStatus.RESUELTO, ReportStatus.RECHAZADO, ReportStatus.CERRADO];
 
 @Injectable()
 export class DenunciasService {
-  async findAll(status?: string) {
-    return {
-      items: [],
-      count: 0,
-      filters: { status: status ?? 'all' },
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(user: AuthenticatedUser, status?: string) {
+    const where = {
+      ...(user.role === 'CIUDADANO' ? { reporterId: user.sub } : {}),
+      ...(status ? { status: status as never } : {}),
     };
+    const items = await this.prisma.report.findMany({
+      where,
+      include: { category: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return { items, count: items.length, filters: { status: status ?? 'all' } };
   }
 
-  async findOne(id: string) {
-    return {
-      id,
-      title: 'Denuncia de ejemplo',
-      description: 'Listado base para la entidad de denuncias.',
-      status: 'PENDIENTE',
-    };
+  async findOne(id: string, user: AuthenticatedUser) {
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true, evidence: true, comments: true, history: true },
+    });
+    this.assertCanAccess(report, user);
+    return report;
   }
 
-  async create(data: Record<string, unknown>) {
-    return {
-      id: 'demo-report-id',
-      ...data,
-      status: 'PENDIENTE',
-      createdAt: new Date().toISOString(),
-    };
+  async managementQueue(user: AuthenticatedUser, status?: string) {
+    this.assertManagementRole(user);
+    const items = await this.prisma.report.findMany({
+      where: status ? { status: status as ReportStatus } : { status: { notIn: terminalStatuses } },
+      include: { category: true, reporter: true, assignee: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return { items, count: items.length, filters: { status: status ?? 'active' } };
   }
 
-  async update(id: string, data: Record<string, unknown>) {
-    return {
-      id,
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
+  async create(reporterId: string, dto: CreateReportDto) {
+    return this.prisma.report.create({
+      data: {
+        title: dto.title,
+        description: dto.description,
+        type: dto.type,
+        priority: dto.priority,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        address: dto.address,
+        reference: dto.reference,
+        reporter: { connect: { id: reporterId } },
+        category: { connect: { id: dto.categoryId } },
+      },
+      include: { category: true },
+    });
   }
 
-  async remove(id: string) {
-    return {
-      id,
-      deleted: true,
-      deletedAt: new Date().toISOString(),
-    };
+  async take(id: string, user: AuthenticatedUser) {
+    this.assertManagementRole(user);
+    const report = await this.prisma.report.findUnique({ where: { id } });
+    if (!report) throw new NotFoundException('Denuncia no encontrada');
+    if (user.role === 'ENTE_PUBLICO' && report.assigneeId && report.assigneeId !== user.sub) {
+      throw new ForbiddenException('Esta denuncia ya fue tomada por otro ente');
+    }
+    if (terminalStatuses.includes(report.status)) {
+      throw new ForbiddenException('Esta denuncia ya está cerrada');
+    }
+
+    return this.prisma.$transaction(async (transaction) => {
+      const updated = await transaction.report.update({
+        where: { id },
+        data: { assigneeId: user.sub, status: ReportStatus.ASIGNADO },
+        include: { category: true, reporter: true, assignee: true },
+      });
+      await transaction.reportHistory.create({
+        data: { reportId: id, fromStatus: report.status, toStatus: ReportStatus.ASIGNADO, changedBy: user.sub },
+      });
+      return updated;
+    });
+  }
+
+  async changeStatus(id: string, user: AuthenticatedUser, dto: ManageReportDto) {
+    this.assertManagementRole(user);
+    const report = await this.prisma.report.findUnique({ where: { id } });
+    if (!report) throw new NotFoundException('Denuncia no encontrada');
+    if (user.role === 'ENTE_PUBLICO' && report.assigneeId !== user.sub) {
+      throw new ForbiddenException('Primero debes tomar esta denuncia');
+    }
+    if (terminalStatuses.includes(report.status)) {
+      throw new ForbiddenException('Esta denuncia ya está cerrada');
+    }
+
+    return this.prisma.$transaction(async (transaction) => {
+      const updated = await transaction.report.update({
+        where: { id },
+        data: { status: dto.status, resolvedAt: dto.status === ReportStatus.RESUELTO ? new Date() : null },
+        include: { category: true, reporter: true, assignee: true },
+      });
+      await transaction.reportHistory.create({
+        data: { reportId: id, fromStatus: report.status, toStatus: dto.status, changedBy: user.sub },
+      });
+      return updated;
+    });
+  }
+
+  async update(id: string, user: AuthenticatedUser, dto: UpdateReportDto) {
+    const report = await this.prisma.report.findUnique({ where: { id } });
+    this.assertCanAccess(report, user);
+
+    if (dto.status || dto.assigneeId) {
+      throw new ForbiddenException('Usa el flujo de gestión para cambiar estado o asignación');
+    }
+
+    return this.prisma.report.update({ where: { id }, data: dto });
+  }
+
+  async remove(id: string, user: AuthenticatedUser) {
+    const report = await this.prisma.report.findUnique({ where: { id } });
+    this.assertCanAccess(report, user);
+    await this.prisma.report.delete({ where: { id } });
+    return { id, deleted: true };
+  }
+
+  private assertCanAccess(report: { reporterId: string } | null, user: AuthenticatedUser) {
+    if (!report) {
+      throw new NotFoundException('Denuncia no encontrada');
+    }
+    if (user.role === 'CIUDADANO' && report.reporterId !== user.sub) {
+      throw new ForbiddenException('No tienes acceso a esta denuncia');
+    }
+  }
+
+  private assertManagementRole(user: AuthenticatedUser) {
+    if (!managementRoles.includes(user.role)) {
+      throw new ForbiddenException('No tienes permisos para gestionar denuncias');
+    }
   }
 }

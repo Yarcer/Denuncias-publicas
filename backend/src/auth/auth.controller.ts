@@ -34,6 +34,11 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Post('anonymous')
+  anonymousLogin() {
+    return this.authService.anonymousLogin();
+  }
+
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
   me(@Req() req: AuthenticatedRequest) {
