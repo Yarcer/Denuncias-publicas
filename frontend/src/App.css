@@ -63,14 +63,34 @@
   font-weight: 700;
   cursor: pointer;
   background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
-  color: white;
+  color: rgb(252, 252, 252);
   box-shadow: 0 12px 28px rgba(37, 99, 235, 0.25);
 }
 
-.actions button.secondary {
-  background: #e2e8f0;
-  color: #0f172a;
-  box-shadow: none;
+.actions .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border: 2px solid #2563eb;
+  border-radius: 12px;
+  background: transparent;
+  color: #2563eb;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.actions .btn-secondary:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.actions .btn-secondary:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.25);
+  outline-offset: 3px;
 }
 
 .stats-panel {
