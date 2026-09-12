@@ -1,6 +1,7 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginUserDto, RegisterUserDto } from './dto/register-user.dto';
 
@@ -12,6 +13,13 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterUserDto) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+    if (existingUser) {
+      throw new ConflictException('El correo ya está registrado');
+    }
+
     const passwordHash = await argon2.hash(dto.password);
 
     const user = await this.prisma.user.create({
@@ -40,9 +48,37 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    if (user.status !== 'ACTIVO') {
+      throw new UnauthorizedException('La cuenta no está activa');
+    }
+
     const isValid = await argon2.verify(user.passwordHash, dto.password);
     if (!isValid) {
       throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    return {
+      user: this.publicUser(user),
+      accessToken: await this.signToken(user.id, user.email, user.role),
+    };
+  }
+
+  async anonymousLogin() {
+    const anonymousId = randomUUID();
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email: `anon-${anonymousId}@anonymous.local`,
+          passwordHash: await argon2.hash(randomUUID()),
+          firstName: 'Visitante',
+          role: 'CIUDADANO',
+        },
+      });
+    } catch {
+      throw new ServiceUnavailableException(
+        'La base de datos no está disponible. Inicia PostgreSQL e inténtalo de nuevo.',
+      );
     }
 
     return {

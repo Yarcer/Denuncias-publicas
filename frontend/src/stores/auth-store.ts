@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 type User = {
   id: string;
@@ -16,9 +17,14 @@ type AuthState = {
   clearSession: () => void;
 };
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  token: null,
-  setSession: (user, token) => set({ user, token }),
-  clearSession: () => set({ user: null, token: null }),
-}));
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      token: null,
+      setSession: (user, token) => set({ user, token }),
+      clearSession: () => set({ user: null, token: null }),
+    }),
+    { name: 'denuncias-auth' },
+  ),
+);
