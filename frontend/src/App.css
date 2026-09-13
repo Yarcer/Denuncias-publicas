@@ -46,7 +46,7 @@ body {
   display: inline-block;
   background: linear-gradient(135deg, #dbeafe, #e0f2fe);
   color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  border: 1px solid #000000;
   border-radius: 999px;
   padding: 8px 16px;
   font-size: 12px;
@@ -304,15 +304,20 @@ textarea {
 }
 
 .dashboard-header {
-  padding: 34px 42px 24px;
+  padding: 18px 42px;
   border-bottom: 1px solid #eef2f7;
   background:
-    linear-gradient(90deg, rgba(239, 246, 255, 0.95), rgba(255, 255, 255, 0.95));
+    linear-gradient(
+      90deg,
+      rgba(239, 246, 255, 0.95),
+      rgba(255, 255, 255, 0.95)
+    );
 }
 
 .dashboard-header h1 {
-  margin: 12px 0 0;
+  margin: 6px 0 0;
   color: #0f172a;
+  font-size: 1.35rem;
 }
 
 .dashboard-grid {
@@ -805,4 +810,61 @@ textarea {
   .auth-form {
     padding: 40px 30px;
   }
+}
+
+/* menu de "mi cuenta" */
+
+.cuenta-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.cuenta-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 190px;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 10px;
+
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+
+  z-index: 1000;
+}
+
+.cuenta-dropdown span {
+  display: block;
+  padding: 10px;
+  font-size: 0.9rem;
+  color: #475569;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.cuenta-dropdown button {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px;
+
+  border: none;
+  background: transparent;
+
+  color: #0f172a;
+  text-align: left;
+
+  cursor: pointer;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.cuenta-dropdown button:hover {
+  background: #f1f5f9;
+  transform: none;
+  box-shadow: none;
 }

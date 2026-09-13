@@ -2,6 +2,17 @@ import { useEffect, useState, type FormEvent } from 'react'
 import './CrearDenuncia.css'
 import { api } from '../lib/api'
 
+import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Popup,
+  useMapEvents,
+} from 'react-leaflet'
+
+import 'leaflet/dist/leaflet.css'
+
+
 type Category = {
   id: string
   name: string
@@ -31,6 +42,37 @@ const subcategorias = {
   ],
 }
 
+type SelectorUbicacionProps = {
+  latitud: number | null
+  longitud: number | null
+  onSeleccionar: (latitud: number, longitud: number) => void
+}
+
+function SelectorUbicacion({
+  latitud,
+  longitud,
+  onSeleccionar,
+}: SelectorUbicacionProps) {
+  useMapEvents({
+    click(e) {
+      onSeleccionar(e.latlng.lat, e.latlng.lng)
+    },
+  })
+
+  if (latitud === null || longitud === null) {
+    return null
+  }
+
+  return (
+    <CircleMarker
+      center={[latitud, longitud]}
+      radius={9}
+    >
+      <Popup>Ubicación seleccionada</Popup>
+    </CircleMarker>
+  )
+}
+
 function CrearDenuncia() {
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriaId, setCategoriaId] = useState('')
@@ -38,10 +80,13 @@ function CrearDenuncia() {
   const [subcategoria, setSubcategoria] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [ubicacion, setUbicacion] = useState('')
-  const [latitud, setLatitud] = useState('')
-  const [longitud, setLongitud] = useState('')
+  const [latitud, setLatitud] = useState<number | null>(null)
+  const [longitud, setLongitud] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
+  const [evidencia, setEvidencia] = useState<File | null>(null)
+  const [vistaPrevia, setVistaPrevia] = useState('')
+
 
   useEffect(() => {
     async function cargarCategorias() {
@@ -84,6 +129,26 @@ function CrearDenuncia() {
 
     setCategoriaNombre(categoriaSeleccionada?.name ?? '')
   }
+
+function seleccionarUbicacion(
+  nuevaLatitud: number,
+  nuevaLongitud: number
+) {
+  setLatitud(nuevaLatitud)
+  setLongitud(nuevaLongitud)
+}
+
+function handleEvidenciaChange(file: File | null) {
+  setEvidencia(file)
+
+  if (!file) {
+    setVistaPrevia('')
+    return
+  }
+
+  const url = URL.createObjectURL(file)
+  setVistaPrevia(url)
+}
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -136,8 +201,9 @@ function CrearDenuncia() {
 
   const claveCategoria = obtenerClaveCategoria(categoriaNombre)
 
-  return (
-    <main className="denuncia-page">
+return (
+<main className="denuncia-page">
+
       <h1>Crear reporte</h1>
       <p>Completá los datos para registrar un nuevo reporte.</p>
 
@@ -212,41 +278,75 @@ function CrearDenuncia() {
           />
         </div>
 
-        <div>
-          <label htmlFor="latitud">Latitud</label>
+              <div>
+  <label>Ubicación en el mapa</label>
 
-          <input
-            id="latitud"
-            type="number"
-            step="any"
-            placeholder="-34.9011"
-            value={latitud}
-            onChange={(e) => setLatitud(e.target.value)}
-            required
-          />
-        </div>
+  <p className="mapa-ayuda">
+    Hacé clic en el mapa para marcar dónde ocurre el problema.
+  </p>
 
-        <div>
-          <label htmlFor="longitud">Longitud</label>
+<MapContainer
+  center={[-32.3667, -54.1833]}
+  zoom={14}
+  minZoom={13}
+  maxBounds={[
+    [-32.42, -54.25],
+    [-32.31, -54.11],
+  ]}
+  maxBoundsViscosity={1.0}
+  className="mapa-ubicacion"
+>
+    <TileLayer
+      attribution="&copy; OpenStreetMap contributors"
+      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    />
 
-          <input
-            id="longitud"
-            type="number"
-            step="any"
-            placeholder="-56.1645"
-            value={longitud}
-            onChange={(e) => setLongitud(e.target.value)}
-            required
-          />
-        </div>
+    <SelectorUbicacion
+      latitud={latitud}
+      longitud={longitud}
+      onSeleccionar={seleccionarUbicacion}
+    />
+  </MapContainer>
+
+  {latitud !== null && longitud !== null && (
+    <p className="ubicacion-seleccionada">
+      ✓ Ubicación seleccionada
+    </p>
+  )}
+</div>
+
+<div>
+  <label htmlFor="evidencia">Evidencia</label>
+
+  <input
+    id="evidencia"
+    type="file"
+    accept="image/*"
+    onChange={(e) =>
+      handleEvidenciaChange(e.target.files?.[0] ?? null)
+    }
+  />
+
+  <p className="evidencia-ayuda">
+    Podés adjuntar una foto del problema.
+  </p>
+
+  {vistaPrevia && (
+    <div className="evidencia-preview">
+      <img
+        src={vistaPrevia}
+        alt="Vista previa de la evidencia"
+      />
+    </div>
+  )}
+</div>
 
         {error && <p className="error">{error}</p>}
         {mensaje && <p className="notice">{mensaje}</p>}
 
         <button type="submit">Enviar reporte</button>
-      </form>
+         </form>
     </main>
   )
-}
-
+  }
 export default CrearDenuncia

@@ -57,6 +57,9 @@ function App() {
   const [report, setReport] = useState(emptyReport);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
+  const [vistaCiudadano, setVistaCiudadano] =
+  useState<'crear' | 'reportes'>('crear');
 
   useEffect(() => {
   if (!user) return;
@@ -65,9 +68,9 @@ function App() {
     try {
       const reportsResponse = await api.get('/denuncias');
       setReports(reportsResponse.data.data.items);
-      console.log('Denuncias cargadas correctamente');
+      console.log('Reportes cargados correctamente');
     } catch (error) {
-      console.error('Error cargando denuncias:', error);
+      console.error('Error cargando reportes:', error);
     }
 
     try {
@@ -128,7 +131,7 @@ function App() {
       setReport(emptyReport);
       setNotice('Denuncia registrada correctamente.');
     } catch (reportError: any) {
-      setError(reportError.response?.data?.message ?? 'No se pudo registrar la denuncia.');
+      setError(reportError.response?.data?.message ?? 'No se pudo registrar el reporte.');
     }
   }
 if (!user) {
@@ -142,12 +145,12 @@ if (!user) {
             className="auth-logo"
           />
 
-          <span className="eyebrow">Denuncias públicas</span>
+          <span className="eyebrow">Reportes públicos</span>
 
           <h1>Tu ciudad también se cuida reportando.</h1>
 
           <p>
-            Registrá incidentes y consultá el avance de cada denuncia desde un solo lugar.
+            Registrá incidentes y consultá el avance de cada reporte desde un solo lugar.
           </p>
         </div>
 
@@ -246,55 +249,112 @@ if (!user) {
 return (
   <main className="app-shell">
     <section className="dashboard">
-      <header className="dashboard-header">
-        <div>
-          <span className="eyebrow">Panel ciudadano</span>
-          <h1>Hola, {user.firstName || user.email}</h1>
-        </div>
 
-        <button
-          className="secondary"
-          onClick={clearSession}
+<nav className="ciudadano-nav">
+  <div className="ciudadano-nav-logo">
+    <img
+      src={puntoReporteLogo}
+      alt="PuntoReporte"
+    />
+  </div>
+
+  <div className="ciudadano-nav-links">
+    <button type="button">
+      Inicio
+    </button>
+
+<button
+  type="button"
+  className={vistaCiudadano === 'crear' ? 'nav-activo' : ''}
+  onClick={() => setVistaCiudadano('crear')}
+>
+  Crear reporte
+</button>
+
+<button
+  type="button"
+  className={vistaCiudadano === 'reportes' ? 'nav-activo' : ''}
+  onClick={() => setVistaCiudadano('reportes')}
+>
+  Mis reportes
+</button>
+
+<div className="cuenta-menu">
+  <button
+    type="button"
+    onClick={() => setMenuCuentaAbierto(!menuCuentaAbierto)}
+  >
+    Mi cuenta
+  </button>
+
+  {menuCuentaAbierto && (
+    <div className="cuenta-dropdown">
+      <span>{user.firstName || user.email}</span>
+
+      <button
+        type="button"
+       onClick={() => {
+  setMenuCuentaAbierto(false);
+  clearSession();
+}}
+      >
+        Cerrar sesión
+      </button>
+    </div>
+  )}
+</div>
+
+</div>
+</nav>
+
+<header className="dashboard-header">
+  <div>
+    <span className="eyebrow">Panel ciudadano</span>
+    <h1>Hola, {user.firstName || user.email}</h1>
+  </div>
+</header>
+
+{vistaCiudadano === 'crear' && (
+  <CrearDenuncia />
+)}
+
+{vistaCiudadano === 'reportes' && (
+  <section className="reports-panel">
+    <div className="panel-heading">
+      <div>
+        <span className="eyebrow" style={{ color: '#000000' }}>
+  Historial
+</span>
+        <h2>Mis reportes</h2>
+      </div>
+
+      <strong>{reports.length}</strong>
+    </div>
+
+    {reports.length === 0 ? (
+      <p className="empty-state">
+        Todavía no tienes reportes registrados.
+      </p>
+    ) : (
+      reports.map((item) => (
+        <article
+          className="report-item"
+          key={item.id}
         >
-          Cerrar sesión
-        </button>
-      </header>
-
-      <CrearDenuncia />
-
-      <section className="reports-panel">
-        <div className="panel-heading">
           <div>
-            <span className="eyebrow">Historial</span>
-            <h2>Mis denuncias</h2>
+            <strong>{item.title}</strong>
+            <p>{item.description}</p>
           </div>
 
-          <strong>{reports.length}</strong>
-        </div>
+          <span>{item.status}</span>
+        </article>
+      ))
+    )}
+  </section>
+)}
 
-        {reports.length === 0 ? (
-          <p className="empty-state">
-            Todavía no tienes denuncias registradas.
-          </p>
-        ) : (
-          reports.map((item) => (
-            <article
-              className="report-item"
-              key={item.id}
-            >
-              <div>
-                <strong>{item.title}</strong>
-                <p>{item.description}</p>
-              </div>
-
-              <span>{item.status}</span>
-            </article>
-          ))
-        )}
-      </section>
-    </section>
-  </main>
+</section>
+</main>
 )
 }
-
 export default App;
