@@ -1,52 +1,100 @@
 .denuncia-page {
-  min-height: 100vh;
-  padding: 60px 20px;
-  background: #f5f7fa;
+  min-height: auto;
+  padding: 45px 28px 55px;
+
+  background:
+    radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.12), transparent 32%),
+    linear-gradient(135deg, #eaf3ff 0%, #dfeeff 50%, #edf6ff 100%);
+
+  border-radius: 22px;
 }
 
 .denuncia-page h1 {
   text-align: center;
-  margin-bottom: 8px;
+  margin: 0 0 10px;
+
+  color: #0f172a;
+
+  font-size: 2.2rem;
 }
 
 .denuncia-page > p {
   text-align: center;
-  margin-bottom: 32px;
-  color: #666;
+
+  max-width: 650px;
+
+  margin: 0 auto 34px;
+
+  color: #475569;
+
+  font-size: 1rem;
 }
 
 .denuncia-form {
-  max-width: 650px;
+  max-width: 780px;
+
   margin: 0 auto;
-  padding: 32px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+
+  padding: 38px;
+
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.88) 0%,
+      rgba(239, 246, 255, 0.94) 100%
+    );
+
+  border: 1px solid rgba(37, 99, 235, 0.14);
+
+  border-radius: 22px;
+
+  box-shadow:
+    0 18px 45px rgba(15, 23, 42, 0.10);
 }
 
 .denuncia-form div {
   display: flex;
   flex-direction: column;
-  margin-bottom: 22px;
+
+  margin-bottom: 24px;
 }
 
 .denuncia-form label {
-  margin-bottom: 8px;
-  font-weight: 600;
+  margin-bottom: 9px;
+
+  font-weight: 700;
+
+  color: #1e293b;
 }
 
 .denuncia-form input,
 .denuncia-form select,
 .denuncia-form textarea {
-  padding: 12px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  width: 100%;
+
+  padding: 14px 15px;
+
+  border: 1px solid #bfd3ee;
+
+  border-radius: 12px;
+
   font-size: 16px;
+
   font-family: inherit;
+
+  color: #0f172a;
+
+  background: rgba(255, 255, 255, 0.8);
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
 }
 
 .denuncia-form textarea {
-  min-height: 120px;
+  min-height: 140px;
+
   resize: vertical;
 }
 
@@ -54,26 +102,96 @@
 .denuncia-form select:focus,
 .denuncia-form textarea:focus {
   outline: none;
+
   border-color: #2563eb;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.10);
 }
 
 .denuncia-form select:disabled {
-  background: #eeeeee;
+  background: #e2e8f0;
+
+  color: #64748b;
+
   cursor: not-allowed;
 }
 
 .denuncia-form button {
   width: 100%;
-  padding: 14px;
+
+  padding: 16px;
+
   border: none;
-  border-radius: 8px;
-  background: #2563eb;
+
+  border-radius: 12px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #2563eb 0%,
+      #0ea5e9 100%
+    );
+
   color: white;
+
   font-size: 16px;
-  font-weight: 600;
+
+  font-weight: 700;
+
   cursor: pointer;
+
+  box-shadow:
+    0 12px 28px rgba(37, 99, 235, 0.22);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .denuncia-form button:hover {
-  background: #1d4ed8;
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 16px 32px rgba(37, 99, 235, 0.28);
+}
+
+.denuncia-form button:active {
+  transform: translateY(0);
+}
+
+.denuncia-form .error {
+  padding: 12px 14px;
+
+  border-radius: 10px;
+
+  background: #fee2e2;
+
+  color: #b91c1c;
+}
+
+.denuncia-form .notice {
+  padding: 12px 14px;
+
+  border-radius: 10px;
+
+  background: #dcfce7;
+
+  color: #047857;
+}
+
+@media (max-width: 700px) {
+  .denuncia-page {
+    padding: 30px 16px 40px;
+  }
+
+  .denuncia-page h1 {
+    font-size: 1.8rem;
+  }
+
+  .denuncia-form {
+    padding: 24px;
+  }
 }

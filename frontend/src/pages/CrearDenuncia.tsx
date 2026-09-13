@@ -1,5 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import './CrearDenuncia.css'
+import { api } from '../lib/api'
+
+type Category = {
+  id: string
+  name: string
+  type: string
+}
 
 const subcategorias = {
   infraestructura: [
@@ -25,83 +32,221 @@ const subcategorias = {
 }
 
 function CrearDenuncia() {
-  const [categoria, setCategoria] = useState('')
+  const [categories, setCategories] = useState<Category[]>([])
+  const [categoriaId, setCategoriaId] = useState('')
+  const [categoriaNombre, setCategoriaNombre] = useState('')
+  const [subcategoria, setSubcategoria] = useState('')
+  const [descripcion, setDescripcion] = useState('')
+  const [ubicacion, setUbicacion] = useState('')
+  const [latitud, setLatitud] = useState('')
+  const [longitud, setLongitud] = useState('')
+  const [error, setError] = useState('')
+  const [mensaje, setMensaje] = useState('')
+
+  useEffect(() => {
+    async function cargarCategorias() {
+      try {
+        const response = await api.get('/categorias')
+        setCategories(response.data.data.items)
+      } catch {
+        setError('No se pudieron cargar las categorías.')
+      }
+    }
+
+    void cargarCategorias()
+  }, [])
+
+  function obtenerClaveCategoria(nombre: string) {
+    const nombreNormalizado = nombre.toLowerCase()
+
+    if (nombreNormalizado.includes('infraestructura')) {
+      return 'infraestructura'
+    }
+
+    if (nombreNormalizado.includes('limpieza')) {
+      return 'limpieza'
+    }
+
+    if (nombreNormalizado.includes('convivencia')) {
+      return 'convivencia'
+    }
+
+    return ''
+  }
+
+  function handleCategoriaChange(id: string) {
+    setCategoriaId(id)
+    setSubcategoria('')
+
+    const categoriaSeleccionada = categories.find(
+      (category) => category.id === id
+    )
+
+    setCategoriaNombre(categoriaSeleccionada?.name ?? '')
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+
+    setError('')
+    setMensaje('')
+
+    if (
+      !categoriaId ||
+      !subcategoria ||
+      !descripcion ||
+      !latitud ||
+      !longitud
+    ) {
+      setError('Completá todos los campos obligatorios.')
+      return
+    }
+
+    try {
+      const categoriaSeleccionada = categories.find(
+        (category) => category.id === categoriaId
+      )
+
+      await api.post('/denuncias', {
+        title: subcategoria,
+        description: descripcion,
+        type: categoriaSeleccionada?.type ?? 'URBANO',
+        latitude: Number(latitud),
+        longitude: Number(longitud),
+        address: ubicacion,
+        categoryId: categoriaId,
+      })
+
+      setCategoriaId('')
+      setCategoriaNombre('')
+      setSubcategoria('')
+      setDescripcion('')
+      setUbicacion('')
+      setLatitud('')
+      setLongitud('')
+
+      setMensaje('Reporte registrado correctamente.')
+    } catch (err: any) {
+      setError(
+        err.response?.data?.message ??
+          'No se pudo registrar la denuncia.'
+      )
+    }
+  }
+
+  const claveCategoria = obtenerClaveCategoria(categoriaNombre)
 
   return (
-    <main className='denuncia-page'>
-      <h1>Crear denuncia</h1>
-      <p>Completá los datos para registrar una nueva denuncia.</p>
+    <main className="denuncia-page">
+      <h1>Crear reporte</h1>
+      <p>Completá los datos para registrar un nuevo reporte.</p>
 
-      <form className='denuncia-form'>
+      <form className="denuncia-form" onSubmit={handleSubmit}>
         <div>
           <label htmlFor="categoria">Categoría</label>
 
           <select
             id="categoria"
-            value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
+            value={categoriaId}
+            onChange={(e) => handleCategoriaChange(e.target.value)}
+            required
           >
             <option value="">Seleccioná una categoría</option>
-            <option value="infraestructura">Infraestructura</option>
-            <option value="limpieza">Limpieza</option>
-            <option value="convivencia">Convivencia</option>
+
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
           </select>
         </div>
 
-          <div>
-  <label htmlFor="subcategoria">Subcategoría</label>
+        <div>
+          <label htmlFor="subcategoria">Subcategoría</label>
 
-  <select
-    id="subcategoria"
-    disabled={!categoria}
-  >
-    <option value="">
-      {categoria
-        ? 'Seleccioná una subcategoría'
-        : 'Primero elegí una categoría'}
-    </option>
+          <select
+            id="subcategoria"
+            value={subcategoria}
+            onChange={(e) => setSubcategoria(e.target.value)}
+            disabled={!claveCategoria}
+            required
+          >
+            <option value="">
+              {claveCategoria
+                ? 'Seleccioná una subcategoría'
+                : 'Primero elegí una categoría'}
+            </option>
 
-    {categoria &&
-      subcategorias[categoria as keyof typeof subcategorias].map(
-        (subcategoria) => (
-          <option key={subcategoria} value={subcategoria}>
-            {subcategoria}
-          </option>
-        )
-      )}
-  </select>
-</div>
+            {claveCategoria &&
+              subcategorias[
+                claveCategoria as keyof typeof subcategorias
+              ].map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+          </select>
+        </div>
+
         <div>
           <label htmlFor="descripcion">Descripción</label>
 
           <textarea
             id="descripcion"
             placeholder="Describí el problema..."
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            required
           />
         </div>
+
         <div>
-  <label htmlFor="ubicacion">Ubicación</label>
+          <label htmlFor="ubicacion">Ubicación</label>
 
-  <input
-    id="ubicacion"
-    type="text"
-    placeholder="Ej: Av. Italia 2450, esquina Propios"
-  />
-</div>
-<div>
-  <label htmlFor="evidencia">Evidencia</label>
+          <input
+            id="ubicacion"
+            type="text"
+            placeholder="Ej: Av. Italia 2450, esquina Propios"
+            value={ubicacion}
+            onChange={(e) => setUbicacion(e.target.value)}
+          />
+        </div>
 
-  <input
-    id="evidencia"
-    type="file"
-    accept="image/*"
-  />
-</div>
-        <button type="submit">Enviar denuncia</button>
+        <div>
+          <label htmlFor="latitud">Latitud</label>
+
+          <input
+            id="latitud"
+            type="number"
+            step="any"
+            placeholder="-34.9011"
+            value={latitud}
+            onChange={(e) => setLatitud(e.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor="longitud">Longitud</label>
+
+          <input
+            id="longitud"
+            type="number"
+            step="any"
+            placeholder="-56.1645"
+            value={longitud}
+            onChange={(e) => setLongitud(e.target.value)}
+            required
+          />
+        </div>
+
+        {error && <p className="error">{error}</p>}
+        {mensaje && <p className="notice">{mensaje}</p>}
+
+        <button type="submit">Enviar reporte</button>
       </form>
     </main>
   )
 }
-
 
 export default CrearDenuncia
