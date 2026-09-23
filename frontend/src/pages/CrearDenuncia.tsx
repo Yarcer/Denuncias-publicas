@@ -84,7 +84,6 @@ function CrearDenuncia() {
   const [longitud, setLongitud] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
-  const [evidencia, setEvidencia] = useState<File | null>(null)
   const [vistaPrevia, setVistaPrevia] = useState('')
 
 
@@ -139,7 +138,6 @@ function seleccionarUbicacion(
 }
 
 function handleEvidenciaChange(file: File | null) {
-  setEvidencia(file)
 
   if (!file) {
     setVistaPrevia('')
@@ -187,8 +185,8 @@ function handleEvidenciaChange(file: File | null) {
       setSubcategoria('')
       setDescripcion('')
       setUbicacion('')
-      setLatitud('')
-      setLongitud('')
+      setLatitud(null)
+      setLongitud(null)
 
       setMensaje('Reporte registrado correctamente.')
     } catch (err: any) {

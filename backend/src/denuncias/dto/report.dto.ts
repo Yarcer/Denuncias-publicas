@@ -4,24 +4,24 @@ import { IsEnum, IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, IsUU
 export class CreateReportDto {
   @IsString()
   @IsNotEmpty()
-  title: string;
+  title!: string;
 
   @IsString()
   @IsNotEmpty()
-  description: string;
+  description!: string;
 
   @IsEnum(ReportType)
-  type: ReportType;
+  type!: ReportType;
 
   @IsEnum(ReportPriority)
   @IsOptional()
   priority?: ReportPriority;
 
   @IsLatitude()
-  latitude: number;
+  latitude!: number;
 
   @IsLongitude()
-  longitude: number;
+  longitude!: number;
 
   @IsString()
   @IsOptional()
@@ -31,8 +31,9 @@ export class CreateReportDto {
   @IsOptional()
   reference?: string;
 
-  @IsUUID()
-  categoryId: string;
+  @IsString()
+  @IsNotEmpty()
+  categoryId!: string;
 }
 
 export class UpdateReportDto {

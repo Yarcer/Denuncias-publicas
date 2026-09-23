@@ -5,10 +5,8 @@ import { useAuthStore } from './stores/auth-store';
 import CrearDenuncia from './pages/CrearDenuncia'
 import puntoReporteLogo from './assets/puntoreporte-logo.jpg';
 
-type Category = { id: string; name: string; type: string };
 type Report = { id: string; title: string; description: string; status: string };
 type ManagedReport = Report & { address?: string | null; reporter?: { email: string; firstName?: string | null; lastName?: string | null }; assignee?: { email: string } | null };
-const emptyReport = { title: '', description: '', type: 'URBANO', latitude: '', longitude: '', address: '', categoryId: '' };
 
 function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => void }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
@@ -53,10 +51,7 @@ function App() {
   const [registering, setRegistering] = useState(false);
   const [credentials, setCredentials] = useState({ email: '', password: '', firstName: '', lastName: '' });
   const [reports, setReports] = useState<Report[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [report, setReport] = useState(emptyReport);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
   const [vistaCiudadano, setVistaCiudadano] =
   useState<'crear' | 'reportes'>('crear');
@@ -73,13 +68,6 @@ function App() {
       console.error('Error cargando reportes:', error);
     }
 
-    try {
-      const categoriesResponse = await api.get('/categorias');
-      setCategories(categoriesResponse.data.data.items);
-      console.log('Categorías cargadas correctamente');
-    } catch (error) {
-      console.error('Error cargando categorías:', error);
-    }
   }
 
   void cargarDatos();
@@ -121,19 +109,6 @@ function App() {
     }
   }
 
-  async function handleReport(event: FormEvent) {
-    event.preventDefault();
-    setError('');
-    setNotice('');
-    try {
-      const response = await api.post('/denuncias', { ...report, latitude: Number(report.latitude), longitude: Number(report.longitude) });
-      setReports((current) => [response.data.data, ...current]);
-      setReport(emptyReport);
-      setNotice('Denuncia registrada correctamente.');
-    } catch (reportError: any) {
-      setError(reportError.response?.data?.message ?? 'No se pudo registrar el reporte.');
-    }
-  }
 if (!user) {
   return (
     <main className="app-shell">
