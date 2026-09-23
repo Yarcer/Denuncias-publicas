@@ -1,9 +1,17 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { ManageReportDto } from './dto/manage-report.dto';
 
+type UploadedImage = {
+  buffer: Buffer;
+  mimetype: string;
+  size: number;
+};
 type AuthenticatedUser = { sub: string; role: string };
 const managementRoles = ['ENTE_PUBLICO', 'ADMINISTRADOR'];
 const terminalStatuses: ReportStatus[] = [ReportStatus.RESUELTO, ReportStatus.RECHAZADO, ReportStatus.CERRADO];
@@ -39,7 +47,14 @@ export class DenunciasService {
     this.assertManagementRole(user);
     const items = await this.prisma.report.findMany({
       where: status ? { status: status as ReportStatus } : { status: { notIn: terminalStatuses } },
-      include: { category: true, reporter: true, assignee: true },
+      include: {
+  category: true,
+  evidence: true,
+  reporter: {
+    select: { email: true, firstName: true, lastName: true },
+  },
+  assignee: true,
+},
       orderBy: { createdAt: 'asc' },
     });
     return { items, count: items.length, filters: { status: status ?? 'active' } };
@@ -61,6 +76,37 @@ export class DenunciasService {
       },
       include: { category: true },
     });
+  }
+
+  async uploadEvidence(id: string, user: AuthenticatedUser, file?: UploadedImage) {
+    const report = await this.prisma.report.findUnique({ where: { id } });
+    this.assertCanAccess(report, user);
+
+    if (!file?.buffer || !['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+      throw new BadRequestException('Adjuntá una imagen JPG, PNG o WebP');
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('La imagen no puede superar los 5 MB');
+    }
+
+    const extension =
+  file.mimetype === 'image/jpeg' ? 'jpg' :
+  file.mimetype === 'image/png' ? 'png' : 'webp';
+    const filename = `${randomUUID()}.${extension}`;
+    const directory = join(process.cwd(), 'uploads', 'reports');
+    const filepath = join(directory, filename);
+
+    await mkdir(directory, { recursive: true });
+    await writeFile(filepath, file.buffer);
+
+    try {
+      return await this.prisma.evidence.create({
+        data: { reportId: id, url: filename, type: file.mimetype },
+      });
+    } catch (error) {
+      await unlink(filepath);
+      throw error;
+    }
   }
 
   async take(id: string, user: AuthenticatedUser) {

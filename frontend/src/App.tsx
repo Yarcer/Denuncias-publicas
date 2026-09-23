@@ -6,8 +6,7 @@ import CrearDenuncia from './pages/CrearDenuncia'
 import puntoReporteLogo from './assets/puntoreporte-logo.jpg';
 
 type Report = { id: string; title: string; description: string; status: string };
-type ManagedReport = Report & { address?: string | null; reporter?: { email: string; firstName?: string | null; lastName?: string | null }; assignee?: { email: string } | null };
-
+type ManagedReport = Report & { address?: string | null; latitude?: number | null; longitude?: number | null; reporter?: { email: string; firstName?: string | null; lastName?: string | null }; assignee?: { email: string } | null };
 function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => void }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [filter, setFilter] = useState('active');
@@ -43,7 +42,15 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
     }
   }
 
-  return <main className="app-shell"><section className="dashboard management-dashboard"><header className="dashboard-header"><div><span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span><h1>Bandeja de denuncias</h1></div><button className="secondary" onClick={onLogout}>Cerrar sesión</button></header><div className="management-toolbar"><div><strong>{reports.length}</strong><span> casos en esta vista</span></div><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="active">Activas</option><option value="PENDIENTE">Pendientes</option><option value="ASIGNADO">Asignadas</option><option value="EN_REVISION">En espera</option><option value="RESUELTO">Hechas</option><option value="RECHAZADO">Denegadas</option></select></div>{error && <p className="error management-error">{error}</p>}<section className="management-list">{reports.length === 0 ? <p className="empty-state">No hay denuncias en esta vista.</p> : reports.map((item) => <article className="management-item" key={item.id}><div className="management-item-copy"><span className="status-label">{item.status}</span><h2>{item.title}</h2><p>{item.description}</p><small>{item.address || 'Ubicación sin dirección'} · Reportado por {item.reporter?.firstName || item.reporter?.email || 'ciudadano'}</small></div><div className="management-actions">{!item.assignee && <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>}{item.assignee && <><button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>En espera</button><button onClick={() => changeStatus(item.id, 'RESUELTO')}>Hecha</button><button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>Denegar</button></>}</div></article>)}</section></section></main>;
+  return <main className="app-shell"><section className="dashboard management-dashboard"><header className="dashboard-header"><div><span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span><h1>Bandeja de denuncias</h1></div><button className="secondary" onClick={onLogout}>Cerrar sesión</button></header><div className="management-toolbar"><div><strong>{reports.length}</strong><span> casos en esta vista</span></div><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="active">Activas</option><option value="PENDIENTE">Pendientes</option><option value="ASIGNADO">Asignadas</option><option value="EN_REVISION">En espera</option><option value="RESUELTO">Hechas</option><option value="RECHAZADO">Denegadas</option></select></div>{error && <p className="error management-error">{error}</p>}<section className="management-list">{reports.length === 0 ? <p className="empty-state">No hay denuncias en esta vista.</p> : reports.map((item) => <article className="management-item" key={item.id}><div className="management-item-copy"><span className="status-label">{item.status}</span><h2>{item.title}</h2><p>{item.description}</p><small>{item.address || 'Ubicación sin dirección'} · Reportado por {item.reporter?.firstName || item.reporter?.email || 'ciudadano'}</small> {item.latitude != null && item.longitude != null && (
+  <a
+    href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Ver en el mapa
+  </a>
+)} </div><div className="management-actions">{!item.assignee && <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>}{item.assignee && <><button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>En espera</button><button onClick={() => changeStatus(item.id, 'RESUELTO')}>Hecha</button><button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>Denegar</button></>}</div></article>)}</section></section></main>;
 }
 
 function App() {

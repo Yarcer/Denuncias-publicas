@@ -84,6 +84,7 @@ function CrearDenuncia() {
   const [longitud, setLongitud] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
+  const [evidencia, setEvidencia] = useState<File | null>(null)
   const [vistaPrevia, setVistaPrevia] = useState('')
 
 
@@ -138,6 +139,7 @@ function seleccionarUbicacion(
 }
 
 function handleEvidenciaChange(file: File | null) {
+  setEvidencia(file)
 
   if (!file) {
     setVistaPrevia('')
@@ -170,7 +172,7 @@ function handleEvidenciaChange(file: File | null) {
         (category) => category.id === categoriaId
       )
 
-      await api.post('/denuncias', {
+      const response = await api.post('/denuncias', {
         title: subcategoria,
         description: descripcion,
         type: categoriaSeleccionada?.type ?? 'URBANO',
@@ -180,6 +182,23 @@ function handleEvidenciaChange(file: File | null) {
         categoryId: categoriaId,
       })
 
+      let fotoAdjuntada = true
+
+if (evidencia) {
+  const formData = new FormData()
+  formData.append('file', evidencia)
+
+  try {
+    await api.post(
+      `/denuncias/${response.data.data.id}/evidencia`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+  } catch {
+    fotoAdjuntada = false
+  }
+}
+
       setCategoriaId('')
       setCategoriaNombre('')
       setSubcategoria('')
@@ -188,7 +207,14 @@ function handleEvidenciaChange(file: File | null) {
       setLatitud(null)
       setLongitud(null)
 
-      setMensaje('Reporte registrado correctamente.')
+      setEvidencia(null)
+setVistaPrevia('')
+
+      setMensaje(
+  fotoAdjuntada
+    ? 'Reporte registrado correctamente.'
+    : 'El reporte se guardó, pero no se pudo adjuntar la foto.'
+)
     } catch (err: any) {
       setError(
         err.response?.data?.message ??

@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
@@ -36,6 +37,17 @@ export class DenunciasController {
   @UseGuards(AuthGuard('jwt'))
   create(@Req() req: AuthenticatedRequest, @Body() dto: CreateReportDto) {
     return this.denunciasService.create(req.user.sub, dto);
+  }
+
+    @Post(':id/evidencia')
+  @UseGuards(AuthGuard('jwt'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  uploadEvidence(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @UploadedFile() file: { buffer: Buffer; mimetype: string; size: number },
+  ) {
+    return this.denunciasService.uploadEvidence(id, req.user, file);
   }
 
   @Post(':id/tomar')
