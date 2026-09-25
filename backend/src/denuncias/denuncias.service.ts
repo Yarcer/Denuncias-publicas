@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -43,22 +43,38 @@ export class DenunciasService {
     return report;
   }
 
-  async managementQueue(user: AuthenticatedUser, status?: string) {
-    this.assertManagementRole(user);
-    const items = await this.prisma.report.findMany({
-      where: status ? { status: status as ReportStatus } : { status: { notIn: terminalStatuses } },
-      include: {
-  category: true,
-  evidence: true,
-  reporter: {
-    select: { email: true, firstName: true, lastName: true },
-  },
-  assignee: true,
-},
-      orderBy: { createdAt: 'asc' },
-    });
-    return { items, count: items.length, filters: { status: status ?? 'active' } };
-  }
+async managementQueue(user: AuthenticatedUser, status?: string) {
+  this.assertManagementRole(user);
+
+  const where =
+    status === 'archived'
+      ? { archivedAt: { not: null } }
+      : status
+        ? { status: status as ReportStatus, archivedAt: null }
+        : {
+            status: { notIn: terminalStatuses },
+            archivedAt: null,
+          };
+
+  const items = await this.prisma.report.findMany({
+    where,
+    include: {
+      category: true,
+      evidence: true,
+      reporter: {
+        select: { email: true, firstName: true, lastName: true },
+      },
+      assignee: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  return {
+    items,
+    count: items.length,
+    filters: { status: status ?? 'active' },
+  };
+}
 
   async create(reporterId: string, dto: CreateReportDto) {
     return this.prisma.report.create({
@@ -109,7 +125,68 @@ export class DenunciasService {
     }
   }
 
-  async take(id: string, user: AuthenticatedUser) {
+async getEvidence(
+  reportId: string,
+  evidenceId: string,
+  user: AuthenticatedUser,
+) {
+  const report = await this.prisma.report.findUnique({
+    where: { id: reportId },
+  });
+
+  this.assertCanAccess(report, user);
+
+  const evidence = await this.prisma.evidence.findFirst({
+    where: { id: evidenceId, reportId },
+  });
+
+  if (!evidence) {
+    throw new NotFoundException('Imagen no encontrada');
+  }
+
+  const filepath = join(
+    process.cwd(),
+    'uploads',
+    'reports',
+    evidence.url,
+  );
+
+  try {
+    return {
+      buffer: await readFile(filepath),
+      type: evidence.type,
+    };
+  } catch {
+    throw new NotFoundException('Archivo de imagen no encontrado');
+  }
+}
+
+  async archive(id: string, user: AuthenticatedUser) {
+  this.assertManagementRole(user);
+
+  const report = await this.prisma.report.findUnique({
+    where: { id },
+  });
+
+  if (!report) {
+    throw new NotFoundException('Denuncia no encontrada');
+  }
+
+  if (report.status !== ReportStatus.RECHAZADO) {
+    throw new BadRequestException('Solo se pueden archivar denuncias denegadas');
+  }
+
+  if (report.archivedAt) {
+    throw new BadRequestException('Esta denuncia ya está archivada');
+  }
+
+  return this.prisma.report.update({
+    where: { id },
+    data: { archivedAt: new Date() },
+  });
+}
+
+async take(id: string, user: AuthenticatedUser) {
     this.assertManagementRole(user);
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Denuncia no encontrada');

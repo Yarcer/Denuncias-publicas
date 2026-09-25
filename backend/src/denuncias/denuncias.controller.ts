@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
 import { DenunciasService } from './denuncias.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
@@ -27,6 +27,23 @@ export class DenunciasController {
     return this.denunciasService.managementQueue(req.user, status);
   }
 
+    @Get(':id/evidencia/:evidenceId')
+  @UseGuards(AuthGuard('jwt'))
+  async getEvidence(
+    @Req() req: AuthenticatedRequest,
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Param('evidenceId') evidenceId: string,
+  ) {
+    const image = await this.denunciasService.getEvidence(
+      id,
+      evidenceId,
+      req.user,
+    );
+
+    res.type(image.type).send(image.buffer);
+  }
+  
   @Get(':id')
   @UseGuards(AuthGuard('jwt'))
   findOne(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
@@ -48,6 +65,15 @@ export class DenunciasController {
     @UploadedFile() file: { buffer: Buffer; mimetype: string; size: number },
   ) {
     return this.denunciasService.uploadEvidence(id, req.user, file);
+  }
+
+    @Patch(':id/archivar')
+  @UseGuards(AuthGuard('jwt'))
+  archive(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.denunciasService.archive(id, req.user);
   }
 
   @Post(':id/tomar')

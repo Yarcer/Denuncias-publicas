@@ -6,7 +6,158 @@ import CrearDenuncia from './pages/CrearDenuncia'
 import puntoReporteLogo from './assets/puntoreporte-logo.jpg';
 
 type Report = { id: string; title: string; description: string; status: string };
-type ManagedReport = Report & { address?: string | null; latitude?: number | null; longitude?: number | null; reporter?: { email: string; firstName?: string | null; lastName?: string | null }; assignee?: { email: string } | null };
+type ManagedReport = Report & {
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  reporter?: {
+    email: string;
+    firstName?: string | null;
+    lastName?: string | null;
+  };
+  assignee?: { email: string } | null;
+  evidence?: {
+    id: string;
+    url: string;
+    type: string;
+  }[];
+};
+
+function ReportImage({
+  reportId,
+  evidenceId,
+}: {
+  reportId: string;
+  evidenceId: string;
+}) {
+  const [imageUrl, setImageUrl] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    let url = '';
+    let active = true;
+
+    async function loadImage() {
+      try {
+        const response = await api.get(
+          `/denuncias/${reportId}/evidencia/${evidenceId}`,
+          { responseType: 'blob' },
+        );
+
+        url = URL.createObjectURL(response.data);
+
+        if (active) {
+          setImageUrl(url);
+        } else {
+          URL.revokeObjectURL(url);
+        }
+      } catch {
+        // Si falla la foto, el reporte igualmente se muestra.
+      }
+    }
+
+    void loadImage();
+
+    return () => {
+      active = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [reportId, evidenceId]);
+
+useEffect(() => {
+  if (!expanded) return;
+
+  function handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      setExpanded(false);
+    }
+  }
+
+  window.addEventListener('keydown', handleKeyDown);
+
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+  };
+}, [expanded]);
+
+  if (!imageUrl) return null;
+
+return (
+  <>
+    <button
+      type="button"
+      onClick={() => setExpanded(true)}
+      aria-label="Ampliar foto del reporte"
+      style={{
+        display: 'block',
+        padding: 0,
+        border: 0,
+        background: 'none',
+        cursor: 'pointer',
+        marginTop: '12px',
+      }}
+    >
+      <img
+        src={imageUrl}
+        alt="Foto adjunta al reporte"
+        style={{
+          display: 'block',
+          width: '180px',
+          maxHeight: '140px',
+          objectFit: 'cover',
+          borderRadius: '8px',
+        }}
+      />
+    </button>
+
+    {expanded && (
+      <div
+        onClick={() => setExpanded(false)}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1000,
+          background: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          cursor: 'default',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          aria-label="Cerrar foto"
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            fontSize: '28px',
+            cursor: 'pointer',
+          }}
+        >
+          ×
+        </button>
+
+        <img
+          src={imageUrl}
+          alt="Foto ampliada del reporte"
+          onClick={(event) => event.stopPropagation()}
+          style={{
+            maxWidth: '100%',
+            maxHeight: '90vh',
+            objectFit: 'contain',
+            cursor: 'default',
+          }}
+        />
+      </div>
+    )}
+  </>
+);
+
+}
+
 function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => void }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [filter, setFilter] = useState('active');
@@ -23,6 +174,18 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
   }
 
   useEffect(() => { void loadReports(); }, [filter]);
+
+  async function archiveReport(id: string) {
+  try {
+    await api.patch(`/denuncias/${id}/archivar`);
+    await loadReports();
+  } catch (archiveError: any) {
+    setError(
+      archiveError.response?.data?.message ??
+        'No se pudo archivar la denuncia.',
+    );
+  }
+}
 
   async function takeReport(id: string) {
     try {
@@ -42,7 +205,8 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
     }
   }
 
-  return <main className="app-shell"><section className="dashboard management-dashboard"><header className="dashboard-header"><div><span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span><h1>Bandeja de denuncias</h1></div><button className="secondary" onClick={onLogout}>Cerrar sesión</button></header><div className="management-toolbar"><div><strong>{reports.length}</strong><span> casos en esta vista</span></div><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="active">Activas</option><option value="PENDIENTE">Pendientes</option><option value="ASIGNADO">Asignadas</option><option value="EN_REVISION">En espera</option><option value="RESUELTO">Hechas</option><option value="RECHAZADO">Denegadas</option></select></div>{error && <p className="error management-error">{error}</p>}<section className="management-list">{reports.length === 0 ? <p className="empty-state">No hay denuncias en esta vista.</p> : reports.map((item) => <article className="management-item" key={item.id}><div className="management-item-copy"><span className="status-label">{item.status}</span><h2>{item.title}</h2><p>{item.description}</p><small>{item.address || 'Ubicación sin dirección'} · Reportado por {item.reporter?.firstName || item.reporter?.email || 'ciudadano'}</small> {item.latitude != null && item.longitude != null && (
+  return <main className="app-shell"><section className="dashboard management-dashboard"><header className="dashboard-header"><div><span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span><h1>Bandeja de denuncias</h1></div><button className="secondary" onClick={onLogout}>Cerrar sesión</button></header><div className="management-toolbar"><div><strong>{reports.length}</strong><span> casos en esta vista</span></div><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="active">Activas</option><option value="PENDIENTE">Pendientes</option><option value="ASIGNADO">Asignadas</option><option value="EN_REVISION">En espera</option><option value="RESUELTO">Hechas</option><option value="RECHAZADO">Denegadas</option><option value="archived">Archivadas</option></select></div>{error && <p className="error management-error">{error}</p>}<section className="management-list">{reports.length === 0 ? <p className="empty-state">No hay denuncias en esta vista.</p> : reports.map((item) => <article className="management-item" key={item.id}><div className="management-item-copy"><span className="status-label">{item.status}</span><h2>{item.title}</h2><p>{item.description}</p><small>{item.address || 'Ubicación sin dirección'} · Reportado por {item.reporter?.firstName || item.reporter?.email || 'ciudadano'}</small> {item.latitude != null && item.longitude != null && (
+ 
   <a
     href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
     target="_blank"
@@ -50,7 +214,28 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
   >
     Ver en el mapa
   </a>
-)} </div><div className="management-actions">{!item.assignee && <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>}{item.assignee && <><button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>En espera</button><button onClick={() => changeStatus(item.id, 'RESUELTO')}>Hecha</button><button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>Denegar</button></>}</div></article>)}</section></section></main>;
+)}
+
+{item.evidence?.map((photo) => (
+  <ReportImage
+    key={photo.id}
+    reportId={item.id}
+    evidenceId={photo.id}
+  />
+))}
+
+ </div><div className="management-actions">{!item.assignee && <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>}{item.assignee && <><button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>En espera</button><button onClick={() => changeStatus(item.id, 'RESUELTO')}>Hecha</button><button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>Denegar</button></>}
+
+{item.status === 'RECHAZADO' && filter !== 'archived' && (
+  <button
+    className="secondary"
+    onClick={() => archiveReport(item.id)}
+  >
+    Archivar
+  </button>
+)}
+
+</div></article>)}</section></section></main>;
 }
 
 function App() {
