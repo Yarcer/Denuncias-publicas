@@ -101,6 +101,7 @@ model Report {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   resolvedAt  DateTime?
+    archivedAt  DateTime?
 
   @@index([reporterId])
   @@index([assigneeId])

@@ -37,22 +37,10 @@ async function main() {
   });
 
   const categories = [
-    { name: 'Infraestructura', type: 'URBANO' },
-    { name: 'Alteración del orden público', type: 'POLICIAL' },
-    { name: 'Limpieza en la vía pública', type: 'URBANO' },
-    { name: 'Baches o calles en mal estado', type: 'URBANO' },
-    { name: 'Semáforos dañados o fuera de funcionamiento', type: 'URBANO' },
-    { name: 'Señalización dañada o faltante', type: 'URBANO' },
-    { name: 'Luminarias públicas dañadas', type: 'URBANO' },
-    { name: 'Alcantarillas tapadas o dañadas', type: 'URBANO' },
-    { name: 'Acumulación excesiva de basura', type: 'URBANO' },
-    { name: 'Contenedores llenos o dañados', type: 'URBANO' },
-    { name: 'Contenedores faltantes', type: 'URBANO' },
-    { name: 'Presencia de escombros', type: 'URBANO' },
-    { name: 'Animales sueltos', type: 'URBANO' },
-    { name: 'Ruidos molestos', type: 'URBANO' },
-    { name: 'Obstrucción de la vía pública', type: 'URBANO' },
-  ];
+  { name: 'Infraestructura', type: 'URBANO' },
+  { name: 'Limpieza', type: 'URBANO' },
+  { name: 'Convivencia', type: 'URBANO' },
+];
 
   for (const category of categories) {
     const slug = category.name
