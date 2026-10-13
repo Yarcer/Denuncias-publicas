@@ -307,11 +307,9 @@ textarea {
   padding: 18px 42px;
   border-bottom: 1px solid #eef2f7;
   background:
-    linear-gradient(
-      90deg,
+    linear-gradient(90deg,
       rgba(239, 246, 255, 0.95),
-      rgba(255, 255, 255, 0.95)
-    );
+      rgba(255, 255, 255, 0.95));
 }
 
 .dashboard-header h1 {
@@ -350,7 +348,7 @@ textarea {
   color: #f8fafc;
 }
 
-.panel-heading > strong {
+.panel-heading>strong {
   font-size: 2rem;
   color: #38bdf8;
 }
@@ -371,7 +369,7 @@ textarea {
   color: #cbd5e1;
 }
 
-.report-item > span {
+.report-item>span {
   color: #7dd3fc;
   background: rgba(56, 189, 248, 0.10);
   padding: 6px 10px;
@@ -556,12 +554,10 @@ textarea {
   align-items: flex-start;
 
   background:
-    linear-gradient(
-      145deg,
+    linear-gradient(145deg,
       #eaf4ff 0%,
       #dbeafe 50%,
-      #eff6ff 100%
-    );
+      #eff6ff 100%);
 }
 
 .auth-logo {
@@ -607,21 +603,17 @@ textarea {
 
 .hero-copy {
   padding: 60px 50px;
-  background: linear-gradient(
-    145deg,
-    #dbeafe 0%,
-    #eff6ff 55%,
-    #e0f2fe 100%
-  );
+  background: linear-gradient(145deg,
+      #dbeafe 0%,
+      #eff6ff 55%,
+      #e0f2fe 100%);
 }
 
 .auth-form {
   justify-content: center;
-  background: linear-gradient(
-    180deg,
-    #f8fbff 0%,
-    #edf5ff 100%
-  );
+  background: linear-gradient(180deg,
+      #f8fbff 0%,
+      #edf5ff 100%);
 }
 
 /* ===== NUEVO DISEÑO DEL LOGIN ===== */
@@ -665,12 +657,10 @@ textarea {
   align-items: flex-start;
 
   background:
-    linear-gradient(
-      145deg,
+    linear-gradient(145deg,
       #bfdbfe 0%,
       #dbeafe 45%,
-      #e0f2fe 100%
-    );
+      #e0f2fe 100%);
 }
 
 .auth-logo {
@@ -717,12 +707,10 @@ textarea {
   justify-content: center;
 
   background:
-    linear-gradient(
-      160deg,
+    linear-gradient(160deg,
       #eff6ff 0%,
       #e8f2ff 50%,
-      #dbeafe 100%
-    );
+      #dbeafe 100%);
 }
 
 .auth-form h2 {
@@ -767,11 +755,9 @@ textarea {
 
 .auth-form button[type="submit"] {
   background:
-    linear-gradient(
-      135deg,
+    linear-gradient(135deg,
       #2563eb,
-      #0ea5e9
-    );
+      #0ea5e9);
 
   box-shadow:
     0 10px 24px rgba(37, 99, 235, 0.22);
@@ -867,4 +853,157 @@ textarea {
   background: #f1f5f9;
   transform: none;
   box-shadow: none;
+}
+
+/* Agregar estas reglas al final de frontend/src/App.css */
+.management-board {
+  display: grid;
+  gap: 16px;
+  padding: 0 28px 28px;
+  overflow-x: auto;
+  align-items: start;
+}
+
+.management-board-active {
+  grid-template-columns: repeat(4, minmax(250px, 1fr));
+}
+
+.management-board-single {
+  grid-template-columns: minmax(280px, 520px);
+}
+
+.management-column {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #f1f5f9;
+}
+
+.management-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.management-column-header h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.management-column-header span {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 7px;
+  place-items: center;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.management-column-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.management-column-empty {
+  margin: 0;
+  padding: 18px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #64748b;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.management-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+}
+
+.management-card-copy h3 {
+  margin: 10px 0 6px;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.management-card-copy p {
+  margin: 0 0 10px;
+  color: #475569;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.management-card-copy small {
+  display: block;
+  color: #64748b;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.management-card-map {
+  display: inline-block;
+  margin-top: 10px;
+  color: #2563eb;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.management-card-map:hover {
+  text-decoration: underline;
+}
+
+.management-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.management-card-actions button {
+  flex: 1 1 125px;
+  padding: 9px 10px;
+  font-size: 0.82rem;
+}
+
+.management-card-actions .danger {
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+}
+
+@media (max-width: 1200px) {
+  .management-board-active {
+    grid-template-columns: repeat(2, minmax(250px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .management-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .management-error {
+    margin-right: 20px;
+    margin-left: 20px;
+  }
+
+  .management-board,
+  .management-board-active,
+  .management-board-single {
+    grid-template-columns: minmax(260px, 1fr);
+    padding-right: 20px;
+    padding-left: 20px;
+  }
 }

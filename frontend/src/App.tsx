@@ -165,7 +165,10 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
 
   async function loadReports(selectedStatus = filter) {
     try {
-      const response = await api.get('/denuncias/gestion/bandeja', selectedStatus === 'active' ? {} : { params: { status: selectedStatus } });
+      const response = await api.get(
+        '/denuncias/gestion/bandeja',
+        selectedStatus === 'active' ? {} : { params: { status: selectedStatus } },
+      );
       setReports(response.data.data.items);
       setError('');
     } catch (loadError: any) {
@@ -173,19 +176,20 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
     }
   }
 
-  useEffect(() => { void loadReports(); }, [filter]);
+  useEffect(() => {
+    void loadReports();
+  }, [filter]);
 
   async function archiveReport(id: string) {
-  try {
-    await api.patch(`/denuncias/${id}/archivar`);
-    await loadReports();
-  } catch (archiveError: any) {
-    setError(
-      archiveError.response?.data?.message ??
-        'No se pudo archivar la denuncia.',
-    );
+    try {
+      await api.patch(`/denuncias/${id}/archivar`);
+      await loadReports();
+    } catch (archiveError: any) {
+      setError(
+        archiveError.response?.data?.message ?? 'No se pudo archivar la denuncia.',
+      );
+    }
   }
-}
 
   async function takeReport(id: string) {
     try {
@@ -205,37 +209,140 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
     }
   }
 
-  return <main className="app-shell"><section className="dashboard management-dashboard"><header className="dashboard-header"><div><span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span><h1>Bandeja de denuncias</h1></div><button className="secondary" onClick={onLogout}>Cerrar sesión</button></header><div className="management-toolbar"><div><strong>{reports.length}</strong><span> casos en esta vista</span></div><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="active">Activas</option><option value="PENDIENTE">Pendientes</option><option value="ASIGNADO">Asignadas</option><option value="EN_REVISION">En espera</option><option value="RESUELTO">Hechas</option><option value="RECHAZADO">Denegadas</option><option value="archived">Archivadas</option></select></div>{error && <p className="error management-error">{error}</p>}<section className="management-list">{reports.length === 0 ? <p className="empty-state">No hay denuncias en esta vista.</p> : reports.map((item) => <article className="management-item" key={item.id}><div className="management-item-copy"><span className="status-label">{item.status}</span><h2>{item.title}</h2><p>{item.description}</p><small>{item.address || 'Ubicación sin dirección'} · Reportado por {item.reporter?.firstName || item.reporter?.email || 'ciudadano'}</small> {item.latitude != null && item.longitude != null && (
- 
-  <a
-    href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
-    target="_blank"
-    rel="noopener noreferrer"
-  >
-    Ver en el mapa
-  </a>
-)}
+  const activeColumns = [
+    { title: 'Pendientes', status: 'PENDIENTE' },
+    { title: 'En revisión', status: 'EN_REVISION' },
+    { title: 'Asignadas', status: 'ASIGNADO' },
+    { title: 'En proceso', status: 'EN_PROCESO' },
+  ];
 
-{item.evidence?.map((photo) => (
-  <ReportImage
-    key={photo.id}
-    reportId={item.id}
-    evidenceId={photo.id}
-  />
-))}
+  const filterLabels: Record<string, string> = {
+    PENDIENTE: 'Pendientes',
+    ASIGNADO: 'Asignadas',
+    EN_REVISION: 'En revisión',
+    EN_PROCESO: 'En proceso',
+    RESUELTO: 'Resueltas',
+    RECHAZADO: 'Denegadas',
+    archived: 'Archivadas',
+  };
 
- </div><div className="management-actions">{!item.assignee && <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>}{item.assignee && <><button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>En espera</button><button onClick={() => changeStatus(item.id, 'RESUELTO')}>Hecha</button><button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>Denegar</button></>}
+  const columns = filter === 'active'
+    ? activeColumns
+    : [{ title: filterLabels[filter] ?? 'Reportes', status: '' }];
 
-{item.status === 'RECHAZADO' && filter !== 'archived' && (
-  <button
-    className="secondary"
-    onClick={() => archiveReport(item.id)}
-  >
-    Archivar
-  </button>
-)}
+  return (
+    <main className="app-shell">
+      <section className="dashboard management-dashboard">
+        <header className="dashboard-header">
+          <div>
+            <span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span>
+            <h1>Bandeja de denuncias</h1>
+          </div>
+          <button className="secondary" onClick={onLogout}>Cerrar sesión</button>
+        </header>
 
-</div></article>)}</section></section></main>;
+        <div className="management-toolbar">
+          <div>
+            <strong>{reports.length}</strong>
+            <span> casos en esta vista</span>
+          </div>
+          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+            <option value="active">Activas · tablero</option>
+            <option value="PENDIENTE">Pendientes</option>
+            <option value="ASIGNADO">Asignadas</option>
+            <option value="EN_REVISION">En revisión</option>
+            <option value="EN_PROCESO">En proceso</option>
+            <option value="RESUELTO">Resueltas</option>
+            <option value="RECHAZADO">Denegadas</option>
+            <option value="archived">Archivadas</option>
+          </select>
+        </div>
+
+        {error && <p className="error management-error">{error}</p>}
+
+        <section className={`management-board ${filter === 'active' ? 'management-board-active' : 'management-board-single'}`}>
+          {columns.map((column) => {
+            const columnReports = column.status
+              ? reports.filter((item) => item.status === column.status)
+              : reports;
+
+            return (
+              <div className="management-column" key={column.title}>
+                <header className="management-column-header">
+                  <h2>{column.title}</h2>
+                  <span>{columnReports.length}</span>
+                </header>
+
+                <div className="management-column-cards">
+                  {columnReports.length === 0 ? (
+                    <p className="management-column-empty">No hay denuncias aquí.</p>
+                  ) : columnReports.map((item) => (
+                    <article className="management-card" key={item.id}>
+                      <div className="management-card-copy">
+                        <span className="status-label">{item.status.replace(/_/g, ' ')}</span>
+                        <h3>{item.title}</h3>
+                        <p>{item.description}</p>
+                        <small>
+                          {item.address || 'Ubicación sin dirección'} · Reportado por{' '}
+                          {item.reporter?.firstName || item.reporter?.email || 'ciudadano'}
+                        </small>
+
+                        {item.latitude != null && item.longitude != null && (
+                          <a
+                            className="management-card-map"
+                            href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Ver en el mapa
+                          </a>
+                        )}
+
+                        {item.evidence?.map((photo) => (
+                          <ReportImage
+                            key={photo.id}
+                            reportId={item.id}
+                            evidenceId={photo.id}
+                          />
+                        ))}
+                      </div>
+
+                      <div className="management-card-actions">
+                        {!item.assignee && (
+                          <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
+                        )}
+                        {item.assignee && (
+                          <>
+                            <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
+                              En revisión
+                            </button>
+                            <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
+                              Iniciar trabajo
+                            </button>
+                            <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
+                              Marcar resuelta
+                            </button>
+                            <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
+                              Denegar
+                            </button>
+                          </>
+                        )}
+                        {item.status === 'RECHAZADO' && filter !== 'archived' && (
+                          <button className="secondary" onClick={() => archiveReport(item.id)}>
+                            Archivar
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      </section>
+    </main>
+  );
 }
 
 function App() {
