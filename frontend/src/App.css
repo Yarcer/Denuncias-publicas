@@ -219,8 +219,6 @@ button.secondary:hover,
   color: #0f172a;
 }
 
-/* INPUTS */
-
 input,
 textarea,
 select {
@@ -594,7 +592,7 @@ textarea {
 }
 
 .auth-logo {
-  width: 220px;
+  width: 420px;
   max-width: 100%;
   height: auto;
   display: block;
@@ -664,7 +662,7 @@ textarea {
 }
 
 .auth-logo {
-  width: 280px;
+  width: 360px;
   max-width: 80%;
   height: auto;
 
@@ -698,25 +696,6 @@ textarea {
   color: #334155;
 }
 
-
-/* PARTE DERECHA */
-
-.auth-form {
-  padding: 70px 60px;
-
-  justify-content: center;
-
-  background:
-    linear-gradient(160deg,
-      #eff6ff 0%,
-      #e8f2ff 50%,
-      #dbeafe 100%);
-}
-
-.auth-form h2 {
-  font-size: 2rem;
-  margin-bottom: 18px;
-}
 
 
 /* CAMPOS */
@@ -1561,3 +1540,858 @@ textarea {
     grid-template-columns: minmax(260px, 1fr);
   }
 }
+
+/* Acceso público de PuntoReporte: estilos nuevos del login y sus tres rutas */
+.app-shell.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 4vw, 48px);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(59, 130, 246, 0.16), transparent 35%),
+    linear-gradient(135deg, #eaf5ff 0%, #f6fbff 54%, #e2f4ff 100%);
+}
+
+.auth-card.auth-card-redesign {
+  width: min(1180px, 96vw);
+  min-height: min(760px, calc(100vh - 64px));
+  display: grid;
+  /* La foto queda como panel lateral; el formulario tiene más espacio. */
+  grid-template-columns: minmax(320px, 0.82fr) minmax(500px, 1.18fr);
+  overflow: hidden;
+  border: 1px solid rgba(148, 190, 226, 0.52);
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(15, 45, 80, 0.18);
+}
+
+.auth-photo-panel {
+  position: relative;
+  display: flex;
+  min-height: 650px;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  isolation: isolate;
+  padding: clamp(30px, 4vw, 60px);
+  color: #fff;
+  background: #16466e;
+}
+
+.auth-photo-image,
+.auth-photo-overlay {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.auth-photo-image {
+  object-fit: cover;
+  object-position: center;
+  filter: none;
+  transform: none;
+}
+
+/* Sombra neutra solo en la parte inferior para que el texto se lea. */
+.auth-photo-overlay {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.12) 58%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+.auth-photo-copy {
+  max-width: 540px;
+  margin-bottom: 52px;
+}
+
+.auth-photo-kicker,
+.auth-section-label {
+  display: inline-block;
+  color: #1374d1;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+.auth-photo-kicker {
+  margin-bottom: 16px;
+  color: #d9f5ff;
+}
+
+.auth-photo-copy h1 {
+  max-width: 520px;
+  margin: 0 0 18px;
+  color: #fff;
+  font-size: clamp(2.5rem, 4.1vw, 4.25rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+}
+
+.auth-photo-copy p {
+  max-width: 460px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.auth-photo-location {
+  position: absolute;
+  bottom: 24px;
+  left: clamp(30px, 4vw, 60px);
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+}
+
+.auth-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(32px, 5vw, 68px) clamp(28px, 5.2vw, 74px);
+  background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+}
+
+.auth-panel-logo {
+  display: block;
+  width: min(300px, 82%);
+  height: auto;
+  align-self: center;
+  margin: 0 auto 28px;
+  border-radius: 14px;
+}
+
+.auth-route-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid #d9e4f0;
+}
+
+.auth-route-nav a {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 8px 13px;
+  border-bottom: 3px solid transparent;
+  border-radius: 9px 9px 0 0;
+  color: #53647b;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.auth-route-nav a:hover {
+  color: #155cb6;
+  background: #f1f7ff;
+}
+
+.auth-route-nav a.active {
+  border-bottom-color: #1686e8;
+  color: #075fc2;
+  background: #eef6ff;
+}
+
+.auth-route-nav a:focus-visible,
+.auth-submit:focus-visible {
+  outline: 3px solid rgba(14, 165, 233, 0.38);
+  outline-offset: 3px;
+}
+
+.auth-form-redesign,
+.auth-anonymous-content {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-form.auth-form-redesign {
+  padding: 0;
+  justify-content: flex-start;
+  background: transparent;
+}
+
+.auth-form-redesign .auth-section-label,
+.auth-anonymous-content .auth-section-label {
+  margin-bottom: -10px;
+}
+
+.auth-form-redesign h2,
+.auth-anonymous-content h2 {
+  margin: 0;
+  color: #11233b;
+  font-size: clamp(1.7rem, 2.4vw, 2.15rem);
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.auth-form-intro,
+.auth-anonymous-content>p:not(.error) {
+  margin: -8px 0 4px;
+  color: #66768a;
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.auth-form-redesign label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #273a52;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.auth-form-redesign input {
+  width: 100%;
+  min-height: 54px;
+  padding: 13px 15px;
+  border: 1px solid #cbdced;
+  border-radius: 11px;
+  background: #fbfdff;
+  color: #14263e;
+  font: inherit;
+  font-size: 0.96rem;
+  font-weight: 400;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.auth-form-redesign input::placeholder {
+  color: #9aa9ba;
+}
+
+.auth-form-redesign input:focus {
+  border-color: #1686e8;
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(22, 134, 232, 0.13);
+}
+
+.auth-name-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.auth-submit {
+  display: flex;
+  width: 100%;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 5px;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(105deg, #2169e8 0%, #0aa7d8 100%);
+  box-shadow: 0 10px 22px rgba(24, 116, 211, 0.2);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 800;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.auth-form-redesign button.auth-submit {
+  background: linear-gradient(105deg, #2169e8 0%, #0aa7d8 100%);
+  box-shadow: 0 10px 22px rgba(24, 116, 211, 0.2);
+}
+
+.auth-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 13px 26px rgba(24, 116, 211, 0.26);
+}
+
+.auth-helper-text {
+  display: block;
+  margin-top: 2px;
+  color: #718198;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.auth-panel-footer {
+  margin: 34px 0 0;
+  color: #8b9bad;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .auth-card.auth-card-redesign {
+    width: min(100%, 860px);
+    grid-template-columns: minmax(280px, 0.72fr) minmax(420px, 1.28fr);
+  }
+
+  .auth-photo-panel {
+    padding: 34px;
+  }
+
+  .auth-photo-copy h1 {
+    font-size: clamp(2.1rem, 4vw, 3.3rem);
+  }
+
+  .auth-photo-location {
+    left: 34px;
+  }
+
+  .auth-panel {
+    padding: 36px 30px;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell.auth-shell {
+    display: block;
+    padding: 14px;
+  }
+
+  .auth-card.auth-card-redesign {
+    width: 100%;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    border-radius: 20px;
+  }
+
+  .auth-photo-panel {
+    min-height: 265px;
+    padding: 28px 24px 54px;
+  }
+
+  .auth-photo-copy {
+    margin: 0;
+  }
+
+  .auth-photo-copy h1 {
+    max-width: 430px;
+    margin: 10px 0;
+    font-size: clamp(2rem, 8vw, 2.7rem);
+  }
+
+  .auth-photo-copy p {
+    max-width: 440px;
+    font-size: 0.94rem;
+  }
+
+  .auth-photo-kicker {
+    margin-bottom: 6px;
+  }
+
+  .auth-photo-location {
+    bottom: 18px;
+    left: 24px;
+  }
+
+  .auth-panel {
+    padding: 28px 22px 24px;
+  }
+
+  .auth-panel-logo {
+    width: min(220px, 82%);
+    margin-bottom: 20px;
+  }
+
+  .auth-route-nav {
+    gap: 0;
+    margin-bottom: 24px;
+  }
+
+  .auth-route-nav a {
+    min-height: 58px;
+    padding: 8px 5px 10px;
+    font-size: 0.78rem;
+  }
+
+  .auth-name-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Ajustes solicitados: fondo más definido y tarjeta compacta sin scroll interno. */
+.app-shell.auth-shell {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+  padding: clamp(12px, 2vh, 24px);
+  background: #14243a;
+}
+
+.auth-background {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.auth-photo-image,
+.auth-photo-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.auth-photo-image {
+  z-index: 0;
+  object-fit: cover;
+  object-position: center;
+  filter: brightness(0.76) saturate(0.9);
+  transform: scale(1.02);
+}
+
+.auth-photo-overlay {
+  z-index: 1;
+  background: linear-gradient(135deg,
+      rgba(9, 31, 57, 0.22),
+      rgba(9, 31, 57, 0.42));
+}
+
+.auth-panel {
+  position: relative;
+  z-index: 1;
+  width: min(650px, calc(100vw - 32px));
+  height: min(740px, calc(100vh - 32px));
+  height: min(740px, calc(100svh - 32px));
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(18px, 3vh, 34px) clamp(24px, 5vw, 52px);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 72px rgba(5, 20, 40, 0.36);
+  backdrop-filter: blur(8px);
+}
+
+.auth-panel-logo {
+  width: min(290px, 78%);
+  max-height: 68px;
+  margin-bottom: 16px;
+  object-fit: contain;
+}
+
+.auth-route-nav {
+  gap: 2px;
+  margin-bottom: 18px;
+}
+
+.auth-route-nav a {
+  min-height: 46px;
+  gap: 7px;
+  padding: 7px 5px 9px;
+  font-size: 0.82rem;
+}
+
+.auth-route-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.auth-form-redesign,
+.auth-anonymous-content {
+  gap: 11px;
+}
+
+.auth-form-redesign h2,
+.auth-anonymous-content h2 {
+  font-size: clamp(1.45rem, 2.4vh, 1.8rem);
+}
+
+.auth-form-intro,
+.auth-anonymous-content>p:not(.error) {
+  margin: -5px 0 1px;
+  font-size: 0.88rem;
+}
+
+.auth-form-redesign label {
+  gap: 5px;
+  font-size: 0.82rem;
+}
+
+.auth-form-redesign input {
+  min-height: 44px;
+  padding: 9px 12px;
+  font-size: 0.9rem;
+}
+
+.auth-submit {
+  min-height: 46px;
+  margin-top: 2px;
+  padding: 10px 16px;
+}
+
+.auth-panel-footer {
+  margin-top: 14px;
+}
+
+@media (max-height: 760px) {
+  .auth-panel {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .auth-panel-logo {
+    width: min(245px, 72%);
+    max-height: 54px;
+    margin-bottom: 10px;
+  }
+
+  .auth-route-nav {
+    margin-bottom: 12px;
+  }
+
+  .auth-form-redesign,
+  .auth-anonymous-content {
+    gap: 8px;
+  }
+
+  .auth-form-redesign input {
+    min-height: 40px;
+  }
+
+  .auth-submit {
+    min-height: 42px;
+  }
+
+  .auth-panel-footer {
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 720px) {
+  .auth-panel {
+    width: calc(100vw - 24px);
+    height: min(700px, calc(100vh - 24px));
+    height: min(700px, calc(100svh - 24px));
+    padding: 18px 16px;
+    border-radius: 20px;
+  }
+
+  .auth-panel-logo {
+    width: min(235px, 76%);
+    max-height: 56px;
+    margin-bottom: 12px;
+  }
+
+  .auth-route-nav {
+    margin-bottom: 14px;
+  }
+
+  .auth-route-nav a {
+    min-height: 48px;
+    gap: 4px;
+    padding: 6px 3px 8px;
+    font-size: 0.72rem;
+  }
+
+  .auth-route-icon {
+    width: 14px;
+    height: 14px;
+    flex-basis: 14px;
+  }
+}
+
+/* Logo independiente y tarjeta fija para las tres opciones de acceso */
+.auth-access-stack {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(600px, calc(100vw - 32px));
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-brand-logo {
+  display: block;
+  width: min(560px, calc(100% - 24px));
+  height: clamp(84px, 12svh, 112px);
+  margin: 0;
+  padding: 8px 22px;
+  object-fit: contain;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 12px 34px rgba(5, 20, 40, 0.26);
+}
+
+.auth-panel {
+  width: 100%;
+  height: min(620px, calc(100svh - 150px));
+  padding: 20px clamp(20px, 4vw, 40px);
+  justify-content: flex-start;
+}
+
+.auth-route-nav {
+  margin-bottom: 14px;
+}
+
+.auth-route-nav a {
+  min-height: 50px;
+  font-size: 0.92rem;
+}
+
+.auth-form-redesign,
+.auth-anonymous-content {
+  gap: 13px;
+}
+
+.auth-form-redesign h2,
+.auth-anonymous-content h2 {
+  font-size: 1.8rem;
+}
+
+.auth-form-intro,
+.auth-anonymous-content>p:not(.error) {
+  font-size: 1rem;
+}
+
+.auth-form-redesign label {
+  font-size: 0.95rem;
+}
+
+.auth-form-redesign input {
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+.auth-submit {
+  min-height: 50px;
+  font-size: 1rem;
+}
+
+.auth-panel-footer {
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .auth-access-stack {
+    width: calc(100vw - 24px);
+    gap: 8px;
+  }
+
+  .auth-brand-logo {
+    width: calc(100% - 16px);
+    height: 84px;
+    padding: 6px 16px;
+  }
+
+  .auth-panel {
+    height: min(620px, calc(100svh - 132px));
+    padding: 16px 14px;
+  }
+
+  .auth-route-nav a {
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-height: 680px) {
+  .auth-brand-logo {
+    height: 70px;
+  }
+
+  .auth-panel {
+    height: calc(100svh - 120px);
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .auth-form-redesign,
+  .auth-anonymous-content {
+    gap: 8px;
+  }
+
+  .auth-form-redesign input {
+    min-height: 42px;
+  }
+}
+
+/* El logo queda suelto sobre la foto, sin una placa blanca */
+.auth-access-stack {
+  width: min(760px, calc(100vw - 24px));
+  gap: 0;
+}
+
+.auth-brand-logo {
+  width: min(740px, 100%);
+  height: clamp(120px, 17svh, 165px);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+
+.auth-panel {
+  width: min(600px, 100%);
+  height: min(600px, calc(100svh - 190px));
+}
+
+@media (max-width: 720px) {
+  .auth-access-stack {
+    width: calc(100vw - 24px);
+  }
+
+  .auth-brand-logo {
+    height: clamp(100px, 15svh, 135px);
+  }
+
+  .auth-panel {
+    height: min(590px, calc(100svh - 160px));
+  }
+}
+
+@media (max-height: 680px) {
+  .auth-brand-logo {
+    height: 92px;
+  }
+
+  .auth-panel {
+    height: calc(100svh - 116px);
+  }
+}
+
+/* Corrección según la captura: logo realmente más grande y sin placa */
+.auth-access-stack {
+  position: relative;
+  z-index: auto;
+  width: min(760px, calc(100vw - 24px));
+  gap: 0;
+}
+
+.auth-brand-logo {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: min(740px, 100%);
+  height: 250px;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  object-fit: contain;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  mix-blend-mode: multiply;
+}
+
+
+@media (max-height: 680px) {
+  .auth-brand-logo {
+    height: 170px;
+  }
+
+  .auth-panel {
+    height: calc(100svh - 195px);
+  }
+
+  .auth-form-redesign,
+  .auth-anonymous-content {
+    gap: 8px;
+  }
+
+  .auth-form-redesign input {
+    min-height: 40px;
+  }
+}
+
+/* Placa prolija para el logo: conserva sus colores y aprovecha el blanco del JPG */
+.auth-access-stack {
+  width: min(600px, calc(100vw - 24px));
+  gap: 12px;
+}
+
+.auth-brand-logo {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: min(560px, 100%);
+  height: 210px;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  object-fit: cover;
+  object-position: center;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 16px 38px rgba(5, 20, 40, 0.3);
+  mix-blend-mode: normal;
+}
+
+.auth-panel {
+  width: min(600px, 100%);
+  height: min(500px, calc(100svh - 250px));
+}
+
+@media (max-height: 680px) {
+  .auth-brand-logo {
+    height: 150px;
+  }
+
+  .auth-panel {
+    height: calc(100svh - 190px);
+  }
+}
+
+.auth-access-stack {
+  position: relative;
+  z-index: auto;
+  width: min(600px, calc(100vw - 24px));
+  gap: 10px;
+}
+
+.auth-brand-logo {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: min(360px, 100%);
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  object-fit: contain;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  mix-blend-mode: normal;
+}
+
+@media (max-width: 720px) {
+  .auth-brand-logo {
+    width: min(340px, 100%);
+  }
+}
+

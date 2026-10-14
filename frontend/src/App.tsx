@@ -3,7 +3,16 @@ import './App.css';
 import { api } from './lib/api';
 import { useAuthStore } from './stores/auth-store';
 import CrearDenuncia from './pages/CrearDenuncia'
-import puntoReporteLogo from './assets/puntoreporte-logo.jpg';
+import puntoReporteLogo from './assets/puntoreporte-logo.png';
+import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
+
+type AuthRoute = 'login' | 'register' | 'anonymous';
+
+function getAuthRoute(pathname = window.location.pathname): AuthRoute {
+  if (pathname === '/registro') return 'register';
+  if (pathname === '/anonimo') return 'anonymous';
+  return 'login';
+}
 
 type Report = { id: string; title: string; description: string; status: string };
 type ManagedReport = Report & {
@@ -442,13 +451,38 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
 
 function App() {
   const { user, setSession, clearSession } = useAuthStore();
-  const [registering, setRegistering] = useState(false);
+  const [authRoute, setAuthRoute] = useState<AuthRoute>(() =>
+    getAuthRoute(),
+  );
+  const registering = authRoute === 'register';
   const [credentials, setCredentials] = useState({ email: '', password: '', firstName: '', lastName: '' });
   const [reports, setReports] = useState<Report[]>([]);
   const [error, setError] = useState('');
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
   const [vistaCiudadano, setVistaCiudadano] =
     useState<'crear' | 'reportes'>('crear');
+
+  function navigateAuth(route: AuthRoute) {
+    const routePaths: Record<AuthRoute, string> = {
+      login: '/login',
+      register: '/registro',
+      anonymous: '/anonimo',
+    };
+
+    window.history.pushState({}, '', routePaths[route]);
+    setAuthRoute(route);
+    setError('');
+  }
+
+  useEffect(() => {
+    function handlePopState() {
+      setAuthRoute(getAuthRoute());
+      setError('');
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -505,109 +539,182 @@ function App() {
 
   if (!user) {
     return (
-      <main className="app-shell">
-        <section className="auth-card">
-          <div className="hero-copy">
-            <img
-              src={puntoReporteLogo}
-              alt="PuntoReporte"
-              className="auth-logo"
-            />
+      <main className="app-shell auth-shell">
+        <div className="auth-background" aria-hidden="true">
+          <img
+            className="auth-photo-image"
+            src={plazaConstitucionMelo}
+            alt=""
+          />
+          <div className="auth-photo-overlay" />
+        </div>
 
-            <span className="eyebrow">Reportes públicos</span>
+        <div className="auth-access-stack">
+          <img
+            src={puntoReporteLogo}
+            alt="PuntoReporte"
+            className="auth-brand-logo"
+          />
 
-            <h1>Tu ciudad también se cuida reportando.</h1>
+          <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
 
-            <p>
-              Registrá incidentes y consultá el avance de cada reporte desde un solo lugar.
-            </p>
-          </div>
+            <nav className="auth-route-nav" aria-label="Opciones de acceso">
+              <a
+                href="/login"
+                className={authRoute === 'login' ? 'active' : ''}
+                aria-current={authRoute === 'login' ? 'page' : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('login');
+                }}
+              >
+                <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
+                  <path d="M10 17l5-5-5-5M15 12H4" />
+                </svg>
+                <span>Iniciar sesión</span>
+              </a>
+              <a
+                href="/registro"
+                className={authRoute === 'register' ? 'active' : ''}
+                aria-current={authRoute === 'register' ? 'page' : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('register');
+                }}
+              >
+                <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M15 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-4A4.5 4.5 0 0 0 2 18.5V20" />
+                  <circle cx="8.5" cy="6.5" r="4" />
+                  <path d="M19 8v6M16 11h6" />
+                </svg>
+                <span>Crear cuenta</span>
+              </a>
+              <a
+                href="/anonimo"
+                className={authRoute === 'anonymous' ? 'active' : ''}
+                aria-current={authRoute === 'anonymous' ? 'page' : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('anonymous');
+                }}
+              >
+                Entrar como anónimo
+              </a>
+            </nav>
 
-          <form className="auth-form" onSubmit={handleAuth}>
-            <h2>{registering ? 'Crear cuenta' : 'Iniciar sesión'}</h2>
-
-            {registering && (
-              <div className="form-row">
-                <input
-                  placeholder="Nombre"
-                  value={credentials.firstName}
-                  onChange={(event) =>
-                    setCredentials({
-                      ...credentials,
-                      firstName: event.target.value,
-                    })
-                  }
-                />
-
-                <input
-                  placeholder="Apellido"
-                  value={credentials.lastName}
-                  onChange={(event) =>
-                    setCredentials({
-                      ...credentials,
-                      lastName: event.target.value,
-                    })
-                  }
-                />
+            {authRoute === 'anonymous' ? (
+              <div className="auth-anonymous-content">
+                <h2>Ingresar como anónimo</h2>
+                <p>
+                  Podés continuar sin crear una cuenta. La sesión será temporal.
+                </p>
+                {error && <p className="error">{error}</p>}
+                <button
+                  type="button"
+                  className="auth-submit"
+                  onClick={handleAnonymousLogin}
+                >
+                  Continuar como anónimo
+                </button>
+                <small className="auth-helper-text">
+                  Para consultar tus reportes luego, te recomendamos crear una cuenta.
+                </small>
               </div>
+            ) : (
+              <form className="auth-form auth-form-redesign" onSubmit={handleAuth}>
+                <span className="auth-section-label">
+
+                </span>
+                <h2>{registering ? 'Crear cuenta' : 'Bienvenido/a'}</h2>
+                <p className="auth-form-intro">
+                </p>
+
+                {registering && (
+                  <div className="auth-name-fields">
+                    <label>
+                      Nombre
+                      <input
+                        required
+                        autoComplete="given-name"
+                        placeholder="Tu nombre"
+                        value={credentials.firstName}
+                        onChange={(event) =>
+                          setCredentials({
+                            ...credentials,
+                            firstName: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Apellido
+                      <input
+                        required
+                        autoComplete="family-name"
+                        placeholder="Tu apellido"
+                        value={credentials.lastName}
+                        onChange={(event) =>
+                          setCredentials({
+                            ...credentials,
+                            lastName: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+                )}
+
+                <label htmlFor="auth-email">
+                  Correo electrónico
+                  <input
+                    id="auth-email"
+                    required
+                    type="email"
+                    autoComplete="email"
+                    placeholder="nombre@correo.com"
+                    value={credentials.email}
+                    onChange={(event) =>
+                      setCredentials({
+                        ...credentials,
+                        email: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label htmlFor="auth-password">
+                  Contraseña
+                  <input
+                    id="auth-password"
+                    required
+                    minLength={6}
+                    type="password"
+                    autoComplete={registering ? 'new-password' : 'current-password'}
+                    placeholder="Ingresá tu contraseña"
+                    value={credentials.password}
+                    onChange={(event) =>
+                      setCredentials({
+                        ...credentials,
+                        password: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                {error && <p className="error">{error}</p>}
+
+                <button type="submit" className="auth-submit">
+                  {registering ? 'Crear mi cuenta' : 'Entrar'}
+                </button>
+              </form>
             )}
 
-            <input
-              required
-              type="email"
-              placeholder="Correo electrónico"
-              value={credentials.email}
-              onChange={(event) =>
-                setCredentials({
-                  ...credentials,
-                  email: event.target.value,
-                })
-              }
-            />
-
-            <input
-              required
-              minLength={6}
-              type="password"
-              placeholder="Contraseña"
-              value={credentials.password}
-              onChange={(event) =>
-                setCredentials({
-                  ...credentials,
-                  password: event.target.value,
-                })
-              }
-            />
-
-            {error && <p className="error">{error}</p>}
-
-            <button type="submit">
-              {registering ? 'Registrarme' : 'Entrar'}
-            </button>
-
-            <button
-              type="button"
-              className="link-button"
-              onClick={() => setRegistering(!registering)}
-            >
-              {registering ? 'Ya tengo una cuenta' : 'Crear una cuenta'}
-            </button>
-
-            <span className="divider">o</span>
-
-            <button
-              type="button"
-              className="secondary"
-              onClick={handleAnonymousLogin}
-            >
-              Entrar como visitante
-            </button>
-
-            <small className="helper-text">
-              La sesión de visitante es temporal y no requiere registro.
-            </small>
-          </form>
-        </section>
+            <p className="auth-panel-footer">
+              Reportá. Informá. Mejorá.
+            </p>
+          </section>
+        </div>
       </main>
     );
   }
