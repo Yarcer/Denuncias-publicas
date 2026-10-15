@@ -3,7 +3,7 @@
 Plataforma para registrar denuncias ciudadanas y permitir que entes públicos y administradores las gestionen.
 
 ## Requisitos
-
+ooo
 - Node.js
 - pnpm 10+
 - Docker Desktop
