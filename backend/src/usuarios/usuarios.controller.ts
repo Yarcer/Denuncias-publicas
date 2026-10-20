@@ -1,32 +1,46 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import type { Request } from 'express';
+import { CreateAdministrativeUserDto, UpdateAdministrativeUserDto, UpdateAdministrativeUserStatusDto } from './dto/administrative-user.dto';
 import { UsuariosService } from './usuarios.service';
 
+type AuthenticatedRequest = Request & {
+  user: { sub: string; role: string };
+};
+
 @Controller('usuarios')
+@UseGuards(AuthGuard('jwt'))
 export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
 
-  @Get()
-  @UseGuards(AuthGuard('jwt'))
-  findAll() {
-    return this.usuariosService.findAll();
+  @Get('administrativos')
+  findAdministrativeUsers(@Req() req: AuthenticatedRequest) {
+    return this.usuariosService.findAdministrativeUsers(req.user);
   }
 
-  @Get(':id')
-  @UseGuards(AuthGuard('jwt'))
-  findOne(@Param('id') id: string) {
-    return this.usuariosService.findOne(id);
+  @Post('administrativos')
+  createAdministrativeUser(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateAdministrativeUserDto,
+  ) {
+    return this.usuariosService.createAdministrativeUser(req.user, dto);
   }
 
-  @Post()
-  @UseGuards(AuthGuard('jwt'))
-  create(@Body() body: Record<string, unknown>) {
-    return this.usuariosService.create(body);
+  @Patch(':id/estado')
+  updateAdministrativeUserStatus(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateAdministrativeUserStatusDto,
+  ) {
+    return this.usuariosService.updateAdministrativeUserStatus(req.user, id, dto);
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt'))
-  update(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.usuariosService.update(id, body);
+  updateAdministrativeUser(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateAdministrativeUserDto,
+  ) {
+    return this.usuariosService.updateAdministrativeUser(req.user, id, dto);
   }
 }

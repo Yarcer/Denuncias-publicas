@@ -72,6 +72,7 @@ export class AuthService {
           email: `anon-${anonymousId}@anonymous.local`,
           passwordHash: await argon2.hash(randomUUID()),
           firstName: 'Visitante',
+          isAnonymous: true,
           role: 'CIUDADANO',
         },
       });
@@ -107,7 +108,7 @@ export class AuthService {
     });
   }
 
-  private publicUser(user: { id: string; email: string; role: string; status: string; firstName: string | null; lastName: string | null; phone: string | null; createdAt: Date; updatedAt: Date; }) {
+  private publicUser(user: { id: string; email: string; role: string; isAnonymous: boolean; status: string; firstName: string | null; lastName: string | null; phone: string | null; createdAt: Date; updatedAt: Date; }) {
     const { passwordHash, ...rest } = user as typeof user & { passwordHash?: string };
     return rest;
   }

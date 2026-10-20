@@ -5,6 +5,7 @@ type User = {
   id: string;
   email: string;
   role: string;
+  isAnonymous?: boolean;
   status: string;
   firstName?: string | null;
   lastName?: string | null;

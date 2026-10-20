@@ -3,6 +3,7 @@ import './App.css';
 import { api } from './lib/api';
 import { useAuthStore } from './stores/auth-store';
 import CrearDenuncia from './pages/CrearDenuncia'
+import GestionUsuarios from './pages/GestionUsuarios'
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
@@ -14,7 +15,7 @@ function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   return 'login';
 }
 
-type Report = { id: string; title: string; description: string; status: string };
+type Report = { id: string; title: string; description: string; status: string; priority?: string };
 type ManagedReport = Report & {
   address?: string | null;
   latitude?: number | null;
@@ -23,6 +24,7 @@ type ManagedReport = Report & {
     email: string;
     firstName?: string | null;
     lastName?: string | null;
+    isAnonymous: boolean;
   };
   assignee?: { email: string } | null;
   evidence?: {
@@ -167,8 +169,9 @@ function ReportImage({
 
 }
 
-function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => void }) {
+function ManagementDashboard({ isAdmin, currentUserId, onLogout }: { isAdmin: boolean; currentUserId: string; onLogout: () => void }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
+  const [managementView, setManagementView] = useState<'reports' | 'users'>('reports');
   const [filter, setFilter] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
@@ -276,8 +279,9 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
             </button>
             <button
               type="button"
-              className={!isArchivedView ? 'admin-nav-active' : ''}
+              className={managementView === 'reports' && !isArchivedView ? 'admin-nav-active' : ''}
               onClick={() => {
+                setManagementView('reports');
                 setFilter('active');
                 scrollToSection('admin-board');
               }}
@@ -286,11 +290,20 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
             </button>
             <button
               type="button"
-              className={isArchivedView ? 'admin-nav-active' : ''}
-              onClick={() => setFilter('archived')}
+              className={managementView === 'reports' && isArchivedView ? 'admin-nav-active' : ''}
+              onClick={() => { setManagementView('reports'); setFilter('archived'); }}
             >
               <span aria-hidden="true">▣</span> Archivadas
             </button>
+            {isAdmin && (
+              <button
+                type="button"
+                className={managementView === 'users' ? 'admin-nav-active' : ''}
+                onClick={() => setManagementView('users')}
+              >
+                <span aria-hidden="true">♙</span> Usuarios administrativos
+              </button>
+            )}
           </nav>
 
           <button type="button" className="admin-logout" onClick={onLogout}>
@@ -299,6 +312,10 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
         </aside>
 
         <section className="admin-main">
+          {managementView === 'users' && isAdmin ? (
+            <GestionUsuarios currentUserId={currentUserId} />
+          ) : (
+            <>
           <header className="admin-header">
             <div className="admin-page-title">
               <span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span>
@@ -380,14 +397,21 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
                     ) : columnReports.map((item) => (
                       <article className="admin-report-card" key={item.id}>
                         <div className="admin-report-copy">
-                          <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
-                            {item.status.replace(/_/g, ' ')}
-                          </span>
+                          <div className="admin-report-chips">
+                            <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
+                              {item.status.replace(/_/g, ' ')}
+                            </span>
+                            {isAdmin && item.priority && (
+                              <span className={`admin-priority-chip admin-priority-${item.priority.toLowerCase()}`}>
+                                Prioridad {item.priority.toLowerCase()}
+                              </span>
+                            )}
+                          </div>
                           <h4>{item.title}</h4>
                           <p>{item.description}</p>
                           <div className="admin-report-meta">
                             <span><b aria-hidden="true">⌖</b>{item.address || 'Ubicación sin dirección'}</span>
-                            <span><b aria-hidden="true">♙</b>{item.reporter?.firstName || item.reporter?.email || 'Ciudadano'}</span>
+                            <span><b aria-hidden="true">♙</b>{item.reporter?.isAnonymous ? 'Anónimo' : item.reporter?.firstName || item.reporter?.email || 'Ciudadano'}</span>
                           </div>
 
                           {item.latitude != null && item.longitude != null && (
@@ -443,6 +467,8 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
               );
             })}
           </section>
+            </>
+          )}
         </section>
       </div>
     </main>
@@ -720,7 +746,7 @@ function App() {
   }
 
   if (user.role === 'ENTE_PUBLICO' || user.role === 'ADMINISTRADOR') {
-    return <ManagementDashboard isAdmin={user.role === 'ADMINISTRADOR'} onLogout={clearSession} />;
+    return <ManagementDashboard isAdmin={user.role === 'ADMINISTRADOR'} currentUserId={user.id} onLogout={clearSession} />;
   }
   return (
     <main className="app-shell">

@@ -47,6 +47,7 @@ model User {
   email        String     @unique
   passwordHash String
   role         Role       @default(CIUDADANO)
+  isAnonymous  Boolean    @default(false)
   status       UserStatus @default(ACTIVO)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -107,6 +108,7 @@ model Report {
   @@index([assigneeId])
   @@index([status])
   @@index([type])
+  @@index([priority])
 }
 
 model Evidence {

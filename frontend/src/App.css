@@ -1358,6 +1358,44 @@ textarea {
   text-transform: uppercase;
 }
 
+.admin-report-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-priority-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.admin-priority-baja {
+  border-color: #f2c879;
+  background: #fff8e8;
+  color: #875000;
+}
+
+.admin-priority-alta,
+.admin-priority-urgente {
+  border-color: #8cc9ad;
+  background: #edf8f1;
+  color: #176b45;
+}
+
+.admin-priority-media {
+  border-color: #b8c7d9;
+  background: #f1f5f9;
+  color: #475569;
+}
+
 .admin-status-pendiente {
   background: #fff0cf;
   color: #8a4b00;
