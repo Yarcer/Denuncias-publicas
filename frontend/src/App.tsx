@@ -358,7 +358,7 @@ function ManagementDashboard({
   }
 
   return (
-    <main className="app-shell admin-app-shell">
+    <main className={`app-shell admin-app-shell ${isAdmin ? 'superadmin-shell' : 'entity-shell'}`}>
       <div className="admin-layout">
         <aside className="admin-sidebar">
           <div className="admin-brand" aria-label="PuntoReporte">
@@ -368,7 +368,7 @@ function ManagementDashboard({
 
           <nav className="admin-nav" aria-label="Navegación de administración">
             <button type="button" onClick={() => scrollToSection('admin-summary')}>
-              <span aria-hidden="true">⌂</span> Resumen
+              <span aria-hidden="true">⌂</span> Inicio
             </button>
             <button
               type="button"
@@ -378,7 +378,7 @@ function ManagementDashboard({
                 scrollToSection('admin-board');
               }}
             >
-              <span aria-hidden="true">▤</span> Bandeja de denuncias
+              <span aria-hidden="true">▤</span> Bandeja de reportes
             </button>
             <button
               type="button"
@@ -398,7 +398,7 @@ function ManagementDashboard({
           <header className="admin-header">
             <div className="admin-page-title">
               <span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span>
-              <h1>Bandeja de denuncias</h1>
+              <h1>Bandeja de reportes</h1>
               <p>Organiza y sigue los reportes de la ciudad.</p>
             </div>
 
