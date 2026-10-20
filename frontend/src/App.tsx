@@ -1,14 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import './App.css';
 import { api } from './lib/api';
+import { getApiErrorMessage } from './lib/api-error';
 import { useAuthStore } from './stores/auth-store';
 import CrearDenuncia from './pages/CrearDenuncia'
+import { formatReportIdentifier } from './lib/report-id';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
-type AuthRoute = 'login' | 'register' | 'anonymous';
+type AuthRoute = 'login' | 'register' | 'anonymous' | 'management-login';
 
 function getAuthRoute(pathname = window.location.pathname): AuthRoute {
+  if (pathname === '/gestion/login') return 'management-login';
   if (pathname === '/registro') return 'register';
   if (pathname === '/anonimo') return 'anonymous';
   return 'login';
@@ -24,13 +27,55 @@ type ManagedReport = Report & {
     firstName?: string | null;
     lastName?: string | null;
   };
-  assignee?: { email: string } | null;
+  assignee?: {
+    id: string;
+    email: string;
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null;
   evidence?: {
     id: string;
     url: string;
     type: string;
   }[];
 };
+
+type AssignableUser = {
+  id: string;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  entityName?: string | null;
+};
+
+function EmergencyShortcuts() {
+  const hotlines = [
+    { label: 'Emergencias', number: '911', description: 'Atención inmediata' },
+    { label: 'Bomberos', number: '104', description: 'Incendios y rescates' },
+    { label: 'Emergencia médica', number: '105', description: 'Asistencia médica' },
+  ];
+
+  return (
+    <section className="emergency-shortcuts" aria-label="Teléfonos de emergencia de Uruguay">
+      <div className="emergency-heading">
+        <span aria-hidden="true">!</span>
+        <div>
+          <h2>¿Es una emergencia?</h2>
+          <p>Usá estos accesos directos para llamar.</p>
+        </div>
+      </div>
+      <div className="emergency-links">
+        {hotlines.map((hotline) => (
+          <a key={hotline.number} href={`tel:${hotline.number}`}>
+            <strong>{hotline.number}</strong>
+            <span>{hotline.label}</span>
+            <small>{hotline.description}</small>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function ReportImage({
   reportId,
@@ -167,8 +212,17 @@ function ReportImage({
 
 }
 
-function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => void }) {
+function ManagementDashboard({
+  isAdmin,
+  currentUserId,
+  onLogout,
+}: {
+  isAdmin: boolean;
+  currentUserId: string;
+  onLogout: () => void;
+}) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [filter, setFilter] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
@@ -181,23 +235,56 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
       );
       setReports(response.data.data.items);
       setError('');
-    } catch (loadError: any) {
-      setError(loadError.response?.data?.message ?? 'No se pudo cargar la bandeja.');
+    } catch (loadError: unknown) {
+      setError(getApiErrorMessage(loadError, 'No se pudo cargar la bandeja.'));
     }
   }
 
   useEffect(() => {
-    void loadReports();
+    let active = true;
+
+    async function fetchReports() {
+      try {
+        const response = await api.get(
+          '/denuncias/gestion/bandeja',
+          filter === 'active' ? {} : { params: { status: filter } },
+        );
+        if (active) {
+          setReports(response.data.data.items);
+          setError('');
+        }
+      } catch (loadError: unknown) {
+        if (active) {
+          setError(getApiErrorMessage(loadError, 'No se pudo cargar la bandeja.'));
+        }
+      }
+    }
+
+    void fetchReports();
+    return () => {
+      active = false;
+    };
   }, [filter]);
+
+  useEffect(() => {
+    async function loadAssignableUsers() {
+      try {
+        const response = await api.get('/denuncias/gestion/funcionarios');
+        setAssignableUsers(response.data.data.items);
+      } catch (loadError: unknown) {
+        setError(getApiErrorMessage(loadError, 'No se pudieron cargar los funcionarios.'));
+      }
+    }
+
+    void loadAssignableUsers();
+  }, []);
 
   async function archiveReport(id: string) {
     try {
       await api.patch(`/denuncias/${id}/archivar`);
       await loadReports();
-    } catch (archiveError: any) {
-      setError(
-        archiveError.response?.data?.message ?? 'No se pudo archivar la denuncia.',
-      );
+    } catch (archiveError: unknown) {
+      setError(getApiErrorMessage(archiveError, 'No se pudo archivar la denuncia.'));
     }
   }
 
@@ -205,8 +292,17 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
     try {
       await api.post(`/denuncias/${id}/tomar`);
       await loadReports();
-    } catch (takeError: any) {
-      setError(takeError.response?.data?.message ?? 'No se pudo tomar la denuncia.');
+    } catch (takeError: unknown) {
+      setError(getApiErrorMessage(takeError, 'No se pudo tomar la denuncia.'));
+    }
+  }
+
+  async function assignReport(id: string, assigneeId: string) {
+    try {
+      await api.patch(`/denuncias/${id}/asignar`, { assigneeId });
+      await loadReports();
+    } catch (assignError: unknown) {
+      setError(getApiErrorMessage(assignError, 'No se pudo asignar la denuncia.'));
     }
   }
 
@@ -214,8 +310,8 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
     try {
       await api.patch(`/denuncias/${id}/estado`, { status });
       await loadReports();
-    } catch (statusError: any) {
-      setError(statusError.response?.data?.message ?? 'No se pudo actualizar el estado.');
+    } catch (statusError: unknown) {
+      setError(getApiErrorMessage(statusError, 'No se pudo actualizar el estado.'));
     }
   }
 
@@ -335,6 +431,8 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
             </div>
           </header>
 
+          <EmergencyShortcuts />
+
           {error && <p className="error management-error">{error}</p>}
 
           <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
@@ -383,6 +481,9 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
                           <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
                             {item.status.replace(/_/g, ' ')}
                           </span>
+                          <small className="report-identifier">
+                            Identificador: {formatReportIdentifier(item.id)}
+                          </small>
                           <h4>{item.title}</h4>
                           <p>{item.description}</p>
                           <div className="admin-report-meta">
@@ -411,10 +512,42 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
                         </div>
 
                         <div className="admin-report-actions">
+                          <label className="report-assignment">
+                            Asignar a funcionario
+                            <select
+                              value={item.assignee?.id ?? ''}
+                              onChange={(event) => {
+                                if (event.target.value) {
+                                  void assignReport(item.id, event.target.value);
+                                }
+                              }}
+                              aria-label={`Asignar denuncia ${formatReportIdentifier(item.id)}`}
+                            >
+                              <option value="">Seleccionar funcionario</option>
+                              {item.assignee && !assignableUsers.some((staff) => staff.id === item.assignee?.id) && (
+                                <option value={item.assignee.id}>
+                                  {item.assignee.firstName || item.assignee.email}
+                                </option>
+                              )}
+                              {assignableUsers.map((staff) => (
+                                <option key={staff.id} value={staff.id}>
+                                  {staff.firstName
+                                    ? `${staff.firstName} ${staff.lastName ?? ''}`.trim()
+                                    : staff.email}
+                                  {isAdmin && staff.entityName ? ` · ${staff.entityName}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
                           {!item.assignee && (
                             <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
                           )}
                           {item.assignee && (
+                            <p className="assigned-to">
+                              Asignada a {item.assignee.firstName || item.assignee.email}
+                            </p>
+                          )}
+                          {(isAdmin || item.assignee?.id === currentUserId) && item.assignee && (
                             <>
                               <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
                                 En revisión
@@ -455,6 +588,7 @@ function App() {
     getAuthRoute(),
   );
   const registering = authRoute === 'register';
+  const managementLogin = authRoute === 'management-login';
   const [credentials, setCredentials] = useState({ email: '', password: '', firstName: '', lastName: '' });
   const [reports, setReports] = useState<Report[]>([]);
   const [error, setError] = useState('');
@@ -467,6 +601,7 @@ function App() {
       login: '/login',
       register: '/registro',
       anonymous: '/anonimo',
+      'management-login': '/gestion/login',
     };
 
     window.history.pushState({}, '', routePaths[route]);
@@ -516,14 +651,14 @@ function App() {
 
       const response = await api.post(
         registering ? '/auth/register' : '/auth/login',
-        payload
+        registering
+          ? payload
+          : { ...payload, portal: managementLogin ? 'gestion' : 'ciudadano' },
       );
 
       setSession(response.data.data.user, response.data.data.accessToken);
-    } catch (authError: any) {
-      setError(
-        authError.response?.data?.message ?? 'No se pudo iniciar sesión.'
-      );
+    } catch (authError: unknown) {
+      setError(getApiErrorMessage(authError, 'No se pudo iniciar sesión.'));
     }
   }
 
@@ -532,8 +667,8 @@ function App() {
     try {
       const response = await api.post('/auth/anonymous');
       setSession(response.data.data.user, response.data.data.accessToken);
-    } catch (anonymousError: any) {
-      setError(anonymousError.response?.data?.message ?? 'No se pudo crear la sesión temporal.');
+    } catch (anonymousError: unknown) {
+      setError(getApiErrorMessage(anonymousError, 'No se pudo crear la sesión temporal.'));
     }
   }
 
@@ -558,7 +693,22 @@ function App() {
 
           <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
 
-            <nav className="auth-route-nav" aria-label="Opciones de acceso">
+            <nav
+              className={`auth-route-nav ${managementLogin ? 'auth-route-nav-management' : ''}`}
+              aria-label="Opciones de acceso"
+            >
+              {managementLogin ? (
+                <a
+                  href="/login"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('login');
+                  }}
+                >
+                  Acceso ciudadano
+                </a>
+              ) : (
+                <>
               <a
                 href="/login"
                 className={authRoute === 'login' ? 'active' : ''}
@@ -601,7 +751,29 @@ function App() {
               >
                 Entrar como anónimo
               </a>
+                </>
+              )}
             </nav>
+
+            {!managementLogin && (
+              <a
+                className="institutional-access-link"
+                href="/gestion/login"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('management-login');
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-4h4v4" />
+                </svg>
+                <span>
+                  <strong>Acceso para funcionarios</strong>
+                  <small>Ingresar al portal del ente público</small>
+                </span>
+                <b aria-hidden="true">→</b>
+              </a>
+            )}
 
             {authRoute === 'anonymous' ? (
               <div className="auth-anonymous-content">
@@ -624,10 +796,25 @@ function App() {
             ) : (
               <form className="auth-form auth-form-redesign" onSubmit={handleAuth}>
                 <span className="auth-section-label">
-
+                  {managementLogin
+                    ? 'PORTAL INSTITUCIONAL'
+                    : registering
+                      ? 'CUENTA CIUDADANA'
+                      : 'ACCESO CIUDADANO'}
                 </span>
-                <h2>{registering ? 'Crear cuenta' : 'Bienvenido/a'}</h2>
+                <h2>
+                  {registering
+                    ? 'Crear cuenta'
+                    : managementLogin
+                      ? 'Acceso de ente público'
+                      : 'Bienvenido/a'}
+                </h2>
                 <p className="auth-form-intro">
+                  {managementLogin
+                    ? 'Ingresá con tu cuenta institucional para gestionar denuncias.'
+                    : registering
+                      ? ''
+                      : 'Ingresá para crear y seguir tus denuncias.'}
                 </p>
 
                 {registering && (
@@ -720,7 +907,13 @@ function App() {
   }
 
   if (user.role === 'ENTE_PUBLICO' || user.role === 'ADMINISTRADOR') {
-    return <ManagementDashboard isAdmin={user.role === 'ADMINISTRADOR'} onLogout={clearSession} />;
+    return (
+      <ManagementDashboard
+        isAdmin={user.role === 'ADMINISTRADOR'}
+        currentUserId={user.id}
+        onLogout={clearSession}
+      />
+    );
   }
   return (
     <main className="app-shell">
@@ -790,6 +983,8 @@ function App() {
           </div>
         </header>
 
+        <EmergencyShortcuts />
+
         {vistaCiudadano === 'crear' && (
           <CrearDenuncia />
         )}
@@ -818,6 +1013,9 @@ function App() {
                   key={item.id}
                 >
                   <div>
+                    <small className="report-identifier">
+                      Identificador: {formatReportIdentifier(item.id)}
+                    </small>
                     <strong>{item.title}</strong>
                     <p>{item.description}</p>
                   </div>

@@ -57,6 +57,15 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    if (
+      (dto.portal === 'ciudadano' && user.role !== 'CIUDADANO') ||
+      (dto.portal === 'gestion' &&
+        user.role !== 'ENTE_PUBLICO' &&
+        user.role !== 'ADMINISTRADOR')
+    ) {
+      throw new UnauthorizedException('La cuenta no tiene acceso a este portal');
+    }
+
     return {
       user: this.publicUser(user),
       accessToken: await this.signToken(user.id, user.email, user.role),

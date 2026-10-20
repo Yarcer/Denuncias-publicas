@@ -73,6 +73,7 @@ El seed crea estas cuentas:
 |---|---|---|
 | Administrador | `admin@denuncias.local` | `Admin123!` |
 | Ente público | `ente@denuncias.local` | `Ente123!` |
+| Funcionario del ente | `funcionario@denuncias.local` | `Funcionario123!` |
 
 No uses estas contraseñas en producción.
 
@@ -101,24 +102,28 @@ pnpm --dir frontend dev
 
 ### Ciudadano o visitante
 
-- Registrarse e iniciar sesión.
+- Registrarse e iniciar sesión desde `/login`.
 - Entrar como visitante mediante una sesión temporal.
 - Crear denuncias.
-- Consultar sus propias denuncias.
+- Recibir un identificador de seguimiento y consultar sus propias denuncias.
+- Llamar a emergencias, bomberos o asistencia médica desde los accesos directos.
 
 ### Ente público
 
-- Iniciar sesión con la cuenta demo.
+- Iniciar sesión desde `/gestion/login` con una cuenta institucional.
 - Ver la bandeja de denuncias activas.
 - Filtrar por estado.
-- Tomar una denuncia.
+- Tomar una denuncia o asignarla a un funcionario activo del mismo ente.
 - Marcarla como `EN_REVISION`, `RESUELTO` o `RECHAZADO`.
 
 ### Administrador
 
+- Iniciar sesión desde `/gestion/login`.
 - Ver la bandeja completa.
 - Gestionar denuncias y estados.
 - Consultar los cambios registrados en el historial.
+
+Las operaciones de gestión de categorías y usuarios están restringidas a administradores. La asignación interna requiere cuentas `ENTE_PUBLICO` activas con el mismo nombre de ente; el seed incluye un funcionario demo para probar ese flujo. La botonera telefónica usa los números uruguayos 911, 104 y 105.
 
 ## Solución de problemas
 

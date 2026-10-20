@@ -10,6 +10,7 @@ const prisma = new PrismaClient({
 async function main() {
   const adminPassword = await argon2.hash('Admin123!');
   const entityPassword = await argon2.hash('Ente123!');
+  const staffPassword = await argon2.hash('Funcionario123!');
 
   await prisma.user.upsert({
     where: { email: 'admin@denuncias.local' },
@@ -32,6 +33,26 @@ async function main() {
       firstName: 'Ente',
       lastName: 'Demo',
       entityName: 'Municipalidad Demo',
+      role: 'ENTE_PUBLICO',
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'funcionario@denuncias.local' },
+    update: {
+      passwordHash: staffPassword,
+      role: 'ENTE_PUBLICO',
+      status: 'ACTIVO',
+      entityName: 'Municipalidad Demo',
+      jurisdiction: 'Melo',
+    },
+    create: {
+      email: 'funcionario@denuncias.local',
+      passwordHash: staffPassword,
+      firstName: 'Funcionario',
+      lastName: 'Demo',
+      entityName: 'Municipalidad Demo',
+      jurisdiction: 'Melo',
       role: 'ENTE_PUBLICO',
     },
   });

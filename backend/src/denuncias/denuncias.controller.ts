@@ -2,10 +2,12 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, Upl
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { DenunciasService } from './denuncias.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
-import { ManageReportDto } from './dto/manage-report.dto';
+import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
 
 type AuthenticatedRequest = Request & {
   user: { sub: string; role: string };
@@ -27,7 +29,13 @@ export class DenunciasController {
     return this.denunciasService.managementQueue(req.user, status);
   }
 
-    @Get(':id/evidencia/:evidenceId')
+  @Get('gestion/funcionarios')
+  @UseGuards(AuthGuard('jwt'))
+  assignableUsers(@Req() req: AuthenticatedRequest) {
+    return this.denunciasService.assignableUsers(req.user);
+  }
+
+  @Get(':id/evidencia/:evidenceId')
   @UseGuards(AuthGuard('jwt'))
   async getEvidence(
     @Req() req: AuthenticatedRequest,
@@ -51,13 +59,15 @@ export class DenunciasController {
   }
 
   @Post()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CIUDADANO')
   create(@Req() req: AuthenticatedRequest, @Body() dto: CreateReportDto) {
     return this.denunciasService.create(req.user.sub, dto);
   }
 
     @Post(':id/evidencia')
-  @UseGuards(AuthGuard('jwt'))
+    @UseGuards(AuthGuard('jwt'), RolesGuard)
+    @Roles('CIUDADANO')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
   uploadEvidence(
     @Req() req: AuthenticatedRequest,
@@ -82,6 +92,16 @@ export class DenunciasController {
     return this.denunciasService.take(id, req.user);
   }
 
+  @Patch(':id/asignar')
+  @UseGuards(AuthGuard('jwt'))
+  assign(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: AssignReportDto,
+  ) {
+    return this.denunciasService.assign(id, req.user, dto);
+  }
+
   @Patch(':id/estado')
   @UseGuards(AuthGuard('jwt'))
   changeStatus(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: ManageReportDto) {
@@ -89,13 +109,15 @@ export class DenunciasController {
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CIUDADANO')
   update(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdateReportDto) {
     return this.denunciasService.update(id, req.user, dto);
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CIUDADANO')
   remove(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.denunciasService.remove(id, req.user);
   }

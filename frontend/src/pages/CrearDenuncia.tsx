@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import './CrearDenuncia.css'
 import { api } from '../lib/api'
+import { getApiErrorMessage } from '../lib/api-error'
+import { formatReportIdentifier } from '../lib/report-id'
 
 import {
   MapContainer,
@@ -212,14 +214,11 @@ setVistaPrevia('')
 
       setMensaje(
   fotoAdjuntada
-    ? 'Reporte registrado correctamente.'
-    : 'El reporte se guardó, pero no se pudo adjuntar la foto.'
+    ? `Reporte registrado correctamente. Tu identificador es ${formatReportIdentifier(response.data.data.id)}.`
+    : `El reporte se guardó, pero no se pudo adjuntar la foto. Tu identificador es ${formatReportIdentifier(response.data.data.id)}.`
 )
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message ??
-          'No se pudo registrar la denuncia.'
-      )
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'No se pudo registrar la denuncia.'))
     }
   }
 

@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterUserDto {
   @IsEmail()
@@ -27,4 +27,8 @@ export class LoginUserDto {
 
   @IsNotEmpty()
   password: string;
+
+  @IsOptional()
+  @IsIn(['ciudadano', 'gestion'])
+  portal?: 'ciudadano' | 'gestion';
 }

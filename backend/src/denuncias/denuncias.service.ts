@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
-import { ManageReportDto } from './dto/manage-report.dto';
+import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
 
 type UploadedImage = {
   buffer: Buffer;
@@ -18,7 +18,7 @@ const terminalStatuses: ReportStatus[] = [ReportStatus.RESUELTO, ReportStatus.RE
 
 @Injectable()
 export class DenunciasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async findAll(user: AuthenticatedUser, status?: string) {
     const where = {
@@ -37,44 +37,78 @@ export class DenunciasService {
   async findOne(id: string, user: AuthenticatedUser) {
     const report = await this.prisma.report.findUnique({
       where: { id },
-      include: { category: true, evidence: true, comments: true, history: true },
+      include: {
+        category: true,
+        evidence: true,
+        comments: {
+          where: user.role === 'CIUDADANO' ? { isInternal: false } : {},
+        },
+        history: true,
+      },
     });
     this.assertCanAccess(report, user);
     return report;
   }
 
-async managementQueue(user: AuthenticatedUser, status?: string) {
-  this.assertManagementRole(user);
+  async managementQueue(user: AuthenticatedUser, status?: string) {
+    this.assertManagementRole(user);
 
-  const where =
-    status === 'archived'
-      ? { archivedAt: { not: null } }
-      : status
-        ? { status: status as ReportStatus, archivedAt: null }
-        : {
+    const where =
+      status === 'archived'
+        ? { archivedAt: { not: null } }
+        : status
+          ? { status: status as ReportStatus, archivedAt: null }
+          : {
             status: { notIn: terminalStatuses },
             archivedAt: null,
           };
 
-  const items = await this.prisma.report.findMany({
-    where,
-    include: {
-      category: true,
-      evidence: true,
-      reporter: {
-        select: { email: true, firstName: true, lastName: true },
+    const items = await this.prisma.report.findMany({
+      where,
+      include: {
+        category: true,
+        evidence: true,
+        reporter: {
+          select: { email: true, firstName: true, lastName: true },
+        },
+        assignee: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
       },
-      assignee: true,
-    },
-    orderBy: { createdAt: 'asc' },
-  });
+      orderBy: { createdAt: 'asc' },
+    });
 
-  return {
-    items,
-    count: items.length,
-    filters: { status: status ?? 'active' },
-  };
-}
+    return {
+      items,
+      count: items.length,
+      filters: { status: status ?? 'active' },
+    };
+  }
+
+  async assignableUsers(user: AuthenticatedUser) {
+    this.assertManagementRole(user);
+    const actor = user.role === 'ENTE_PUBLICO'
+      ? await this.prisma.user.findUnique({
+          where: { id: user.sub },
+          select: { entityName: true },
+        })
+      : null;
+    if (user.role === 'ENTE_PUBLICO' && (!actor || !actor.entityName)) {
+      throw new BadRequestException('Tu cuenta no tiene un ente público configurado');
+    }
+    const where = {
+      role: 'ENTE_PUBLICO' as const,
+      status: 'ACTIVO' as const,
+      ...(actor ? { entityName: actor.entityName } : {}),
+    };
+    const items = await this.prisma.user.findMany({
+      where,
+      select: { id: true, email: true, firstName: true, lastName: true, entityName: true },
+      orderBy: [{ entityName: 'asc' }, { firstName: 'asc' }],
+    });
+
+    return { items, count: items.length };
+  }
 
   async create(reporterId: string, dto: CreateReportDto) {
     return this.prisma.report.create({
@@ -106,8 +140,8 @@ async managementQueue(user: AuthenticatedUser, status?: string) {
     }
 
     const extension =
-  file.mimetype === 'image/jpeg' ? 'jpg' :
-  file.mimetype === 'image/png' ? 'png' : 'webp';
+      file.mimetype === 'image/jpeg' ? 'jpg' :
+        file.mimetype === 'image/png' ? 'png' : 'webp';
     const filename = `${randomUUID()}.${extension}`;
     const directory = join(process.cwd(), 'uploads', 'reports');
     const filepath = join(directory, filename);
@@ -125,68 +159,68 @@ async managementQueue(user: AuthenticatedUser, status?: string) {
     }
   }
 
-async getEvidence(
-  reportId: string,
-  evidenceId: string,
-  user: AuthenticatedUser,
-) {
-  const report = await this.prisma.report.findUnique({
-    where: { id: reportId },
-  });
+  async getEvidence(
+    reportId: string,
+    evidenceId: string,
+    user: AuthenticatedUser,
+  ) {
+    const report = await this.prisma.report.findUnique({
+      where: { id: reportId },
+    });
 
-  this.assertCanAccess(report, user);
+    this.assertCanAccess(report, user);
 
-  const evidence = await this.prisma.evidence.findFirst({
-    where: { id: evidenceId, reportId },
-  });
+    const evidence = await this.prisma.evidence.findFirst({
+      where: { id: evidenceId, reportId },
+    });
 
-  if (!evidence) {
-    throw new NotFoundException('Imagen no encontrada');
+    if (!evidence) {
+      throw new NotFoundException('Imagen no encontrada');
+    }
+
+    const filepath = join(
+      process.cwd(),
+      'uploads',
+      'reports',
+      evidence.url,
+    );
+
+    try {
+      return {
+        buffer: await readFile(filepath),
+        type: evidence.type,
+      };
+    } catch {
+      throw new NotFoundException('Archivo de imagen no encontrado');
+    }
   }
-
-  const filepath = join(
-    process.cwd(),
-    'uploads',
-    'reports',
-    evidence.url,
-  );
-
-  try {
-    return {
-      buffer: await readFile(filepath),
-      type: evidence.type,
-    };
-  } catch {
-    throw new NotFoundException('Archivo de imagen no encontrado');
-  }
-}
 
   async archive(id: string, user: AuthenticatedUser) {
-  this.assertManagementRole(user);
+    this.assertManagementRole(user);
 
-  const report = await this.prisma.report.findUnique({
-    where: { id },
-  });
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+    });
 
-  if (!report) {
-    throw new NotFoundException('Denuncia no encontrada');
+    if (!report) {
+      throw new NotFoundException('Denuncia no encontrada');
+    }
+
+    if (report.status !== ReportStatus.RECHAZADO) {
+      throw new BadRequestException('Solo se pueden archivar denuncias denegadas');
+    }
+
+    if (report.archivedAt) {
+      throw new BadRequestException('Esta denuncia ya está archivada');
+    }
+
+    return this.prisma.report.update({
+      where: { id },
+      data: { archivedAt: new Date() },
+    });
   }
 
-  if (report.status !== ReportStatus.RECHAZADO) {
-    throw new BadRequestException('Solo se pueden archivar denuncias denegadas');
-  }
-
-  if (report.archivedAt) {
-    throw new BadRequestException('Esta denuncia ya está archivada');
-  }
-
-  return this.prisma.report.update({
-    where: { id },
-    data: { archivedAt: new Date() },
-  });
-}
-
-async take(id: string, user: AuthenticatedUser) {
+  async take(id: string, user: AuthenticatedUser) {
     this.assertManagementRole(user);
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
@@ -201,10 +235,71 @@ async take(id: string, user: AuthenticatedUser) {
       const updated = await transaction.report.update({
         where: { id },
         data: { assigneeId: user.sub, status: ReportStatus.ASIGNADO },
-        include: { category: true, reporter: true, assignee: true },
+        include: {
+          category: true,
+          reporter: { select: { id: true, email: true, firstName: true, lastName: true } },
+          assignee: { select: { id: true, email: true, firstName: true, lastName: true } },
+        },
       });
       await transaction.reportHistory.create({
         data: { reportId: id, fromStatus: report.status, toStatus: ReportStatus.ASIGNADO, changedBy: user.sub },
+      });
+      return updated;
+    });
+  }
+
+  async assign(id: string, user: AuthenticatedUser, dto: AssignReportDto) {
+    this.assertManagementRole(user);
+    const report = await this.prisma.report.findUnique({ where: { id } });
+    if (!report) throw new NotFoundException('Denuncia no encontrada');
+    if (terminalStatuses.includes(report.status)) {
+      throw new ForbiddenException('Esta denuncia ya está cerrada');
+    }
+
+    const actor = user.role === 'ENTE_PUBLICO'
+      ? await this.prisma.user.findUnique({
+          where: { id: user.sub },
+          select: { entityName: true },
+        })
+      : null;
+    if (user.role === 'ENTE_PUBLICO' && (!actor || !actor.entityName)) {
+      throw new BadRequestException('Tu cuenta no tiene un ente público configurado');
+    }
+    const assignee = await this.prisma.user.findFirst({
+      where: {
+        id: dto.assigneeId,
+        role: 'ENTE_PUBLICO',
+        status: 'ACTIVO',
+        ...(actor ? { entityName: actor.entityName } : {}),
+      },
+      select: { id: true, email: true, firstName: true, lastName: true },
+    });
+    if (!assignee) {
+      throw new BadRequestException('El funcionario no pertenece a tu ente o no está activo');
+    }
+    const nextStatus = report.status === ReportStatus.PENDIENTE
+      ? ReportStatus.ASIGNADO
+      : report.status;
+
+    return this.prisma.$transaction(async (transaction) => {
+      const updated = await transaction.report.update({
+        where: { id },
+        data: { assigneeId: assignee.id, status: nextStatus },
+        include: {
+          category: true,
+          assignee: {
+            select: { id: true, email: true, firstName: true, lastName: true },
+          },
+        },
+      });
+      await transaction.reportHistory.create({
+        data: {
+          reportId: id,
+          fromStatus: report.status,
+          toStatus: nextStatus,
+          changedBy: user.sub,
+          comment: `Asignada internamente a ${assignee.firstName || assignee.email}`,
+        },
       });
       return updated;
     });
@@ -225,7 +320,11 @@ async take(id: string, user: AuthenticatedUser) {
       const updated = await transaction.report.update({
         where: { id },
         data: { status: dto.status, resolvedAt: dto.status === ReportStatus.RESUELTO ? new Date() : null },
-        include: { category: true, reporter: true, assignee: true },
+        include: {
+          category: true,
+          reporter: { select: { id: true, email: true, firstName: true, lastName: true } },
+          assignee: { select: { id: true, email: true, firstName: true, lastName: true } },
+        },
       });
       await transaction.reportHistory.create({
         data: { reportId: id, fromStatus: report.status, toStatus: dto.status, changedBy: user.sub },
