@@ -47,7 +47,7 @@ En Cloudflare Pages, crea el proyecto con el nombre elegido, conecta el reposito
 - **Build output directory:** `frontend/dist`
 - **Variable de entorno de producción:** `VITE_API_URL=https://<tu-api>.onrender.com/api`
 
-Tras el primer despliegue, configura `CORS_ORIGIN` en Render con el origen real de Pages (`https://<nombre>.pages.dev`) o Workers (`https://<nombre>.<subdominio>.workers.dev`) y vuelve a desplegar la API. En Pages, el archivo `frontend/public/_redirects` permite recargar las rutas de React; en Workers el fallback SPA está definido por Wrangler.
+Tras el primer despliegue, configura `CORS_ORIGIN` en Render con el origen real de Pages (`https://<nombre>.pages.dev`) o Workers (`https://<nombre>.<subdominio>.workers.dev`) y vuelve a desplegar la API. Pages aplica automáticamente el fallback SPA; en Workers el fallback está definido por Wrangler.
 
 ### Cloudflare Workers
 
