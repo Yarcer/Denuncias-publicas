@@ -160,6 +160,10 @@ Asegúrate de que `backend/.env` use `reportes_db` y reinicia el backend. La var
 pnpm build
 ```
 
+## Publicar la página
+
+La guía para publicarla con planes gratuitos, dominio `pages.dev` y medidas de seguridad está en [DEPLOYMENT.md](./DEPLOYMENT.md). Antes de usar datos reales, configura la base de datos y el bucket privado de evidencias indicados allí.
+
 ## Estado del proyecto
 
 La migración inicial está en `backend/prisma/migrations`. Los endpoints de autenticación, denuncias y gestión de estados están implementados. Evidencias, comentarios avanzados y administración completa de categorías/usuarios quedan como trabajo posterior.

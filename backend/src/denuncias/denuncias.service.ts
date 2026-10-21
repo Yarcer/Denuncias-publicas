@@ -1,9 +1,14 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { EvidenceStorageService } from './evidence-storage.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
 
@@ -18,7 +23,12 @@ const terminalStatuses: ReportStatus[] = [ReportStatus.RESUELTO, ReportStatus.RE
 
 @Injectable()
 export class DenunciasService {
-  constructor(private readonly prisma: PrismaService) { }
+  private readonly logger = new Logger(DenunciasService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly evidenceStorage: EvidenceStorageService,
+  ) {}
 
   async findAll(user: AuthenticatedUser, status?: string) {
     const where = {
@@ -128,11 +138,18 @@ export class DenunciasService {
     });
   }
 
-  async uploadEvidence(id: string, user: AuthenticatedUser, file?: UploadedImage) {
+  async uploadEvidence(
+    id: string,
+    user: AuthenticatedUser,
+    file?: UploadedImage,
+  ) {
     const report = await this.prisma.report.findUnique({ where: { id } });
     this.assertCanAccess(report, user);
 
-    if (!file?.buffer || !['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+    if (
+      !file?.buffer ||
+      !['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)
+    ) {
       throw new BadRequestException('Adjuntá una imagen JPG, PNG o WebP');
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -140,21 +157,27 @@ export class DenunciasService {
     }
 
     const extension =
-      file.mimetype === 'image/jpeg' ? 'jpg' :
-        file.mimetype === 'image/png' ? 'png' : 'webp';
+      file.mimetype === 'image/jpeg'
+        ? 'jpg'
+        : file.mimetype === 'image/png'
+          ? 'png'
+          : 'webp';
     const filename = `${randomUUID()}.${extension}`;
-    const directory = join(process.cwd(), 'uploads', 'reports');
-    const filepath = join(directory, filename);
-
-    await mkdir(directory, { recursive: true });
-    await writeFile(filepath, file.buffer);
+    await this.evidenceStorage.put(filename, file.buffer, file.mimetype);
 
     try {
       return await this.prisma.evidence.create({
         data: { reportId: id, url: filename, type: file.mimetype },
       });
     } catch (error) {
-      await unlink(filepath);
+      try {
+        await this.evidenceStorage.delete(filename);
+      } catch (cleanupError) {
+        this.logger.error(
+          `No se pudo limpiar la evidencia ${filename} después de fallar el registro`,
+          cleanupError instanceof Error ? cleanupError.stack : undefined,
+        );
+      }
       throw error;
     }
   }
@@ -178,21 +201,12 @@ export class DenunciasService {
       throw new NotFoundException('Imagen no encontrada');
     }
 
-    const filepath = join(
-      process.cwd(),
-      'uploads',
-      'reports',
-      evidence.url,
-    );
-
-    try {
-      return {
-        buffer: await readFile(filepath),
-        type: evidence.type,
-      };
-    } catch {
+    const buffer = await this.evidenceStorage.get(evidence.url);
+    if (!buffer) {
       throw new NotFoundException('Archivo de imagen no encontrado');
     }
+
+    return { buffer, type: evidence.type };
   }
 
   async archive(id: string, user: AuthenticatedUser) {

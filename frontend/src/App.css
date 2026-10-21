@@ -2609,3 +2609,17 @@ textarea {
     min-height: 62px;
   }
 }
+
+.admin-app-shell.superadmin-shell .admin-sidebar {
+  background: linear-gradient(180deg, #30284d 0%, #211b38 100%);
+}
+
+.admin-app-shell.superadmin-shell .admin-nav button.admin-nav-active {
+  background: #7056c7;
+}
+
+.admin-app-shell.superadmin-shell .admin-page-title .eyebrow {
+  background: linear-gradient(135deg, #f2edff, #e8e0ff);
+  color: #5f46ad;
+  border-color: #d2c4f2;
+}

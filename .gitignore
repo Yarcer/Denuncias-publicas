@@ -9,5 +9,4 @@ frontend/dist
 backend/generated
 backend/prisma/dev.db
 backend/prisma/*.db
-pnpm-lock.yaml
 /backend/uploads/
