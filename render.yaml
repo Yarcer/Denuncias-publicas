@@ -3,8 +3,8 @@ services:
     name: denuncias-publicas-api
     runtime: node
     plan: free
-    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm --filter backend build
-    startCommand: pnpm --dir backend exec prisma migrate deploy && pnpm --dir backend db:seed && pnpm --filter backend start:prod
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter backend build
+    startCommand: pnpm --dir backend exec prisma migrate deploy && pnpm --dir backend db:seed && pnpm --dir backend start:prod
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
