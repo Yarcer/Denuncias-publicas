@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ReportStatus } from '@prisma/client';
+import { ReportPriority, ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
@@ -31,7 +31,11 @@ export class DenunciasService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return { items, count: items.length, filters: { status: status ?? 'all' } };
+    const visibleItems = user.role === 'ADMINISTRADOR'
+      ? items
+      : items.map((item) => this.withoutPriority(item));
+
+    return { items: visibleItems, count: items.length, filters: { status: status ?? 'all' } };
   }
 
   async findOne(id: string, user: AuthenticatedUser) {
@@ -47,7 +51,9 @@ export class DenunciasService {
       },
     });
     this.assertCanAccess(report, user);
-    return report;
+    return user.role === 'ADMINISTRADOR' || !report
+      ? report
+      : this.withoutPriority(report);
   }
 
   async managementQueue(user: AuthenticatedUser, status?: string) {
@@ -69,17 +75,30 @@ export class DenunciasService {
         category: true,
         evidence: true,
         reporter: {
-          select: { email: true, firstName: true, lastName: true },
+          select: {
+            email: true,
+            firstName: true,
+            lastName: true,
+            isAnonymous: true,
+          },
         },
         assignee: {
           select: { id: true, email: true, firstName: true, lastName: true },
         },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy:
+        user.role === 'ADMINISTRADOR'
+          ? [{ priority: 'desc' }, { createdAt: 'asc' }]
+          : { createdAt: 'asc' },
     });
 
+    const visibleItems =
+      user.role === 'ADMINISTRADOR'
+        ? items
+        : items.map((item) => this.withoutPriority(item));
+
     return {
-      items,
+      items: visibleItems,
       count: items.length,
       filters: { status: status ?? 'active' },
     };
@@ -87,23 +106,35 @@ export class DenunciasService {
 
   async assignableUsers(user: AuthenticatedUser) {
     this.assertManagementRole(user);
-    const actor = user.role === 'ENTE_PUBLICO'
-      ? await this.prisma.user.findUnique({
+    const actor =
+      user.role === 'ENTE_PUBLICO'
+        ? await this.prisma.user.findUnique({
           where: { id: user.sub },
           select: { entityName: true },
         })
-      : null;
+        : null;
+
     if (user.role === 'ENTE_PUBLICO' && (!actor || !actor.entityName)) {
-      throw new BadRequestException('Tu cuenta no tiene un ente público configurado');
+      throw new BadRequestException(
+        'Tu cuenta no tiene un ente público configurado',
+      );
     }
+
     const where = {
       role: 'ENTE_PUBLICO' as const,
       status: 'ACTIVO' as const,
       ...(actor ? { entityName: actor.entityName } : {}),
     };
+
     const items = await this.prisma.user.findMany({
       where,
-      select: { id: true, email: true, firstName: true, lastName: true, entityName: true },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        entityName: true,
+      },
       orderBy: [{ entityName: 'asc' }, { firstName: 'asc' }],
     });
 
@@ -111,12 +142,17 @@ export class DenunciasService {
   }
 
   async create(reporterId: string, dto: CreateReportDto) {
-    return this.prisma.report.create({
+    const reporter = await this.prisma.user.findUnique({
+      where: { id: reporterId },
+      select: { isAnonymous: true, role: true },
+    });
+
+    const report = await this.prisma.report.create({
       data: {
         title: dto.title,
         description: dto.description,
         type: dto.type,
-        priority: dto.priority,
+        priority: reporter?.isAnonymous ? ReportPriority.BAJA : ReportPriority.ALTA,
         latitude: dto.latitude,
         longitude: dto.longitude,
         address: dto.address,
@@ -126,6 +162,10 @@ export class DenunciasService {
       },
       include: { category: true },
     });
+
+    return reporter?.role === 'ADMINISTRADOR'
+      ? report
+      : this.withoutPriority(report);
   }
 
   async uploadEvidence(id: string, user: AuthenticatedUser, file?: UploadedImage) {
@@ -214,13 +254,19 @@ export class DenunciasService {
       throw new BadRequestException('Esta denuncia ya está archivada');
     }
 
-    return this.prisma.report.update({
-      where: { id },
-      data: { archivedAt: new Date() },
-    });
+const archivedReport = await this.prisma.report.update({
+  where: { id },
+  data: { archivedAt: new Date() },
+});
+
+return user.role === 'ADMINISTRADOR'
+  ? archivedReport
+  : this.withoutPriority(archivedReport);
+
   }
 
   async take(id: string, user: AuthenticatedUser) {
+
     this.assertManagementRole(user);
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
@@ -244,7 +290,9 @@ export class DenunciasService {
       await transaction.reportHistory.create({
         data: { reportId: id, fromStatus: report.status, toStatus: ReportStatus.ASIGNADO, changedBy: user.sub },
       });
-      return updated;
+      return user.role === 'ADMINISTRADOR'
+        ? updated
+        : this.withoutPriority(updated);
     });
   }
 
@@ -258,9 +306,9 @@ export class DenunciasService {
 
     const actor = user.role === 'ENTE_PUBLICO'
       ? await this.prisma.user.findUnique({
-          where: { id: user.sub },
-          select: { entityName: true },
-        })
+        where: { id: user.sub },
+        select: { entityName: true },
+      })
       : null;
     if (user.role === 'ENTE_PUBLICO' && (!actor || !actor.entityName)) {
       throw new BadRequestException('Tu cuenta no tiene un ente público configurado');
@@ -329,7 +377,9 @@ export class DenunciasService {
       await transaction.reportHistory.create({
         data: { reportId: id, fromStatus: report.status, toStatus: dto.status, changedBy: user.sub },
       });
-      return updated;
+      return user.role === 'ADMINISTRADOR'
+        ? updated
+        : this.withoutPriority(updated);
     });
   }
 
@@ -341,7 +391,11 @@ export class DenunciasService {
       throw new ForbiddenException('Usa el flujo de gestión para cambiar estado o asignación');
     }
 
-    return this.prisma.report.update({ where: { id }, data: dto });
+    const updatedReport = await this.prisma.report.update({ where: { id }, data: dto });
+
+    return user.role === 'ADMINISTRADOR'
+      ? updatedReport
+      : this.withoutPriority(updatedReport);
   }
 
   async remove(id: string, user: AuthenticatedUser) {
@@ -364,5 +418,11 @@ export class DenunciasService {
     if (!managementRoles.includes(user.role)) {
       throw new ForbiddenException('No tienes permisos para gestionar denuncias');
     }
+  }
+
+  private withoutPriority<T extends { priority: ReportPriority }>(report: T): Omit<T, 'priority'> {
+    const { priority, ...visibleReport } = report;
+    void priority;
+    return visibleReport;
   }
 }

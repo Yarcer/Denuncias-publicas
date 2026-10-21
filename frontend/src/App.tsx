@@ -5,6 +5,7 @@ import { getApiErrorMessage } from './lib/api-error';
 import { useAuthStore } from './stores/auth-store';
 import CrearDenuncia from './pages/CrearDenuncia'
 import { formatReportIdentifier } from './lib/report-id';
+import GestionUsuarios from './pages/GestionUsuarios';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
@@ -17,7 +18,7 @@ function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   return 'login';
 }
 
-type Report = { id: string; title: string; description: string; status: string };
+type Report = { id: string; title: string; description: string; status: string; priority?: string };
 type ManagedReport = Report & {
   address?: string | null;
   latitude?: number | null;
@@ -26,6 +27,7 @@ type ManagedReport = Report & {
     email: string;
     firstName?: string | null;
     lastName?: string | null;
+    isAnonymous: boolean;
   };
   assignee?: {
     id: string;
@@ -223,6 +225,7 @@ function ManagementDashboard({
 }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const [managementView, setManagementView] = useState<'reports' | 'users'>('reports');
   const [filter, setFilter] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
@@ -372,8 +375,9 @@ function ManagementDashboard({
             </button>
             <button
               type="button"
-              className={!isArchivedView ? 'admin-nav-active' : ''}
+              className={managementView === 'reports' && !isArchivedView ? 'admin-nav-active' : ''}
               onClick={() => {
+                setManagementView('reports');
                 setFilter('active');
                 scrollToSection('admin-board');
               }}
@@ -382,11 +386,20 @@ function ManagementDashboard({
             </button>
             <button
               type="button"
-              className={isArchivedView ? 'admin-nav-active' : ''}
-              onClick={() => setFilter('archived')}
+              className={managementView === 'reports' && isArchivedView ? 'admin-nav-active' : ''}
+              onClick={() => { setManagementView('reports'); setFilter('archived'); }}
             >
               <span aria-hidden="true">▣</span> Archivadas
             </button>
+            {isAdmin && (
+              <button
+                type="button"
+                className={managementView === 'users' ? 'admin-nav-active' : ''}
+                onClick={() => setManagementView('users')}
+              >
+                <span aria-hidden="true">♙</span> Usuarios administrativos
+              </button>
+            )}
           </nav>
 
           <button type="button" className="admin-logout" onClick={onLogout}>
@@ -395,187 +408,200 @@ function ManagementDashboard({
         </aside>
 
         <section className="admin-main">
-          <header className="admin-header">
-            <div className="admin-page-title">
-              <span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span>
-              <h1>Bandeja de reportes</h1>
-              <p>Organiza y sigue los reportes de la ciudad.</p>
-            </div>
-
-            <div className="admin-header-tools">
-              <label className="admin-search">
-                <span aria-hidden="true">⌕</span>
-                <input
-                  type="search"
-                  placeholder="Buscar denuncias..."
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  aria-label="Buscar denuncias"
-                />
-              </label>
-              <select
-                className="admin-filter"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                aria-label="Filtrar denuncias por estado"
-              >
-                <option value="active">Activas · tablero</option>
-                <option value="PENDIENTE">Pendientes</option>
-                <option value="ASIGNADO">Asignadas</option>
-                <option value="EN_REVISION">En revisión</option>
-                <option value="EN_PROCESO">En proceso</option>
-                <option value="RESUELTO">Resueltas</option>
-                <option value="RECHAZADO">Denegadas</option>
-                <option value="archived">Archivadas</option>
-              </select>
-            </div>
-          </header>
-
-          <EmergencyShortcuts />
-
-          {error && <p className="error management-error">{error}</p>}
-
-          <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
-            <article className="admin-summary-card admin-summary-blue">
-              <span className="admin-summary-icon" aria-hidden="true">▤</span>
-              <div><span>Casos en esta vista</span><strong>{reports.length}</strong></div>
-            </article>
-            <article className="admin-summary-card admin-summary-amber">
-              <span className="admin-summary-icon" aria-hidden="true">◷</span>
-              <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
-            </article>
-            <article className="admin-summary-card admin-summary-green">
-              <span className="admin-summary-icon" aria-hidden="true">✓</span>
-              <div><span>En proceso</span><strong>{inProgressCount}</strong></div>
-            </article>
-          </section>
-
-          <div className="admin-board-heading" id="admin-board">
-            <div>
-              <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
-              <p>{visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}</p>
-            </div>
-          </div>
-
-          <section className={`admin-board ${filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}>
-            {columns.map((column) => {
-              const columnReports = column.status
-                ? visibleReports.filter((item) => item.status === column.status)
-                : visibleReports;
-
-              return (
-                <div className="admin-column" key={column.title}>
-                  <header className="admin-column-header">
-                    <h3>{column.title}</h3>
-                    <span>{columnReports.length}</span>
-                  </header>
-
-                  <div className="admin-column-cards">
-                    {columnReports.length === 0 ? (
-                      <p className="admin-column-empty">
-                        {search ? 'No hay coincidencias.' : 'No hay denuncias aquí.'}
-                      </p>
-                    ) : columnReports.map((item) => (
-                      <article className="admin-report-card" key={item.id}>
-                        <div className="admin-report-copy">
-                          <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
-                            {item.status.replace(/_/g, ' ')}
-                          </span>
-                          <small className="report-identifier">
-                            Identificador: {formatReportIdentifier(item.id)}
-                          </small>
-                          <h4>{item.title}</h4>
-                          <p>{item.description}</p>
-                          <div className="admin-report-meta">
-                            <span><b aria-hidden="true">⌖</b>{item.address || 'Ubicación sin dirección'}</span>
-                            <span><b aria-hidden="true">♙</b>{item.reporter?.firstName || item.reporter?.email || 'Ciudadano'}</span>
-                          </div>
-
-                          {item.latitude != null && item.longitude != null && (
-                            <a
-                              className="admin-map-link"
-                              href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <span aria-hidden="true">⌖</span> Ver mapa
-                            </a>
-                          )}
-
-                          {item.evidence?.map((photo) => (
-                            <ReportImage
-                              key={photo.id}
-                              reportId={item.id}
-                              evidenceId={photo.id}
-                            />
-                          ))}
-                        </div>
-
-                        <div className="admin-report-actions">
-                          <label className="report-assignment">
-                            Asignar a funcionario
-                            <select
-                              value={item.assignee?.id ?? ''}
-                              onChange={(event) => {
-                                if (event.target.value) {
-                                  void assignReport(item.id, event.target.value);
-                                }
-                              }}
-                              aria-label={`Asignar denuncia ${formatReportIdentifier(item.id)}`}
-                            >
-                              <option value="">Seleccionar funcionario</option>
-                              {item.assignee && !assignableUsers.some((staff) => staff.id === item.assignee?.id) && (
-                                <option value={item.assignee.id}>
-                                  {item.assignee.firstName || item.assignee.email}
-                                </option>
-                              )}
-                              {assignableUsers.map((staff) => (
-                                <option key={staff.id} value={staff.id}>
-                                  {staff.firstName
-                                    ? `${staff.firstName} ${staff.lastName ?? ''}`.trim()
-                                    : staff.email}
-                                  {isAdmin && staff.entityName ? ` · ${staff.entityName}` : ''}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          {!item.assignee && (
-                            <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
-                          )}
-                          {item.assignee && (
-                            <p className="assigned-to">
-                              Asignada a {item.assignee.firstName || item.assignee.email}
-                            </p>
-                          )}
-                          {(isAdmin || item.assignee?.id === currentUserId) && item.assignee && (
-                            <>
-                              <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
-                                En revisión
-                              </button>
-                              <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
-                                Iniciar trabajo
-                              </button>
-                              <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
-                                Marcar resuelta
-                              </button>
-                              <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
-                                Denegar
-                              </button>
-                            </>
-                          )}
-                          {item.status === 'RECHAZADO' && filter !== 'archived' && (
-                            <button className="secondary" onClick={() => archiveReport(item.id)}>
-                              Archivar
-                            </button>
-                          )}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
+          {managementView === 'users' && isAdmin ? (
+            <GestionUsuarios currentUserId={currentUserId} />
+          ) : (
+            <>
+              <header className="admin-header">
+                <div className="admin-page-title">
+                  <span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span>
+                  <h1>Bandeja de reportes</h1>
+                  <p>Organiza y sigue los reportes de la ciudad.</p>
                 </div>
-              );
-            })}
-          </section>
+
+                <div className="admin-header-tools">
+                  <label className="admin-search">
+                    <span aria-hidden="true">⌕</span>
+                    <input
+                      type="search"
+                      placeholder="Buscar denuncias..."
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      aria-label="Buscar denuncias"
+                    />
+                  </label>
+                  <select
+                    className="admin-filter"
+                    value={filter}
+                    onChange={(event) => setFilter(event.target.value)}
+                    aria-label="Filtrar denuncias por estado"
+                  >
+                    <option value="active">Activas · tablero</option>
+                    <option value="PENDIENTE">Pendientes</option>
+                    <option value="ASIGNADO">Asignadas</option>
+                    <option value="EN_REVISION">En revisión</option>
+                    <option value="EN_PROCESO">En proceso</option>
+                    <option value="RESUELTO">Resueltas</option>
+                    <option value="RECHAZADO">Denegadas</option>
+                    <option value="archived">Archivadas</option>
+                  </select>
+                </div>
+              </header>
+
+              <EmergencyShortcuts />
+
+              {error && <p className="error management-error">{error}</p>}
+
+              <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
+                <article className="admin-summary-card admin-summary-blue">
+                  <span className="admin-summary-icon" aria-hidden="true">▤</span>
+                  <div><span>Casos en esta vista</span><strong>{reports.length}</strong></div>
+                </article>
+                <article className="admin-summary-card admin-summary-amber">
+                  <span className="admin-summary-icon" aria-hidden="true">◷</span>
+                  <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
+                </article>
+                <article className="admin-summary-card admin-summary-green">
+                  <span className="admin-summary-icon" aria-hidden="true">✓</span>
+                  <div><span>En proceso</span><strong>{inProgressCount}</strong></div>
+                </article>
+              </section>
+
+              <div className="admin-board-heading" id="admin-board">
+                <div>
+                  <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
+                  <p>{visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}</p>
+                </div>
+              </div>
+
+              <section className={`admin-board ${filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}>
+                {columns.map((column) => {
+                  const columnReports = column.status
+                    ? visibleReports.filter((item) => item.status === column.status)
+                    : visibleReports;
+
+                  return (
+                    <div className="admin-column" key={column.title}>
+                      <header className="admin-column-header">
+                        <h3>{column.title}</h3>
+                        <span>{columnReports.length}</span>
+                      </header>
+
+                      <div className="admin-column-cards">
+                        {columnReports.length === 0 ? (
+                          <p className="admin-column-empty">
+                            {search ? 'No hay coincidencias.' : 'No hay denuncias aquí.'}
+                          </p>
+                        ) : columnReports.map((item) => (
+                          <article className="admin-report-card" key={item.id}>
+                            <div className="admin-report-copy">
+                              <div className="admin-report-chips">
+                                <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
+                                  {item.status.replace(/_/g, ' ')}
+                                </span>
+                                {isAdmin && item.priority && (
+                                  <span className={`admin-priority-chip admin-priority-${item.priority.toLowerCase()}`}>
+                                    Prioridad {item.priority.toLowerCase()}
+                                  </span>
+                                )}
+                              </div>
+                              <small className="report-identifier">
+                                Identificador: {formatReportIdentifier(item.id)}
+                              </small>
+                              <h4>{item.title}</h4>
+                              <p>{item.description}</p>
+                              <div className="admin-report-meta">
+                                <span><b aria-hidden="true">⌖</b>{item.address || 'Ubicación sin dirección'}</span>
+                                <span><b aria-hidden="true">♙</b>{item.reporter?.isAnonymous ? 'Anónimo' : item.reporter?.firstName || item.reporter?.email || 'Ciudadano'}</span>
+                              </div>
+
+                              {item.latitude != null && item.longitude != null && (
+                                <a
+                                  className="admin-map-link"
+                                  href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <span aria-hidden="true">⌖</span> Ver mapa
+                                </a>
+                              )}
+
+                              {item.evidence?.map((photo) => (
+                                <ReportImage
+                                  key={photo.id}
+                                  reportId={item.id}
+                                  evidenceId={photo.id}
+                                />
+                              ))}
+                            </div>
+
+                            <div className="admin-report-actions">
+                              <label className="report-assignment">
+                                Asignar a funcionario
+                                <select
+                                  value={item.assignee?.id ?? ''}
+                                  onChange={(event) => {
+                                    if (event.target.value) {
+                                      void assignReport(item.id, event.target.value);
+                                    }
+                                  }}
+                                  aria-label={`Asignar denuncia ${formatReportIdentifier(item.id)}`}
+                                >
+                                  <option value="">Seleccionar funcionario</option>
+                                  {item.assignee && !assignableUsers.some((staff) => staff.id === item.assignee?.id) && (
+                                    <option value={item.assignee.id}>
+                                      {item.assignee.firstName || item.assignee.email}
+                                    </option>
+                                  )}
+                                  {assignableUsers.map((staff) => (
+                                    <option key={staff.id} value={staff.id}>
+                                      {staff.firstName
+                                        ? `${staff.firstName} ${staff.lastName ?? ''}`.trim()
+                                        : staff.email}
+                                      {isAdmin && staff.entityName ? ` · ${staff.entityName}` : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              {!item.assignee && (
+                                <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
+                              )}
+                              {item.assignee && (
+                                <p className="assigned-to">
+                                  Asignada a {item.assignee.firstName || item.assignee.email}
+                                </p>
+                              )}
+                              {(isAdmin || item.assignee?.id === currentUserId) && item.assignee && (
+                                <>
+                                  <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
+                                    En revisión
+                                  </button>
+                                  <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
+                                    Iniciar trabajo
+                                  </button>
+                                  <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
+                                    Marcar resuelta
+                                  </button>
+                                  <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
+                                    Denegar
+                                  </button>
+                                </>
+                              )}
+                              {item.status === 'RECHAZADO' && filter !== 'archived' && (
+                                <button className="secondary" onClick={() => archiveReport(item.id)}>
+                                  Archivar
+                                </button>
+                              )}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
+            </>
+          )}
         </section>
       </div>
     </main>
@@ -709,48 +735,48 @@ function App() {
                 </a>
               ) : (
                 <>
-              <a
-                href="/login"
-                className={authRoute === 'login' ? 'active' : ''}
-                aria-current={authRoute === 'login' ? 'page' : undefined}
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('login');
-                }}
-              >
-                <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
-                  <path d="M10 17l5-5-5-5M15 12H4" />
-                </svg>
-                <span>Iniciar sesión</span>
-              </a>
-              <a
-                href="/registro"
-                className={authRoute === 'register' ? 'active' : ''}
-                aria-current={authRoute === 'register' ? 'page' : undefined}
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('register');
-                }}
-              >
-                <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M15 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-4A4.5 4.5 0 0 0 2 18.5V20" />
-                  <circle cx="8.5" cy="6.5" r="4" />
-                  <path d="M19 8v6M16 11h6" />
-                </svg>
-                <span>Crear cuenta</span>
-              </a>
-              <a
-                href="/anonimo"
-                className={authRoute === 'anonymous' ? 'active' : ''}
-                aria-current={authRoute === 'anonymous' ? 'page' : undefined}
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('anonymous');
-                }}
-              >
-                Entrar como anónimo
-              </a>
+                  <a
+                    href="/login"
+                    className={authRoute === 'login' ? 'active' : ''}
+                    aria-current={authRoute === 'login' ? 'page' : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateAuth('login');
+                    }}
+                  >
+                    <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
+                      <path d="M10 17l5-5-5-5M15 12H4" />
+                    </svg>
+                    <span>Iniciar sesión</span>
+                  </a>
+                  <a
+                    href="/registro"
+                    className={authRoute === 'register' ? 'active' : ''}
+                    aria-current={authRoute === 'register' ? 'page' : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateAuth('register');
+                    }}
+                  >
+                    <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M15 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-4A4.5 4.5 0 0 0 2 18.5V20" />
+                      <circle cx="8.5" cy="6.5" r="4" />
+                      <path d="M19 8v6M16 11h6" />
+                    </svg>
+                    <span>Crear cuenta</span>
+                  </a>
+                  <a
+                    href="/anonimo"
+                    className={authRoute === 'anonymous' ? 'active' : ''}
+                    aria-current={authRoute === 'anonymous' ? 'page' : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateAuth('anonymous');
+                    }}
+                  >
+                    Entrar como anónimo
+                  </a>
                 </>
               )}
             </nav>
