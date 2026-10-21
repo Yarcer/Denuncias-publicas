@@ -2,13 +2,13 @@
 
 La publicación propuesta usa:
 
-- **Cloudflare Pages** para el frontend, con una dirección `*.pages.dev` y HTTPS.
+- **Cloudflare Pages** para el frontend, con una dirección `*.pages.dev` y HTTPS, o **Workers** si Pages no está disponible en el panel, con una dirección `*.workers.dev`.
 - **Render** para la API, con una dirección `*.onrender.com` y plan gratuito.
 - **Neon** para PostgreSQL y **Cloudflare R2** para evidencias privadas.
 
 Los planes gratuitos tienen límites y pueden cambiar. El servicio gratuito de Render puede suspenderse cuando no se usa; la primera solicitud después de una pausa puede demorar. No es un SLA para un servicio público crítico.
 
-La dirección de Pages será un subdominio gratuito como `https://denuncias-publicas.pages.dev`, si ese nombre está disponible. No es un dominio `.com` propio ni queda reservado hasta que crees el proyecto en Cloudflare.
+La dirección será un subdominio gratuito `*.pages.dev` o `*.workers.dev`, según la plataforma, si el nombre está disponible. No es un dominio `.com` propio ni queda reservado hasta que crees el proyecto en Cloudflare.
 
 ## 1. Subir el repositorio
 
@@ -29,15 +29,17 @@ Sube el proyecto a un repositorio privado de GitHub. No subas archivos `.env`, c
 
 ## 4. Desplegar la API
 
-1. Elige primero el nombre de Pages que intentarás usar; ese nombre define el origen CORS, por ejemplo `https://denuncias-publicas.pages.dev`.
+1. Elige primero el nombre de tu sitio; luego usarás su URL pública completa como origen CORS en Render.
 2. En Render, crea un **Blueprint** desde el repositorio y acepta la configuración de `render.yaml`.
 3. Completa los campos `DATABASE_URL`, `CORS_ORIGIN`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY`.
 4. Despliega la API. Render genera el secreto JWT automáticamente.
 5. Comprueba `https://<tu-api>.onrender.com/api/health`.
 
-`CORS_ORIGIN` debe ser el origen exacto de Pages, por ejemplo `https://denuncias-publicas.pages.dev`, sin ruta final. Las migraciones y categorías iniciales se preparan al iniciar la API. En producción el seed no crea usuarios demo; mantén una sola instancia mientras uses este comando de arranque.
+`CORS_ORIGIN` debe ser el origen HTTPS exacto de la web publicada (`*.pages.dev` o `*.workers.dev`), sin ruta final. Las migraciones y categorías iniciales se preparan al iniciar la API. En producción el seed no crea usuarios demo; mantén una sola instancia mientras uses este comando de arranque.
 
 ## 5. Desplegar el frontend
+
+### Cloudflare Pages
 
 En Cloudflare Pages, crea el proyecto con el nombre elegido, conecta el repositorio y configura:
 
@@ -45,7 +47,19 @@ En Cloudflare Pages, crea el proyecto con el nombre elegido, conecta el reposito
 - **Build output directory:** `frontend/dist`
 - **Variable de entorno de producción:** `VITE_API_URL=https://<tu-api>.onrender.com/api`
 
-Tras el primer despliegue, configura `CORS_ORIGIN` en Render con la dirección real de Pages y vuelve a desplegar la API. El archivo `frontend/public/_redirects` permite que las rutas de React funcionen al recargar la página.
+Tras el primer despliegue, configura `CORS_ORIGIN` en Render con el origen real de Pages (`https://<nombre>.pages.dev`) o Workers (`https://<nombre>.<subdominio>.workers.dev`) y vuelve a desplegar la API. En Pages, el archivo `frontend/public/_redirects` permite recargar las rutas de React; en Workers el fallback SPA está definido por Wrangler.
+
+### Cloudflare Workers
+
+Si el panel solo permite crear Workers, despliega el frontend estático como Worker con la configuración incluida en `frontend/wrangler.jsonc`:
+
+- Conecta `Yarcer/Denuncias-publicas` desde **Workers & Pages → Create application → Worker → Connect to Git**.
+- **Root directory:** `frontend`
+- **Build command:** `pnpm install --frozen-lockfile --prod=false && pnpm build`
+- **Deploy command:** `pnpm exec wrangler deploy`
+- Agrega `VITE_API_URL=https://<tu-api>.onrender.com/api` en las variables de build del entorno **Production**.
+
+El Worker `denuncias-publicas` sirve el frontend compilado en `frontend/dist` y configura fallback SPA para las rutas de React. Si ya creaste un Worker con otro nombre, cambia `name` en `frontend/wrangler.jsonc` para que coincida.
 
 Los builds de producción fallan deliberadamente si falta `VITE_API_URL` o si no es una URL HTTPS terminada en `/api`.
 
