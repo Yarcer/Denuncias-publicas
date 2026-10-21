@@ -2464,6 +2464,47 @@ textarea {
   min-height: min(460px, calc(100svh - 250px));
 }
 
+/* Keep the complete form reachable when registration needs more vertical space. */
+.app-shell.auth-shell {
+  height: auto;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.auth-access-stack {
+  flex: 0 0 auto;
+}
+
+.auth-panel {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+@media (max-width: 720px) {
+  .app-shell.auth-shell {
+    justify-content: flex-start;
+    padding: 12px;
+  }
+
+  .auth-access-stack {
+    width: 100%;
+  }
+
+  .auth-panel {
+    padding: 18px 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .auth-name-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
 .emergency-shortcuts {
   display: grid;
   grid-template-columns: minmax(190px, 0.75fr) minmax(0, 1.8fr);
