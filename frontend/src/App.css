@@ -2794,3 +2794,160 @@ textarea {
   color: #5f46ad;
   border-color: #d2c4f2;
 }
+
+.citizen-home {
+  margin: 28px 42px 42px;
+  padding: clamp(22px, 4vw, 38px);
+  border: 1px solid #dbeafe;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #fff 0%, #f5faff 100%);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+.citizen-home-intro h1 {
+  margin: 14px 0 8px;
+  color: #0f172a;
+  font-size: clamp(1.7rem, 4vw, 2.35rem);
+  line-height: 1.15;
+}
+
+.citizen-home-intro p {
+  max-width: 650px;
+  margin: 0;
+  color: #52647c;
+  line-height: 1.65;
+}
+
+.citizen-status-panel {
+  margin-top: 26px;
+  padding: 22px;
+  border: 1px solid #dbe5f0;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.citizen-status-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.citizen-status-heading h2 {
+  margin: 10px 0 0;
+  color: #13243a;
+  font-size: 1.25rem;
+}
+
+.citizen-status-heading > strong {
+  color: #1d4ed8;
+  font-size: 1.6rem;
+}
+
+.citizen-status-message {
+  margin: 14px 0 0;
+  color: #52647c;
+  line-height: 1.5;
+}
+
+.citizen-status-list {
+  margin-top: 12px;
+}
+
+.citizen-status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid #e8eef5;
+}
+
+.citizen-status-item > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.citizen-status-item small {
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.citizen-status-item strong {
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+.citizen-status-item > span {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eaf3ff;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.citizen-status-link,
+.citizen-home-logout,
+.citizen-status-error button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.citizen-status-link {
+  margin-top: 12px;
+  background: #e8eef6;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+.citizen-home-logout {
+  margin-top: 20px;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  box-shadow: none;
+}
+
+.citizen-status-error {
+  margin-top: 14px;
+  color: #991b1b;
+}
+
+.citizen-status-error p {
+  margin: 0 0 10px;
+}
+
+.citizen-status-error button {
+  background: #fee2e2;
+  color: #991b1b;
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  .citizen-home {
+    margin: 18px;
+    padding: 22px 18px;
+  }
+
+  .citizen-status-panel {
+    padding: 18px 14px;
+  }
+
+  .citizen-status-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .citizen-home-logout,
+  .citizen-status-link {
+    width: 100%;
+  }
+}

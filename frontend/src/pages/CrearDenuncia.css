@@ -269,3 +269,26 @@
   background: #eaf3ff;
   color: #2563eb;
 }
+
+@media (max-width: 720px) {
+  .ciudadano-nav {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .ciudadano-nav-logo img {
+    width: min(210px, 70vw);
+  }
+
+  .ciudadano-nav-links {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .ciudadano-nav-links button {
+    padding: 10px 12px;
+    font-size: 0.88rem;
+  }
+}

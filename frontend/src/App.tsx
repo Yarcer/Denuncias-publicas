@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import './App.css';
 import { api } from './lib/api';
 import { getApiErrorMessage } from './lib/api-error';
@@ -9,6 +9,7 @@ import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
 type AuthRoute = 'login' | 'register' | 'anonymous' | 'management-login';
+type CitizenView = 'inicio' | 'crear' | 'reportes';
 
 function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   if (pathname === '/gestion/login') return 'management-login';
@@ -18,6 +19,25 @@ function getAuthRoute(pathname = window.location.pathname): AuthRoute {
 }
 
 type Report = { id: string; title: string; description: string; status: string };
+const reportStatusLabels: Record<string, string> = {
+  PENDIENTE: 'Pendiente',
+  EN_REVISION: 'En revisión',
+  ASIGNADO: 'Asignado',
+  EN_PROCESO: 'En proceso',
+  RESUELTO: 'Resuelto',
+  RECHAZADO: 'Rechazado',
+  CERRADO: 'Cerrado',
+};
+
+function isAnonymousUser(email: string) {
+  return email.startsWith('anon-') && email.endsWith('@anonymous.local');
+}
+
+async function fetchCitizenReports(): Promise<Report[]> {
+  const response = await api.get<{ data: { items: Report[] } }>('/denuncias');
+  return response.data.data.items;
+}
+
 type ManagedReport = Report & {
   address?: string | null;
   latitude?: number | null;
@@ -592,10 +612,11 @@ function App() {
   const managementLogin = authRoute === 'management-login';
   const [credentials, setCredentials] = useState({ email: '', password: '', firstName: '', lastName: '' });
   const [reports, setReports] = useState<Report[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [reportsError, setReportsError] = useState('');
   const [error, setError] = useState('');
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
-  const [vistaCiudadano, setVistaCiudadano] =
-    useState<'crear' | 'reportes'>('crear');
+  const [vistaCiudadano, setVistaCiudadano] = useState<CitizenView>('crear');
 
   function navigateAuth(route: AuthRoute) {
     const routePaths: Record<AuthRoute, string> = {
@@ -617,6 +638,22 @@ function App() {
     setError('');
   }
 
+  function resetCitizenReports() {
+    setReports([]);
+    setReportsError('');
+    setReportsLoading(true);
+  }
+
+  function clearCurrentSession() {
+    resetCitizenReports();
+    clearSession();
+  }
+
+  function logoutCitizen() {
+    clearCurrentSession();
+    navigateHome();
+  }
+
   useEffect(() => {
     function handlePopState() {
       setIsHome(window.location.pathname === '/');
@@ -628,21 +665,46 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  const loadCitizenReports = useCallback(async () => {
+    try {
+      setReports(await fetchCitizenReports());
+      setReportsError('');
+    } catch (loadError: unknown) {
+      console.error('Error cargando reportes:', loadError);
+      setReportsError(getApiErrorMessage(loadError, 'No se pudieron cargar tus reportes.'));
+    } finally {
+      setReportsLoading(false);
+    }
+  }, []);
+
+  function refreshCitizenReports() {
+    setReportsLoading(true);
+    setReportsError('');
+    void loadCitizenReports();
+  }
+
   useEffect(() => {
     if (!user) return;
 
-    async function cargarDatos() {
-      try {
-        const reportsResponse = await api.get('/denuncias');
-        setReports(reportsResponse.data.data.items);
-        console.log('Reportes cargados correctamente');
-      } catch (error) {
-        console.error('Error cargando reportes:', error);
-      }
+    let active = true;
+    fetchCitizenReports()
+      .then((items) => {
+        if (!active) return;
+        setReports(items);
+        setReportsError('');
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        console.error('Error cargando reportes:', loadError);
+        setReportsError(getApiErrorMessage(loadError, 'No se pudieron cargar tus reportes.'));
+      })
+      .finally(() => {
+        if (active) setReportsLoading(false);
+      });
 
-    }
-
-    void cargarDatos();
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   async function handleAuth(event: FormEvent) {
@@ -665,6 +727,7 @@ function App() {
           : { ...payload, portal: managementLogin ? 'gestion' : 'ciudadano' },
       );
 
+      resetCitizenReports();
       setSession(response.data.data.user, response.data.data.accessToken);
     } catch (authError: unknown) {
       setError(getApiErrorMessage(authError, 'No se pudo iniciar sesión.'));
@@ -675,6 +738,7 @@ function App() {
     setError('');
     try {
       const response = await api.post('/auth/anonymous');
+      resetCitizenReports();
       setSession(response.data.data.user, response.data.data.accessToken);
     } catch (anonymousError: unknown) {
       setError(getApiErrorMessage(anonymousError, 'No se pudo crear la sesión temporal.'));
@@ -993,10 +1057,12 @@ function App() {
       <ManagementDashboard
         isAdmin={user.role === 'ADMINISTRADOR'}
         currentUserId={user.id}
-        onLogout={clearSession}
+        onLogout={clearCurrentSession}
       />
     );
   }
+  const isAnonymous = isAnonymousUser(user.email);
+
   return (
     <main className="app-shell">
       <section className="dashboard">
@@ -1010,7 +1076,11 @@ function App() {
           </div>
 
           <div className="ciudadano-nav-links">
-            <button type="button">
+            <button
+              type="button"
+              className={vistaCiudadano === 'inicio' ? 'nav-activo' : ''}
+              onClick={() => setVistaCiudadano('inicio')}
+            >
               Inicio
             </button>
 
@@ -1046,7 +1116,7 @@ function App() {
                     type="button"
                     onClick={() => {
                       setMenuCuentaAbierto(false);
-                      clearSession();
+                      logoutCitizen();
                     }}
                   >
                     Cerrar sesión
@@ -1058,17 +1128,92 @@ function App() {
           </div>
         </nav>
 
-        <header className="dashboard-header">
-          <div>
-            <span className="eyebrow">Panel ciudadano</span>
-            <h1>Hola, {user.firstName || user.email}</h1>
-          </div>
-        </header>
+        {vistaCiudadano === 'inicio' && (
+          <section className="citizen-home" aria-labelledby="citizen-home-title">
+            <div className="citizen-home-intro">
+              <span className="eyebrow">Inicio</span>
+              <h1 id="citizen-home-title">
+                {isAnonymous ? 'Tu voz ayuda a mejorar la comunidad.' : `Hola, ${user.firstName || 'ciudadano'}`}
+              </h1>
+              <p>
+                {isAnonymous
+                  ? 'PuntoReporte conecta a la ciudadanía con los organismos públicos para comunicar problemas de la comunidad.'
+                  : 'Desde aquí podés consultar el estado de tus reportes y seguir sus novedades.'}
+              </p>
+            </div>
 
-        <EmergencyShortcuts />
+            {!isAnonymous && (
+              <section className="citizen-status-panel" aria-labelledby="citizen-status-title">
+                <div className="citizen-status-heading">
+                  <div>
+                    <span className="eyebrow">Seguimiento</span>
+                    <h2 id="citizen-status-title">Estado de tus reportes</h2>
+                  </div>
+                  {!reportsLoading && !reportsError && <strong>{reports.length}</strong>}
+                </div>
+
+                {reportsLoading ? (
+                  <p className="citizen-status-message" role="status">Cargando tus reportes…</p>
+                ) : reportsError ? (
+                  <div className="citizen-status-error" role="alert">
+                    <p>{reportsError}</p>
+                    <button type="button" onClick={refreshCitizenReports}>
+                      Reintentar
+                    </button>
+                  </div>
+                ) : reports.length === 0 ? (
+                  <p className="citizen-status-message">
+                    Todavía no tienes reportes. Cuando registres uno, podrás seguir su estado aquí.
+                  </p>
+                ) : (
+                  <div className="citizen-status-list">
+                    {reports.slice(0, 3).map((report) => (
+                      <article className="citizen-status-item" key={report.id}>
+                        <div>
+                          <small>{formatReportIdentifier(report.id)}</small>
+                          <strong>{report.title}</strong>
+                        </div>
+                        <span>{reportStatusLabels[report.status] ?? report.status.replace(/_/g, ' ')}</span>
+                      </article>
+                    ))}
+                  </div>
+                )}
+
+                {reports.length > 0 && !reportsError && (
+                  <button
+                    className="citizen-status-link"
+                    type="button"
+                    onClick={() => setVistaCiudadano('reportes')}
+                  >
+                    Ver todos mis reportes
+                  </button>
+                )}
+              </section>
+            )}
+
+            {!isAnonymous && (
+              <button className="citizen-home-logout" type="button" onClick={logoutCitizen}>
+                Cerrar sesión
+              </button>
+            )}
+          </section>
+        )}
+
+        {vistaCiudadano !== 'inicio' && (
+          <>
+            <header className="dashboard-header">
+              <div>
+                <span className="eyebrow">Panel ciudadano</span>
+                <h1>Hola, {user.firstName || user.email}</h1>
+              </div>
+            </header>
+
+            <EmergencyShortcuts />
+          </>
+        )}
 
         {vistaCiudadano === 'crear' && (
-          <CrearDenuncia />
+          <CrearDenuncia onReportCreated={refreshCitizenReports} />
         )}
 
         {vistaCiudadano === 'reportes' && (
@@ -1084,7 +1229,11 @@ function App() {
               <strong>{reports.length}</strong>
             </div>
 
-            {reports.length === 0 ? (
+            {reportsError ? (
+              <p className="empty-state" role="alert">{reportsError}</p>
+            ) : reportsLoading ? (
+              <p className="empty-state" role="status">Cargando tus reportes…</p>
+            ) : reports.length === 0 ? (
               <p className="empty-state">
                 Todavía no tienes reportes registrados.
               </p>
@@ -1102,7 +1251,7 @@ function App() {
                     <p>{item.description}</p>
                   </div>
 
-                  <span>{item.status}</span>
+                  <span>{reportStatusLabels[item.status] ?? item.status.replace(/_/g, ' ')}</span>
                 </article>
               ))
             )}

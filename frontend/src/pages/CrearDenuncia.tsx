@@ -21,6 +21,10 @@ type Category = {
   type: string
 }
 
+type CrearDenunciaProps = {
+  onReportCreated?: () => void
+}
+
 const subcategorias = {
   infraestructura: [
     'Baches o calles en mal estado',
@@ -75,7 +79,7 @@ function SelectorUbicacion({
   )
 }
 
-function CrearDenuncia() {
+function CrearDenuncia({ onReportCreated }: CrearDenunciaProps) {
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriaId, setCategoriaId] = useState('')
   const [categoriaNombre, setCategoriaNombre] = useState('')
@@ -217,6 +221,7 @@ setVistaPrevia('')
     ? `Reporte registrado correctamente. Tu identificador es ${formatReportIdentifier(response.data.data.id)}.`
     : `El reporte se guardó, pero no se pudo adjuntar la foto. Tu identificador es ${formatReportIdentifier(response.data.data.id)}.`
 )
+      onReportCreated?.()
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'No se pudo registrar la denuncia.'))
     }
