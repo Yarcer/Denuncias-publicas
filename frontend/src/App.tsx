@@ -584,6 +584,7 @@ function ManagementDashboard({
 
 function App() {
   const { user, setSession, clearSession } = useAuthStore();
+  const [isHome, setIsHome] = useState(() => window.location.pathname === '/');
   const [authRoute, setAuthRoute] = useState<AuthRoute>(() =>
     getAuthRoute(),
   );
@@ -605,12 +606,20 @@ function App() {
     };
 
     window.history.pushState({}, '', routePaths[route]);
+    setIsHome(false);
     setAuthRoute(route);
+    setError('');
+  }
+
+  function navigateHome() {
+    window.history.pushState({}, '', '/');
+    setIsHome(true);
     setError('');
   }
 
   useEffect(() => {
     function handlePopState() {
+      setIsHome(window.location.pathname === '/');
       setAuthRoute(getAuthRoute());
       setError('');
     }
@@ -673,6 +682,69 @@ function App() {
   }
 
   if (!user) {
+    if (isHome) {
+      return (
+        <main className="app-shell auth-shell home-shell">
+          <div className="auth-background" aria-hidden="true">
+            <img className="auth-photo-image" src={plazaConstitucionMelo} alt="" />
+            <div className="auth-photo-overlay" />
+          </div>
+
+          <section className="home-panel" aria-labelledby="home-title">
+            <img
+              src={puntoReporteLogo}
+              alt="PuntoReporte"
+              className="home-logo"
+            />
+            <span className="home-eyebrow">Tu comunidad, más escuchada</span>
+            <h1 id="home-title">Reportar es el primer paso para mejorar.</h1>
+            <p className="home-intro">
+              PuntoReporte conecta a la ciudadanía con los organismos públicos.
+              Registrá problemas de tu comunidad, compartí los detalles y consultá
+              el seguimiento de cada denuncia.
+            </p>
+
+            <nav className="home-actions" aria-label="Elegí cómo continuar">
+              <a
+                className="home-action home-action-primary"
+                href="/registro"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('register');
+                }}
+              >
+                Crear una cuenta
+              </a>
+              <a
+                className="home-action"
+                href="/login"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('login');
+                }}
+              >
+                Iniciar sesión
+              </a>
+              <a
+                className="home-action"
+                href="/anonimo"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('anonymous');
+                }}
+              >
+                Continuar como anónimo
+              </a>
+            </nav>
+
+            <p className="home-note">
+              También podés reportar sin crear una cuenta.
+            </p>
+          </section>
+        </main>
+      );
+    }
+
     return (
       <main className="app-shell auth-shell">
         <div className="auth-background" aria-hidden="true">
@@ -685,11 +757,21 @@ function App() {
         </div>
 
         <div className="auth-access-stack">
-          <img
-            src={puntoReporteLogo}
-            alt="PuntoReporte"
-            className="auth-brand-logo"
-          />
+          <a
+            className="auth-home-link"
+            href="/"
+            aria-label="Volver al inicio de PuntoReporte"
+            onClick={(event) => {
+              event.preventDefault();
+              navigateHome();
+            }}
+          >
+            <img
+              src={puntoReporteLogo}
+              alt="PuntoReporte"
+              className="auth-brand-logo"
+            />
+          </a>
 
           <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
 
