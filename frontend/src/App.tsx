@@ -225,12 +225,15 @@ function ManagementDashboard({
 }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
-  const [managementView, setManagementView] = useState<'reports' | 'users'>('reports');
+  const [managementView, setManagementView] = useState<
+    'reports' | 'users' | 'create-user'
+  >(isAdmin ? 'users' : 'reports');
   const [filter, setFilter] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
 
   async function loadReports(selectedStatus = filter) {
+    if (isAdmin) return;
     try {
       const response = await api.get(
         '/denuncias/gestion/bandeja',
@@ -244,6 +247,7 @@ function ManagementDashboard({
   }
 
   useEffect(() => {
+    if (isAdmin) return;
     let active = true;
 
     async function fetchReports() {
@@ -267,9 +271,10 @@ function ManagementDashboard({
     return () => {
       active = false;
     };
-  }, [filter]);
+  }, [filter, isAdmin]);
 
   useEffect(() => {
+    if (isAdmin) return;
     async function loadAssignableUsers() {
       try {
         const response = await api.get('/denuncias/gestion/funcionarios');
@@ -370,35 +375,49 @@ function ManagementDashboard({
           </div>
 
           <nav className="admin-nav" aria-label="Navegación de administración">
-            <button type="button" onClick={() => scrollToSection('admin-summary')}>
-              <span aria-hidden="true">⌂</span> Inicio
-            </button>
-            <button
-              type="button"
-              className={managementView === 'reports' && !isArchivedView ? 'admin-nav-active' : ''}
-              onClick={() => {
-                setManagementView('reports');
-                setFilter('active');
-                scrollToSection('admin-board');
-              }}
-            >
-              <span aria-hidden="true">▤</span> Bandeja de reportes
-            </button>
-            <button
-              type="button"
-              className={managementView === 'reports' && isArchivedView ? 'admin-nav-active' : ''}
-              onClick={() => { setManagementView('reports'); setFilter('archived'); }}
-            >
-              <span aria-hidden="true">▣</span> Archivadas
-            </button>
+            {!isAdmin && (
+              <>
+                <button type="button" onClick={() => scrollToSection('admin-summary')}>
+                  <span aria-hidden="true">⌂</span> Inicio
+                </button>
+                <button
+                  type="button"
+                  className={managementView === 'reports' && !isArchivedView ? 'admin-nav-active' : ''}
+                  onClick={() => {
+                    setManagementView('reports');
+                    setFilter('active');
+                    scrollToSection('admin-board');
+                  }}
+                >
+                  <span aria-hidden="true">▤</span> Bandeja de reportes
+                </button>
+                <button
+                  type="button"
+                  className={managementView === 'reports' && isArchivedView ? 'admin-nav-active' : ''}
+                  onClick={() => { setManagementView('reports'); setFilter('archived'); }}
+                >
+                  <span aria-hidden="true">▣</span> Archivadas
+                </button>
+              </>
+            )}
             {isAdmin && (
-              <button
-                type="button"
-                className={managementView === 'users' ? 'admin-nav-active' : ''}
-                onClick={() => setManagementView('users')}
-              >
-                <span aria-hidden="true">♙</span> Usuarios administrativos
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={managementView === 'users' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('users')}
+                >
+                  <span aria-hidden="true">◉</span> Cuentas de funcionarios
+                </button>
+
+                <button
+                  type="button"
+                  className={managementView === 'create-user' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('create-user')}
+                >
+                  <span aria-hidden="true">＋</span> Añadir funcionario
+                </button>
+              </>
             )}
           </nav>
 
@@ -408,8 +427,12 @@ function ManagementDashboard({
         </aside>
 
         <section className="admin-main">
-          {managementView === 'users' && isAdmin ? (
-            <GestionUsuarios currentUserId={currentUserId} />
+          {isAdmin ? (
+            <GestionUsuarios
+              currentUserId={currentUserId}
+              view={managementView === 'create-user' ? 'create-user' : 'users'}
+               onViewChange={(view) => setManagementView(view)}
+            />
           ) : (
             <>
               <header className="admin-header">
@@ -932,10 +955,10 @@ function App() {
     );
   }
 
-  if (user.role === 'ENTE_PUBLICO' || user.role === 'ADMINISTRADOR') {
+  if (user.role === 'FUNCIONARIO' || user.role === 'SUPERADMINISTRADOR') {
     return (
       <ManagementDashboard
-        isAdmin={user.role === 'ADMINISTRADOR'}
+        isAdmin={user.role === 'SUPERADMINISTRADOR'}
         currentUserId={user.id}
         onLogout={clearSession}
       />

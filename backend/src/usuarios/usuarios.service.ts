@@ -16,7 +16,7 @@ import {
 
 type AuthenticatedUser = { sub: string; role: string };
 
-const administrativeRoles: Role[] = [Role.ENTE_PUBLICO, Role.ADMINISTRADOR];
+const administrativeRoles: Role[] = [Role.FUNCIONARIO, Role.SUPERADMINISTRADOR];
 const administrativeUserSelection = {
   id: true,
   email: true,
@@ -82,8 +82,8 @@ export class UsuariosService {
     this.assertAdministrativeRole(role);
     this.assertOrganization(role, entityName ?? undefined);
 
-    if (id === actor.sub && role !== Role.ADMINISTRADOR) {
-      throw new BadRequestException('No puedes quitarte tu propio rol de administrador');
+    if (id === actor.sub && role !== Role.SUPERADMINISTRADOR) {
+      throw new BadRequestException('No puedes quitarte tu propio rol de SUPERADMINISTRADOR');
     }
 
     const data = {
@@ -140,19 +140,19 @@ export class UsuariosService {
   }
 
   private assertAdministrator(actor: AuthenticatedUser) {
-    if (actor.role !== Role.ADMINISTRADOR) {
-      throw new ForbiddenException('Solo un superadministrador puede gestionar usuarios');
+    if (actor.role !== Role.SUPERADMINISTRADOR) {
+      throw new ForbiddenException('Solo un superSUPERADMINISTRADOR puede gestionar usuarios');
     }
   }
 
   private assertAdministrativeRole(role: Role) {
     if (!administrativeRoles.includes(role)) {
-      throw new BadRequestException('El rol debe ser Ente público o Administrador');
+      throw new BadRequestException('El rol debe ser Ente público o SUPERADMINISTRADOR');
     }
   }
 
   private assertOrganization(role: Role, entityName?: string | null) {
-    if (role === Role.ENTE_PUBLICO && !entityName?.trim()) {
+    if (role === Role.FUNCIONARIO && !entityName?.trim()) {
       throw new BadRequestException('El organismo es obligatorio para usuarios de ente público');
     }
   }

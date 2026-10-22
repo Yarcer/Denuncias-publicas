@@ -13,7 +13,7 @@ type UploadedImage = {
   size: number;
 };
 type AuthenticatedUser = { sub: string; role: string };
-const managementRoles = ['ENTE_PUBLICO', 'ADMINISTRADOR'];
+const managementRoles = ['FUNCIONARIO'];
 const terminalStatuses: ReportStatus[] = [ReportStatus.RESUELTO, ReportStatus.RECHAZADO, ReportStatus.CERRADO];
 
 @Injectable()
@@ -31,7 +31,7 @@ export class DenunciasService {
       orderBy: { createdAt: 'desc' },
     });
 
-    const visibleItems = user.role === 'ADMINISTRADOR'
+    const visibleItems = user.role === 'SUPERADMINISTRADOR'
       ? items
       : items.map((item) => this.withoutPriority(item));
 
@@ -51,7 +51,7 @@ export class DenunciasService {
       },
     });
     this.assertCanAccess(report, user);
-    return user.role === 'ADMINISTRADOR' || !report
+    return user.role === 'SUPERADMINISTRADOR' || !report
       ? report
       : this.withoutPriority(report);
   }
@@ -87,13 +87,13 @@ export class DenunciasService {
         },
       },
       orderBy:
-        user.role === 'ADMINISTRADOR'
+        user.role === 'SUPERADMINISTRADOR'
           ? [{ priority: 'desc' }, { createdAt: 'asc' }]
           : { createdAt: 'asc' },
     });
 
     const visibleItems =
-      user.role === 'ADMINISTRADOR'
+      user.role === 'SUPERADMINISTRADOR'
         ? items
         : items.map((item) => this.withoutPriority(item));
 
@@ -107,21 +107,21 @@ export class DenunciasService {
   async assignableUsers(user: AuthenticatedUser) {
     this.assertManagementRole(user);
     const actor =
-      user.role === 'ENTE_PUBLICO'
+      user.role === 'FUNCIONARIO'
         ? await this.prisma.user.findUnique({
           where: { id: user.sub },
           select: { entityName: true },
         })
         : null;
 
-    if (user.role === 'ENTE_PUBLICO' && (!actor || !actor.entityName)) {
+    if (user.role === 'FUNCIONARIO' && (!actor || !actor.entityName)) {
       throw new BadRequestException(
         'Tu cuenta no tiene un ente público configurado',
       );
     }
 
     const where = {
-      role: 'ENTE_PUBLICO' as const,
+      role: 'FUNCIONARIO' as const,
       status: 'ACTIVO' as const,
       ...(actor ? { entityName: actor.entityName } : {}),
     };
@@ -163,7 +163,7 @@ export class DenunciasService {
       include: { category: true },
     });
 
-    return reporter?.role === 'ADMINISTRADOR'
+    return reporter?.role === 'SUPERADMINISTRADOR'
       ? report
       : this.withoutPriority(report);
   }
@@ -259,7 +259,7 @@ const archivedReport = await this.prisma.report.update({
   data: { archivedAt: new Date() },
 });
 
-return user.role === 'ADMINISTRADOR'
+return user.role === 'SUPERADMINISTRADOR'
   ? archivedReport
   : this.withoutPriority(archivedReport);
 
@@ -270,7 +270,7 @@ return user.role === 'ADMINISTRADOR'
     this.assertManagementRole(user);
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
-    if (user.role === 'ENTE_PUBLICO' && report.assigneeId && report.assigneeId !== user.sub) {
+    if (user.role === 'FUNCIONARIO' && report.assigneeId && report.assigneeId !== user.sub) {
       throw new ForbiddenException('Esta denuncia ya fue tomada por otro ente');
     }
     if (terminalStatuses.includes(report.status)) {
@@ -290,7 +290,7 @@ return user.role === 'ADMINISTRADOR'
       await transaction.reportHistory.create({
         data: { reportId: id, fromStatus: report.status, toStatus: ReportStatus.ASIGNADO, changedBy: user.sub },
       });
-      return user.role === 'ADMINISTRADOR'
+      return user.role === 'SUPERADMINISTRADOR'
         ? updated
         : this.withoutPriority(updated);
     });
@@ -304,19 +304,19 @@ return user.role === 'ADMINISTRADOR'
       throw new ForbiddenException('Esta denuncia ya está cerrada');
     }
 
-    const actor = user.role === 'ENTE_PUBLICO'
+    const actor = user.role === 'FUNCIONARIO'
       ? await this.prisma.user.findUnique({
         where: { id: user.sub },
         select: { entityName: true },
       })
       : null;
-    if (user.role === 'ENTE_PUBLICO' && (!actor || !actor.entityName)) {
+    if (user.role === 'FUNCIONARIO' && (!actor || !actor.entityName)) {
       throw new BadRequestException('Tu cuenta no tiene un ente público configurado');
     }
     const assignee = await this.prisma.user.findFirst({
       where: {
         id: dto.assigneeId,
-        role: 'ENTE_PUBLICO',
+        role: 'FUNCIONARIO',
         status: 'ACTIVO',
         ...(actor ? { entityName: actor.entityName } : {}),
       },
@@ -357,7 +357,7 @@ return user.role === 'ADMINISTRADOR'
     this.assertManagementRole(user);
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
-    if (user.role === 'ENTE_PUBLICO' && report.assigneeId !== user.sub) {
+    if (user.role === 'FUNCIONARIO' && report.assigneeId !== user.sub) {
       throw new ForbiddenException('Primero debes tomar esta denuncia');
     }
     if (terminalStatuses.includes(report.status)) {
@@ -377,7 +377,7 @@ return user.role === 'ADMINISTRADOR'
       await transaction.reportHistory.create({
         data: { reportId: id, fromStatus: report.status, toStatus: dto.status, changedBy: user.sub },
       });
-      return user.role === 'ADMINISTRADOR'
+      return user.role === 'SUPERADMINISTRADOR'
         ? updated
         : this.withoutPriority(updated);
     });
@@ -393,7 +393,7 @@ return user.role === 'ADMINISTRADOR'
 
     const updatedReport = await this.prisma.report.update({ where: { id }, data: dto });
 
-    return user.role === 'ADMINISTRADOR'
+    return user.role === 'SUPERADMINISTRADOR'
       ? updatedReport
       : this.withoutPriority(updatedReport);
   }
@@ -405,10 +405,17 @@ return user.role === 'ADMINISTRADOR'
     return { id, deleted: true };
   }
 
-  private assertCanAccess(report: { reporterId: string } | null, user: AuthenticatedUser) {
+    private assertCanAccess(report: { reporterId: string } | null, user: AuthenticatedUser) {
     if (!report) {
       throw new NotFoundException('Denuncia no encontrada');
     }
+
+    if (user.role === 'SUPERADMINISTRADOR') {
+      throw new ForbiddenException(
+        'El superadministrador no tiene acceso a denuncias',
+      );
+    }
+
     if (user.role === 'CIUDADANO' && report.reporterId !== user.sub) {
       throw new ForbiddenException('No tienes acceso a esta denuncia');
     }

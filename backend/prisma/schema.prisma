@@ -9,8 +9,8 @@ datasource db {
 
 enum Role {
   CIUDADANO
-  ENTE_PUBLICO
-  ADMINISTRADOR
+  FUNCIONARIO
+  SUPERADMINISTRADOR
 }
 
 enum UserStatus {

@@ -38,7 +38,7 @@
 
 .admin-users-layout {
   display: grid;
-  grid-template-columns: minmax(290px, 0.78fr) minmax(0, 1.5fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 18px;
 }

@@ -14,26 +14,26 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: 'admin@denuncias.local' },
-    update: { passwordHash: adminPassword, role: 'ADMINISTRADOR', status: 'ACTIVO' },
+    update: { passwordHash: adminPassword, role: 'SUPERADMINISTRADOR', status: 'ACTIVO' },
     create: {
       email: 'admin@denuncias.local',
       passwordHash: adminPassword,
       firstName: 'Admin',
       lastName: 'Demo',
-      role: 'ADMINISTRADOR',
+      role: 'SUPERADMINISTRADOR',
     },
   });
 
   await prisma.user.upsert({
     where: { email: 'ente@denuncias.local' },
-    update: { passwordHash: entityPassword, role: 'ENTE_PUBLICO', status: 'ACTIVO' },
+    update: { passwordHash: entityPassword, role: 'FUNCIONARIO', status: 'ACTIVO' },
     create: {
       email: 'ente@denuncias.local',
       passwordHash: entityPassword,
       firstName: 'Ente',
       lastName: 'Demo',
       entityName: 'Municipalidad Demo',
-      role: 'ENTE_PUBLICO',
+      role: 'FUNCIONARIO',
     },
   });
 
@@ -41,7 +41,7 @@ async function main() {
     where: { email: 'funcionario@denuncias.local' },
     update: {
       passwordHash: staffPassword,
-      role: 'ENTE_PUBLICO',
+      role: 'FUNCIONARIO',
       status: 'ACTIVO',
       entityName: 'Municipalidad Demo',
       jurisdiction: 'Melo',
@@ -53,7 +53,7 @@ async function main() {
       lastName: 'Demo',
       entityName: 'Municipalidad Demo',
       jurisdiction: 'Melo',
-      role: 'ENTE_PUBLICO',
+      role: 'FUNCIONARIO',
     },
   });
 

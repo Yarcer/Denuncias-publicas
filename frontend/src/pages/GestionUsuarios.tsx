@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../lib/api'
 import './GestionUsuarios.css'
 
-type AdministrativeRole = 'ENTE_PUBLICO' | 'ADMINISTRADOR'
+type AdministrativeRole = 'FUNCIONARIO' | 'SUPERADMINISTRADOR'
 type UserStatus = 'ACTIVO' | 'INACTIVO' | 'BANEADO'
 
 type AdministrativeUser = {
@@ -29,14 +29,22 @@ type UserForm = {
 const emptyForm: UserForm = {
   email: '',
   password: '',
-  role: 'ENTE_PUBLICO',
+  role: 'FUNCIONARIO',
   firstName: '',
   lastName: '',
   entityName: '',
   jurisdiction: '',
 }
 
-function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
+function GestionUsuarios({
+  currentUserId,
+  view,
+  onViewChange,
+}: {
+  currentUserId: string
+  view: 'users' | 'create-user'
+  onViewChange: (view: 'users' | 'create-user') => void
+}) {
   const [users, setUsers] = useState<AdministrativeUser[]>([])
   const [form, setForm] = useState<UserForm>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -76,7 +84,7 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
       entityName: user.entityName ?? '',
       jurisdiction: user.jurisdiction ?? '',
     })
-    document.getElementById('administrative-user-form')?.scrollIntoView({ behavior: 'smooth' })
+    onViewChange('create-user')
   }
 
   function cancelEditing() {
@@ -84,6 +92,7 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
     setForm(emptyForm)
     setError('')
     setNotice('')
+    onViewChange('users')
   }
 
   async function saveUser(event: FormEvent<HTMLFormElement>) {
@@ -138,18 +147,18 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
     <section className="admin-users-page">
       <header className="admin-users-heading">
         <div>
-          <span className="eyebrow">Administración</span>
-          <h1>Usuarios administrativos</h1>
-          <p>Gestiona accesos, roles y organismos.</p>
+          <span className="eyebrow">Panel Superadministrador</span>
+          <p>Gestion de accesos, roles y cuentas.</p>
         </div>
         <span className="admin-users-count">{users.length} cuentas</span>
       </header>
 
       <div className="admin-users-layout">
+        {view === 'create-user' && (
         <form id="administrative-user-form" className="admin-user-form" onSubmit={saveUser}>
           <div className="admin-user-form-heading">
             <div>
-              <h2>{editingId ? 'Editar usuario' : 'Crear usuario'}</h2>
+              <h2>{editingId ? 'Editar usuario' : 'Crear usuario funcionario'}</h2>
               <p>{editingId ? 'Actualiza sus datos administrativos.' : 'Crea una cuenta para gestionar reportes.'}</p>
             </div>
             {editingId && (
@@ -205,14 +214,14 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
                 disabled={editingId === currentUserId}
                 onChange={(event) => setForm({ ...form, role: event.target.value as AdministrativeRole })}
               >
-                <option value="ENTE_PUBLICO">Ente público</option>
-                <option value="ADMINISTRADOR">Administrador</option>
+                <option value="FUNCIONARIO">Ente público</option>
+                <option value="SUPERADMINISTRADOR">SUPERADMINISTRADOR</option>
               </select>
             </label>
             <label>
               Organismo
               <input
-                required={form.role === 'ENTE_PUBLICO'}
+                required={form.role === 'FUNCIONARIO'}
                 value={form.entityName}
                 onChange={(event) => setForm({ ...form, entityName: event.target.value })}
                 placeholder="Ej. Dirección de Tránsito"
@@ -235,7 +244,9 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
             {saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Crear usuario'}
           </button>
         </form>
+        )}
 
+        {view === 'users' && (
         <section className="admin-user-list" aria-labelledby="admin-user-list-title">
           <header>
             <div>
@@ -267,7 +278,7 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
                         <span>{user.email}</span>
                       </td>
                       <td>
-                        <strong>{user.role === 'ADMINISTRADOR' ? 'Administrador' : 'Ente público'}</strong>
+                        <strong>{user.role === 'SUPERADMINISTRADOR' ? 'SUPERADMINISTRADOR' : 'Ente público'}</strong>
                         <span>{user.entityName || user.jurisdiction || 'Sin organismo asignado'}</span>
                       </td>
                       <td>
@@ -295,6 +306,7 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
             </div>
           )}
         </section>
+        )}
       </div>
     </section>
   )
