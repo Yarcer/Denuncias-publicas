@@ -25,7 +25,7 @@ import { validate } from './config/env.validation';
       throttlers: [
         {
           ttl: 60_000,
-          limit: 100, // 100 requests por minuto
+          limit: 2, // 100 requests por minuto
         },
       ],
     }),
