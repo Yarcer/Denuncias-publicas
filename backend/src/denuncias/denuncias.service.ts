@@ -1,14 +1,17 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { ReportStatus } from '@prisma/client';
+import { Prisma, ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EvidenceStorageService } from './evidence-storage.service';
+import { getImageMimeType } from './image-validation';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
 
@@ -121,21 +124,38 @@ export class DenunciasService {
   }
 
   async create(reporterId: string, dto: CreateReportDto) {
-    return this.prisma.report.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        type: dto.type,
-        priority: dto.priority,
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        address: dto.address,
-        reference: dto.reference,
-        reporter: { connect: { id: reporterId } },
-        category: { connect: { id: dto.categoryId } },
+    const createdAfter = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const recentReportCount = await transaction.report.count({
+          where: { reporterId, createdAt: { gte: createdAfter } },
+        });
+        if (recentReportCount >= 10) {
+          throw new HttpException(
+            'Alcanzaste el máximo de 10 reportes en 24 horas.',
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+
+        return transaction.report.create({
+          data: {
+            title: dto.title,
+            description: dto.description,
+            type: dto.type,
+            priority: dto.priority,
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+            address: dto.address,
+            reference: dto.reference,
+            reporter: { connect: { id: reporterId } },
+            category: { connect: { id: dto.categoryId } },
+          },
+          include: { category: true },
+        });
       },
-      include: { category: true },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async uploadEvidence(
@@ -146,10 +166,11 @@ export class DenunciasService {
     const report = await this.prisma.report.findUnique({ where: { id } });
     this.assertCanAccess(report, user);
 
-    if (
-      !file?.buffer ||
-      !['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)
-    ) {
+    if (!file?.buffer) {
+      throw new BadRequestException('Adjuntá una imagen JPG, PNG o WebP');
+    }
+    const detectedMimeType = getImageMimeType(file.buffer);
+    if (!detectedMimeType || detectedMimeType !== file.mimetype) {
       throw new BadRequestException('Adjuntá una imagen JPG, PNG o WebP');
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -157,17 +178,17 @@ export class DenunciasService {
     }
 
     const extension =
-      file.mimetype === 'image/jpeg'
+      detectedMimeType === 'image/jpeg'
         ? 'jpg'
-        : file.mimetype === 'image/png'
+        : detectedMimeType === 'image/png'
           ? 'png'
           : 'webp';
     const filename = `${randomUUID()}.${extension}`;
-    await this.evidenceStorage.put(filename, file.buffer, file.mimetype);
+    await this.evidenceStorage.put(filename, file.buffer, detectedMimeType);
 
     try {
       return await this.prisma.evidence.create({
-        data: { reportId: id, url: filename, type: file.mimetype },
+        data: { reportId: id, url: filename, type: detectedMimeType },
       });
     } catch (error) {
       try {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import './CrearDenuncia.css'
 import { api } from '../lib/api'
 import { getApiErrorMessage } from '../lib/api-error'
@@ -90,8 +90,10 @@ function CrearDenuncia({ onReportCreated }: CrearDenunciaProps) {
   const [longitud, setLongitud] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
+  const [enviando, setEnviando] = useState(false)
   const [evidencia, setEvidencia] = useState<File | null>(null)
   const [vistaPrevia, setVistaPrevia] = useState('')
+  const enviandoRef = useRef(false)
 
 
   useEffect(() => {
@@ -158,6 +160,7 @@ function handleEvidenciaChange(file: File | null) {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    if (enviandoRef.current) return
 
     setError('')
     setMensaje('')
@@ -173,6 +176,8 @@ function handleEvidenciaChange(file: File | null) {
       return
     }
 
+    enviandoRef.current = true
+    setEnviando(true)
     try {
       const categoriaSeleccionada = categories.find(
         (category) => category.id === categoriaId
@@ -224,6 +229,9 @@ setVistaPrevia('')
       onReportCreated?.()
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'No se pudo registrar la denuncia.'))
+    } finally {
+      enviandoRef.current = false
+      setEnviando(false)
     }
   }
 
@@ -372,7 +380,9 @@ return (
         {error && <p className="error">{error}</p>}
         {mensaje && <p className="notice">{mensaje}</p>}
 
-        <button type="submit">Enviar reporte</button>
+        <button type="submit" disabled={enviando}>
+          {enviando ? 'Enviando…' : 'Enviar reporte'}
+        </button>
          </form>
     </main>
   )

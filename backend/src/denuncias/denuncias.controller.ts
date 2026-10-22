@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -61,6 +62,7 @@ export class DenunciasController {
   @Post()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CIUDADANO')
+  @Throttle({ default: { limit: 5, ttl: 60 * 1000 } })
   create(@Req() req: AuthenticatedRequest, @Body() dto: CreateReportDto) {
     return this.denunciasService.create(req.user.sub, dto);
   }

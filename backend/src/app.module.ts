@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { CsrfGuard } from './common/guards/csrf.guard';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
@@ -25,7 +26,7 @@ import { validate } from './config/env.validation';
       throttlers: [
         {
           ttl: 60_000,
-          limit: 2, // 100 requests por minuto
+          limit: 100,
         },
       ],
     }),
@@ -38,6 +39,9 @@ import { validate } from './config/env.validation';
     CategoriasModule,
     UsuariosModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: CsrfGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import './App.css';
 import { api } from './lib/api';
@@ -605,6 +606,7 @@ function ManagementDashboard({
 function App() {
   const { user, setSession, clearSession } = useAuthStore();
   const [isHome, setIsHome] = useState(() => window.location.pathname === '/');
+  const [authReady, setAuthReady] = useState(false);
   const [authRoute, setAuthRoute] = useState<AuthRoute>(() =>
     getAuthRoute(),
   );
@@ -649,9 +651,14 @@ function App() {
     clearSession();
   }
 
-  function logoutCitizen() {
-    clearCurrentSession();
-    navigateHome();
+  async function logoutCitizen() {
+    try {
+      await api.post('/auth/logout');
+      clearCurrentSession();
+      navigateHome();
+    } catch (logoutError: unknown) {
+      setError(getApiErrorMessage(logoutError, 'No se pudo cerrar la sesión en el servidor.'));
+    }
   }
 
   useEffect(() => {
@@ -664,6 +671,34 @@ function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    api.get('/auth/me')
+      .then((response) => {
+        if (active) {
+          setSession(response.data.data.user, response.data.data.csrfToken);
+        }
+      })
+      .catch((authError: unknown) => {
+        if (!active) return;
+        clearSession();
+        if (
+          !axios.isAxiosError(authError) ||
+          authError.response?.status !== 401
+        ) {
+          setError(getApiErrorMessage(authError, 'No se pudo verificar la sesión.'));
+        }
+      })
+      .finally(() => {
+        if (active) setAuthReady(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [clearSession, setSession]);
 
   const loadCitizenReports = useCallback(async () => {
     try {
@@ -728,7 +763,7 @@ function App() {
       );
 
       resetCitizenReports();
-      setSession(response.data.data.user, response.data.data.accessToken);
+      setSession(response.data.data.user, response.data.data.csrfToken);
     } catch (authError: unknown) {
       setError(getApiErrorMessage(authError, 'No se pudo iniciar sesión.'));
     }
@@ -739,10 +774,18 @@ function App() {
     try {
       const response = await api.post('/auth/anonymous');
       resetCitizenReports();
-      setSession(response.data.data.user, response.data.data.accessToken);
+      setSession(response.data.data.user, response.data.data.csrfToken);
     } catch (anonymousError: unknown) {
       setError(getApiErrorMessage(anonymousError, 'No se pudo crear la sesión temporal.'));
     }
+  }
+
+  if (!authReady) {
+    return (
+      <main className="app-shell auth-shell" aria-busy="true">
+        <p>Verificando sesión…</p>
+      </main>
+    );
   }
 
   if (!user) {
