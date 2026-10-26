@@ -377,6 +377,12 @@ textarea {
   white-space: nowrap;
 }
 
+.reports-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 14px 32px 12px;
+}
+
 /* ADMINISTRACIÓN */
 
 .management-toolbar {
@@ -987,7 +993,7 @@ textarea {
   }
 }
 
-/* Agregar al final de frontend/src/App.css. */
+
 .app-shell.admin-app-shell {
   display: block;
   width: 100%;
@@ -1087,7 +1093,7 @@ textarea {
 .admin-main {
   min-width: 0;
   padding: 30px clamp(20px, 3vw, 48px) 40px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .admin-header {
@@ -1167,6 +1173,7 @@ textarea {
   border: 1px solid #d7e1ed;
   border-radius: 12px;
   background: #fff;
+  padding: 0 12px;
 }
 
 .admin-summary {
@@ -2395,3 +2402,223 @@ textarea {
   }
 }
 
+
+/* Estilos de la barra lateral en filtros de administración de reportes - C */
+
+.admin-page-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  align-items: stretch;
+  gap: 20px;
+}
+
+.admin-page-content {
+  min-width: 0;
+}
+
+.admin-results {
+  min-width: 0;
+}
+
+.admin-filter-panel {
+  min-width: 0;
+  align-self: start;
+}
+
+.admin-page-layout:has(.admin-filter-panel details:not([open])) {
+  grid-template-columns: minmax(0, 1fr) 290px;
+  align-items: start;
+}
+
+.admin-page-layout:has(.admin-filter-panel details:not([open])) .admin-filter-panel {
+  grid-column: 2;
+  grid-row: 1;
+  margin-top: 60px;
+}
+
+.admin-page-layout:has(.admin-filter-panel details:not([open])) .admin-page-content {
+  display: contents;
+}
+
+.admin-page-layout:has(.admin-filter-panel details:not([open])) .admin-header {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.admin-page-layout:has(.admin-filter-panel details:not([open])) .admin-summary,
+.admin-page-layout:has(.admin-filter-panel details:not([open])) .admin-results,
+.admin-page-layout:has(.admin-filter-panel details:not([open])) .management-error {
+  grid-column: 1 / -1;
+}
+
+.admin-filter-panel details {
+  position: sticky;
+  top: 18px;
+  padding: 6px 14px;
+  border: 1px solid #dce7f3;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(19, 37, 66, 0.045);
+}
+
+.admin-filter-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-filter-heading::-webkit-details-marker {
+  display: none;
+}
+
+.admin-filter-heading > span:first-child {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 12px;
+  background: #e3efff;
+  color: #1556b5;
+  font-size: 1.3rem;
+}
+
+.admin-filter-title {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-filter-title strong {
+  color: #132542;
+  font-size: 1.05rem;
+}
+
+.admin-filter-title small {
+  color: #6b7c92;
+  font-size: 0.82rem;
+}
+
+.admin-filter-chevron {
+  margin-left: auto;
+  color: #6b7c92;
+  transition: transform 160ms ease;
+}
+
+.admin-filter-panel details[open] .admin-filter-chevron {
+  transform: rotate(180deg);
+}
+
+.admin-filter-fields {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.admin-filter-control {
+  display: grid;
+  gap: 7px;
+  color: #435670;
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.admin-filter-control select,
+.admin-filter-control input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid #d7e1ed;
+  border-radius: 10px;
+  background: #fff;
+  color: #10213b;
+}
+
+.admin-filter-group {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid #e8eef5;
+}
+
+.admin-filter-group legend {
+  padding: 0 8px 0 0;
+  color: #132542;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.admin-clear-filters {
+  justify-self: center;
+  width: auto;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #52647c;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+  margin: 8px;
+}
+
+.admin-clear-filters:hover {
+  background: #f1f5f9;
+  color: #1556b5;
+}
+
+@media (max-width: 1450px) {
+  .admin-board-active {
+    grid-template-columns: repeat(2, minmax(235px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-page-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-page-layout:has(.admin-filter-panel details:not([open])) .admin-page-content {
+    display: block;
+  }
+
+  .admin-page-layout:has(.admin-filter-panel details:not([open])) .admin-header,
+  .admin-page-layout:has(.admin-filter-panel details:not([open])) .admin-summary,
+  .admin-page-layout:has(.admin-filter-panel details:not([open])) .admin-results,
+  .admin-page-layout:has(.admin-filter-panel details:not([open])) .management-error {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .admin-page-layout:has(.admin-filter-panel details:not([open])) .admin-filter-panel {
+    grid-column: auto;
+    grid-row: auto;
+    margin-top: 0;
+  }
+
+  .admin-filter-panel {
+    grid-row: 1;
+  }
+
+  .admin-filter-panel details {
+    position: static;
+  }
+}
+
+@media (min-width: 901px) {
+  .admin-filter-panel {
+    margin-top: 60px;
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-filter-panel {
+    margin-top: 0;
+  }
+}
