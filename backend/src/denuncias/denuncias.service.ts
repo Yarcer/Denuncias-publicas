@@ -76,6 +76,40 @@ async managementQueue(user: AuthenticatedUser, status?: string) {
   };
 }
 
+  async managementHistory(user: AuthenticatedUser) {
+    this.assertManagementRole(user);
+
+    const items = await this.prisma.reportHistory.findMany({
+      where: user.role === 'ENTE_PUBLICO' ? { report: { assigneeId: user.sub } } : {},
+      select: {
+        id: true,
+        fromStatus: true,
+        toStatus: true,
+        changedBy: true,
+        createdAt: true,
+        report: { select: { id: true, title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const responsibleIds = [...new Set(items.map((item) => item.changedBy))];
+    const responsibleUsers = responsibleIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: responsibleIds } },
+          select: { id: true, firstName: true, lastName: true, email: true, entityName: true },
+        })
+      : [];
+    const usersById = new Map(responsibleUsers.map((responsible) => [responsible.id, responsible]));
+
+    return {
+      items: items.map(({ changedBy, ...item }) => ({
+        ...item,
+        responsible: usersById.get(changedBy) ?? null,
+      })),
+      count: items.length,
+    };
+  }
+
   async create(reporterId: string, dto: CreateReportDto) {
     return this.prisma.report.create({
       data: {

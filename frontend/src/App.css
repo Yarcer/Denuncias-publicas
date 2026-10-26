@@ -1496,7 +1496,7 @@ textarea {
   }
 
   .admin-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
   }
 
@@ -2418,6 +2418,55 @@ textarea {
 
 .admin-results {
   min-width: 0;
+}
+
+.admin-page-layout-history {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-history-section {
+  min-width: 0;
+}
+
+.admin-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-history-card {
+  display: grid;
+  gap: 9px;
+  padding: 16px 18px;
+  border: 1px solid #dce7f3;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(19, 37, 66, 0.04);
+}
+
+.admin-history-change {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #667890;
+  font-size: 0.85rem;
+}
+
+.admin-history-card h3 {
+  margin: 0;
+  color: #132542;
+  font-size: 1rem;
+}
+
+.admin-history-card p {
+  margin: 0;
+  color: #52647c;
+  font-size: 0.88rem;
+}
+
+.admin-history-card time {
+  color: #6b7c92;
+  font-size: 0.8rem;
 }
 
 .admin-filter-panel {

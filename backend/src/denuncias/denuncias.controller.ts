@@ -27,6 +27,12 @@ export class DenunciasController {
     return this.denunciasService.managementQueue(req.user, status);
   }
 
+  @Get('gestion/historial')
+  @UseGuards(AuthGuard('jwt'))
+  managementHistory(@Req() req: AuthenticatedRequest) {
+    return this.denunciasService.managementHistory(req.user);
+  }
+
     @Get(':id/evidencia/:evidenceId')
   @UseGuards(AuthGuard('jwt'))
   async getEvidence(

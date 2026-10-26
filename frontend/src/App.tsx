@@ -38,6 +38,19 @@ type ManagedReport = Report & {
   }[];
   createdAt: string;
 };
+type ReportHistoryEntry = {
+  id: string;
+  fromStatus: string;
+  toStatus: string;
+  createdAt: string;
+  report: { id: string; title: string };
+  responsible: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    entityName: string | null;
+  } | null;
+};
 
 function ReportImage({
   reportId,
@@ -176,6 +189,8 @@ function ReportImage({
 
 function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => void }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
+  const [historyItems, setHistoryItems] = useState<ReportHistoryEntry[]>([]);
+  const [activeSection, setActiveSection] = useState<'queue' | 'history'>('queue');
   const [filter, setFilter] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateOrder, setDateOrder] = useState<'newest' | 'oldest'>('newest');
@@ -198,9 +213,25 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
     }
   }
 
+  async function loadHistory() {
+    try {
+      const response = await api.get('/denuncias/gestion/historial');
+      setHistoryItems(response.data.data.items);
+      setError('');
+    } catch (loadError: any) {
+      setError(loadError.response?.data?.message ?? 'No se pudo cargar el historial.');
+    }
+  }
+
   useEffect(() => {
     void loadReports();
   }, [filter]);
+
+  useEffect(() => {
+    if (activeSection === 'history') {
+      void loadHistory();
+    }
+  }, [activeSection]);
 
   async function archiveReport(id: string) {
     try {
@@ -306,6 +337,15 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
   const pendingCount = reports.filter((item) => item.status === 'PENDIENTE').length;
   const inProgressCount = reports.filter((item) => item.status === 'EN_PROCESO').length;
   const isArchivedView = filter === 'archived';
+  const isHistoryView = activeSection === 'history';
+  const visibleHistory = historyItems.filter((item) => {
+    const responsibleName = item.responsible
+      ? `${item.responsible.firstName ?? ''} ${item.responsible.lastName ?? ''} ${item.responsible.email} ${item.responsible.entityName ?? ''}`
+      : 'usuario no disponible';
+    return `${item.report.title} ${item.fromStatus} ${item.toStatus} ${responsibleName}`
+      .toLowerCase()
+      .includes(search);
+  });
 
 
   function scrollToSection(sectionId: string) {
@@ -327,8 +367,9 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
             </button>
             <button
               type="button"
-              className={!isArchivedView ? 'admin-nav-active' : ''}
+              className={!isArchivedView && !isHistoryView ? 'admin-nav-active' : ''}
               onClick={() => {
+                setActiveSection('queue');
                 setFilter('active');
                 scrollToSection('admin-board');
               }}
@@ -337,10 +378,20 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
             </button>
             <button
               type="button"
-              className={isArchivedView ? 'admin-nav-active' : ''}
-              onClick={() => setFilter('archived')}
+              className={isArchivedView && !isHistoryView ? 'admin-nav-active' : ''}
+              onClick={() => {
+                setActiveSection('queue');
+                setFilter('archived');
+              }}
             >
               <span aria-hidden="true">▣</span> Archivadas
+            </button>
+            <button
+              type="button"
+              className={isHistoryView ? 'admin-nav-active' : ''}
+              onClick={() => setActiveSection('history')}
+            >
+              <span aria-hidden="true">◷</span> Historial de cambios
             </button>
           </nav>
 
@@ -350,13 +401,17 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
         </aside>
 
         <section className="admin-main">
-          <div className="admin-page-layout">
+          <div className={`admin-page-layout${isHistoryView ? ' admin-page-layout-history' : ''}`}>
             <div className="admin-page-content">
               <header className="admin-header">
                 <div className="admin-page-title">
                   <span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span>
-                  <h1>Bandeja de denuncias</h1>
-                  <p>Organiza y sigue los reportes de la ciudad.</p>
+                  <h1>{isHistoryView ? 'Historial de cambios' : 'Bandeja de denuncias'}</h1>
+                  <p>
+                    {isHistoryView
+                      ? 'Consulta los cambios de estado, cuándo ocurrieron y quién los realizó.'
+                      : 'Organiza y sigue los reportes de la ciudad.'}
+                  </p>
                 </div>
 
                 <div className="admin-header-tools">
@@ -375,7 +430,7 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
 
               {error && <p className="error management-error">{error}</p>}
 
-              <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
+              {!isHistoryView && <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
                 <article className="admin-summary-card admin-summary-blue">
                   <span className="admin-summary-icon" aria-hidden="true">▤</span>
                   <div><span>Casos en esta vista</span><strong>{reports.length}</strong></div>
@@ -388,8 +443,57 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
                   <span className="admin-summary-icon" aria-hidden="true">✓</span>
                   <div><span>En proceso</span><strong>{inProgressCount}</strong></div>
                 </article>
-              </section>
+              </section>}
 
+              {isHistoryView ? (
+                <section className="admin-history-section" aria-label="Historial de cambios">
+                  <header className="admin-board-heading">
+                    <div>
+                      <h2>Actividad reciente</h2>
+                      <p>{visibleHistory.length} {visibleHistory.length === 1 ? 'cambio' : 'cambios'}</p>
+                    </div>
+                  </header>
+                  {visibleHistory.length === 0 ? (
+                    <p className="admin-column-empty">
+                      {search ? 'No hay cambios que coincidan con la búsqueda.' : 'Todavía no hay cambios de estado registrados.'}
+                    </p>
+                  ) : (
+                    <div className="admin-history-list">
+                      {visibleHistory.map((item) => {
+                        const responsibleName = item.responsible
+                          ? item.responsible.entityName
+                            || `${item.responsible.firstName ?? ''} ${item.responsible.lastName ?? ''}`.trim()
+                            || item.responsible.email
+                          : 'Usuario no disponible';
+
+                        return (
+                          <article className="admin-history-card" key={item.id}>
+                            <div className="admin-history-change">
+                              <span className={`admin-status-chip admin-status-${item.fromStatus.toLowerCase()}`}>
+                                {item.fromStatus.replace(/_/g, ' ')}
+                              </span>
+                              <span aria-hidden="true">→</span>
+                              <span className={`admin-status-chip admin-status-${item.toStatus.toLowerCase()}`}>
+                                {item.toStatus.replace(/_/g, ' ')}
+                              </span>
+                            </div>
+                            <h3>{item.report.title}</h3>
+                            <p>
+                              Modificado por <strong>{responsibleName}</strong>
+                            </p>
+                            <time dateTime={item.createdAt}>
+                              {new Intl.DateTimeFormat('es-UY', {
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                              }).format(new Date(item.createdAt))}
+                            </time>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              ) : (
               <div className="admin-results">
                 <div className="admin-board-heading" id="admin-board">
                   <div>
@@ -489,10 +593,11 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
                   })}
                 </section>
               </div>
+              )}
 
             </div>
 
-            <aside className="admin-filter-panel" aria-label="Filtros de denuncias">
+            {!isHistoryView && <aside className="admin-filter-panel" aria-label="Filtros de denuncias">
               <details open>
                 <summary className="admin-filter-heading">
                   <span aria-hidden="true">☷</span>
@@ -598,7 +703,7 @@ function ManagementDashboard({ isAdmin, onLogout }: { isAdmin: boolean; onLogout
                 </button>
                 </div>
               </details>
-            </aside>
+            </aside>}
           </div>
         </section>
       </div>
