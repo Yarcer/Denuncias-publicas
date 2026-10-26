@@ -19,7 +19,13 @@ function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   return 'login';
 }
 
-type Report = { id: string; title: string; description: string; status: string };
+type Report = {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority?: string;
+};
 const reportStatusLabels: Record<string, string> = {
   PENDIENTE: 'Pendiente',
   EN_REVISION: 'En revisión',
@@ -61,6 +67,13 @@ type ManagedReport = Report & {
   }[];
 };
 
+const priorityLabels: Record<string, string> = {
+  BAJA: 'Baja',
+  MEDIA: 'Media',
+  ALTA: 'Alta',
+  URGENTE: 'Urgente',
+};
+
 type AssignableUser = {
   id: string;
   email: string;
@@ -68,6 +81,36 @@ type AssignableUser = {
   lastName?: string | null;
   entityName?: string | null;
 };
+
+type ManagedCategory = {
+  id: string;
+  name: string;
+  type: string;
+  defaultPriority: string;
+  responsibleEntity: string | null;
+};
+
+type AdminIndicators = {
+  totals: {
+    received: number;
+    pending: number;
+    resolved: number;
+  };
+  categories: Array<{ id: string; name: string; count: number }>;
+  organizations: Array<{ name: string; count: number }>;
+  statuses: Array<{ status: string; label: string; count: number }>;
+  temporalEvolution: Array<{ month: string; count: number }>;
+};
+
+const monthLabels = new Intl.DateTimeFormat('es-UY', {
+  month: 'short',
+  year: '2-digit',
+  timeZone: 'UTC',
+});
+
+function formatIndicatorMonth(month: string) {
+  return monthLabels.format(new Date(`${month}-01T00:00:00Z`));
+}
 
 function EmergencyShortcuts() {
   const hotlines = [
@@ -233,6 +276,39 @@ function ReportImage({
 
 }
 
+function IndicatorBars({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ label: string; count: number }>;
+}) {
+  const maxCount = Math.max(1, ...items.map((item) => item.count));
+
+  return (
+    <section className="indicator-chart">
+      <h3>{title}</h3>
+      {items.length === 0 ? (
+        <p className="indicator-empty">No hay datos disponibles.</p>
+      ) : (
+        <ul className="indicator-bar-list">
+          {items.map((item) => (
+            <li key={item.label}>
+              <div className="indicator-bar-label">
+                <span>{item.label}</span>
+                <strong>{item.count}</strong>
+              </div>
+              <div className="indicator-bar-track">
+                <span style={{ width: `${(item.count / maxCount) * 100}%` }} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function ManagementDashboard({
   isAdmin,
   currentUserId,
@@ -244,9 +320,33 @@ function ManagementDashboard({
 }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const [categories, setCategories] = useState<ManagedCategory[]>([]);
+  const [indicators, setIndicators] = useState<AdminIndicators | null>(null);
+  const [categoryRouteDrafts, setCategoryRouteDrafts] = useState<
+    Record<string, string>
+  >({});
   const [filter, setFilter] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [routingSaved, setRoutingSaved] = useState('');
+  const [indicatorsError, setIndicatorsError] = useState('');
+
+  const loadIndicators = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const response = await api.get('/denuncias/gestion/indicadores');
+      setIndicators(response.data.data);
+      setIndicatorsError('');
+    } catch (loadError: unknown) {
+      setIndicatorsError(
+        getApiErrorMessage(loadError, 'No se pudieron cargar los indicadores.'),
+      );
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    void loadIndicators();
+  }, [loadIndicators]);
 
   async function loadReports(selectedStatus = filter) {
     try {
@@ -256,6 +356,7 @@ function ManagementDashboard({
       );
       setReports(response.data.data.items);
       setError('');
+      await loadIndicators();
     } catch (loadError: unknown) {
       setError(getApiErrorMessage(loadError, 'No se pudo cargar la bandeja.'));
     }
@@ -299,6 +400,60 @@ function ManagementDashboard({
 
     void loadAssignableUsers();
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    async function loadCategories() {
+      try {
+        const response = await api.get('/categorias');
+        const items: ManagedCategory[] = response.data.data.items;
+        setCategories(items);
+        setCategoryRouteDrafts(
+          Object.fromEntries(
+            items.map((category) => [
+              category.id,
+              category.responsibleEntity ?? '',
+            ]),
+          ),
+        );
+      } catch (loadError: unknown) {
+        setError(
+          getApiErrorMessage(
+            loadError,
+            'No se pudieron cargar las reglas de asignación.',
+          ),
+        );
+      }
+    }
+
+    void loadCategories();
+  }, [isAdmin]);
+
+  async function saveCategoryRoute(category: ManagedCategory) {
+    const responsibleEntity = categoryRouteDrafts[category.id]?.trim() ?? '';
+    try {
+      const response = await api.patch(`/categorias/${category.id}`, {
+        responsibleEntity: responsibleEntity || null,
+      });
+      setCategories((current) =>
+        current.map((item) =>
+          item.id === category.id ? response.data.data : item,
+        ),
+      );
+      setCategoryRouteDrafts((current) => ({
+        ...current,
+        [category.id]: responsibleEntity,
+      }));
+      setRoutingSaved(`Regla de ${category.name} guardada.`);
+      setError('');
+    } catch (saveError: unknown) {
+      setRoutingSaved('');
+      setError(
+        getApiErrorMessage(saveError, 'No se pudo guardar la regla de asignación.'),
+      );
+    }
+  }
 
   async function archiveReport(id: string) {
     try {
@@ -408,6 +563,16 @@ function ManagementDashboard({
             >
               <span aria-hidden="true">▣</span> Archivadas
             </button>
+            {isAdmin && (
+              <button type="button" onClick={() => scrollToSection('admin-indicators')}>
+                <span aria-hidden="true">▥</span> Indicadores
+              </button>
+            )}
+            {isAdmin && (
+              <button type="button" onClick={() => scrollToSection('routing-config')}>
+                <span aria-hidden="true">⇢</span> Asignación automática
+              </button>
+            )}
           </nav>
 
           <button type="button" className="admin-logout" onClick={onLogout}>
@@ -452,9 +617,156 @@ function ManagementDashboard({
             </div>
           </header>
 
+          {isAdmin && (
+            <section className="indicators-panel" id="admin-indicators">
+              <div className="indicators-heading">
+                <div>
+                  <span className="eyebrow">Resumen general</span>
+                  <h2>Indicadores de denuncias</h2>
+                  <p>Datos acumulados y evolución de los últimos 12 meses.</p>
+                </div>
+                <button
+                  type="button"
+                  className="indicators-refresh"
+                  onClick={() => void loadIndicators()}
+                >
+                  Actualizar
+                </button>
+              </div>
+              {indicatorsError && (
+                <p className="error management-error" role="alert">{indicatorsError}</p>
+              )}
+              {!indicators && !indicatorsError && (
+                <p className="indicators-loading" role="status">Cargando indicadores…</p>
+              )}
+              {indicators && (
+                <>
+                  <div className="indicators-kpis">
+                    <article className="indicator-kpi">
+                      <span>Denuncias recibidas</span>
+                      <strong>{indicators.totals.received}</strong>
+                    </article>
+                    <article className="indicator-kpi indicator-pending">
+                      <span>Pendientes</span>
+                      <strong>{indicators.totals.pending}</strong>
+                    </article>
+                    <article className="indicator-kpi indicator-resolved">
+                      <span>Resueltas</span>
+                      <strong>{indicators.totals.resolved}</strong>
+                    </article>
+                  </div>
+
+                  <div className="indicator-charts">
+                    <IndicatorBars
+                      title="Distribución por categoría"
+                      items={indicators.categories.map(({ name, count }) => ({ label: name, count }))}
+                    />
+                    <IndicatorBars
+                      title="Distribución por organismo"
+                      items={indicators.organizations.map(({ name, count }) => ({ label: name, count }))}
+                    />
+                    <IndicatorBars
+                      title="Denuncias por estado"
+                      items={indicators.statuses.map(({ label, count }) => ({ label, count }))}
+                    />
+                    <section className="indicator-chart indicator-timeline">
+                      <h3>Evolución mensual</h3>
+                      <div className="timeline-chart" role="img" aria-label="Denuncias recibidas por mes en los últimos 12 meses">
+                        {indicators.temporalEvolution.map(({ month, count }) => {
+                          const maxCount = Math.max(
+                            1,
+                            ...indicators.temporalEvolution.map((item) => item.count),
+                          );
+                          return (
+                            <div className="timeline-column" key={month}>
+                              <span className="timeline-count">{count}</span>
+                              <div className="timeline-track">
+                                <span
+                                  className="timeline-bar"
+                                  style={{ height: `${count === 0 ? 0 : Math.max(4, (count / maxCount) * 100)}%` }}
+                                />
+                              </div>
+                              <small>{formatIndicatorMonth(month)}</small>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+
           <EmergencyShortcuts />
 
           {error && <p className="error management-error">{error}</p>}
+
+          {isAdmin && (
+            <section className="routing-settings" id="routing-config">
+              <header>
+                <h2>Asignación automática por categoría</h2>
+                <p>
+                  Las denuncias se asignan al funcionario activo más antiguo del
+                  organismo indicado. Si no hay coincidencia, quedan pendientes.
+                </p>
+              </header>
+              <datalist id="known-entities">
+                {Array.from(
+                  new Set(
+                    assignableUsers
+                      .map((staff) => staff.entityName?.trim())
+                      .filter((entityName): entityName is string => Boolean(entityName)),
+                  ),
+                ).map((entityName) => (
+                  <option key={entityName} value={entityName} />
+                ))}
+              </datalist>
+              <div className="routing-category-list">
+                {categories.map((category) => (
+                  <div className="routing-category-row" key={category.id}>
+                    <div>
+                      <strong>{category.name}</strong>
+                      <small>Tipo: {category.type}</small>
+                    </div>
+                    <label>
+                      Organismo responsable
+                      <input
+                        list="known-entities"
+                        value={categoryRouteDrafts[category.id] ?? ''}
+                        onChange={(event) => {
+                          setCategoryRouteDrafts((current) => ({
+                            ...current,
+                            [category.id]: event.target.value,
+                          }));
+                          setRoutingSaved('');
+                        }}
+                        placeholder="Ej.: Municipalidad Demo"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void saveCategoryRoute(category)}
+                      disabled={
+                        (categoryRouteDrafts[category.id]?.trim() ?? '') ===
+                        (category.responsibleEntity ?? '')
+                      }
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                ))}
+                {categories.length === 0 && (
+                  <p className="routing-empty">No hay categorías configuradas.</p>
+                )}
+              </div>
+              {routingSaved && (
+                <p className="routing-success" role="status">
+                  {routingSaved}
+                </p>
+              )}
+            </section>
+          )}
 
           <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
             <article className="admin-summary-card admin-summary-blue">
@@ -501,6 +813,11 @@ function ManagementDashboard({
                         <div className="admin-report-copy">
                           <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
                             {item.status.replace(/_/g, ' ')}
+                          </span>
+                          <span
+                            className={`admin-priority-chip admin-priority-${(item.priority ?? 'MEDIA').toLowerCase()}`}
+                          >
+                            Prioridad: {priorityLabels[item.priority ?? 'MEDIA']}
                           </span>
                           <small className="report-identifier">
                             Identificador: {formatReportIdentifier(item.id)}
@@ -958,7 +1275,7 @@ function App() {
                 </svg>
                 <span>
                   <strong>Acceso para funcionarios</strong>
-                  <small>Ingresar al portal del ente público</small>
+                  <small>Ingresar al portal de funcionarios</small>
                 </span>
                 <b aria-hidden="true">→</b>
               </a>
@@ -995,7 +1312,7 @@ function App() {
                   {registering
                     ? 'Crear cuenta'
                     : managementLogin
-                      ? 'Acceso de ente público'
+                      ? 'Acceso de funcionario'
                       : 'Bienvenido/a'}
                 </h2>
                 <p className="auth-form-intro">

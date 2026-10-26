@@ -28,7 +28,6 @@ export class LoginUserDto {
   @IsNotEmpty()
   password: string;
 
-  @IsOptional()
-  @IsIn(['ciudadano', 'gestion'])
-  portal?: 'ciudadano' | 'gestion';
+  @IsIn(['ciudadano', 'funcionario', 'administrador', 'gestion'])
+  portal: 'ciudadano' | 'funcionario' | 'administrador' | 'gestion';
 }

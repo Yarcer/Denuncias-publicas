@@ -27,6 +27,18 @@ JWT_EXPIRES_IN=1h
 CORS_ORIGIN=http://localhost:5173
 ```
 
+Para enviar confirmaciones por correo, configura también los datos de tu proveedor SMTP en `backend/.env`:
+
+```env
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=usuario-smtp
+SMTP_PASSWORD=contraseña-smtp
+SMTP_FROM="Denuncias Públicas <no-reply@example.com>"
+```
+
+`SMTP_HOST`, `SMTP_PORT` y `SMTP_FROM` son obligatorios en conjunto; `SMTP_USER` y `SMTP_PASSWORD` también deben configurarse juntos. El puerto 465 usa TLS implícito. Sin SMTP configurado, la denuncia se registra normalmente y la pantalla informa que no se pudo enviar el correo. Las sesiones anónimas no reciben correo.
+
 ## Iniciar PostgreSQL
 
 Abre Docker Desktop y espera a que el motor esté listo. Después crea el contenedor:
@@ -120,10 +132,15 @@ pnpm --dir frontend dev
 
 - Iniciar sesión desde `/gestion/login`.
 - Ver la bandeja completa.
+- Consultar los indicadores generales de denuncias: totales recibidos, pendientes y resueltos; distribución por categoría, organismo y estado; y evolución mensual de los últimos 12 meses.
 - Gestionar denuncias y estados.
 - Consultar los cambios registrados en el historial.
 
-Las operaciones de gestión de categorías y usuarios están restringidas a administradores. La asignación interna requiere cuentas `ENTE_PUBLICO` activas con el mismo nombre de ente; el seed incluye un funcionario demo para probar ese flujo. La botonera telefónica usa los números uruguayos 911, 104 y 105.
+Las operaciones de gestión de categorías y usuarios están restringidas a administradores. En la bandeja de administración, la sección **Asignación automática** permite definir el organismo responsable de cada categoría. Al crear una denuncia, el backend comprueba que el tipo coincida con la categoría y la asigna al funcionario activo más antiguo cuyo nombre de organismo coincida; si no hay regla o funcionario activo, queda pendiente.
+
+La prioridad también se calcula en el backend a partir de `Category.defaultPriority`, cuyo valor inicial es `MEDIA` para todas las categorías. Un administrador puede cambiarla con `PATCH /api/categorias/:id` enviando, por ejemplo, `{"defaultPriority":"ALTA"}`; los valores aceptados son `BAJA`, `MEDIA`, `ALTA` y `URGENTE`. La API no acepta prioridad en el registro ni en la edición de denuncias por ciudadanos. No se aplican reglas de urgencia basadas en situaciones hasta que esos criterios sean aprobados.
+
+Para aplicar las nuevas columnas, ejecuta `npx prisma migrate deploy` desde `backend`. El seed de desarrollo configura las categorías demo para `Municipalidad Demo`; en producción no asigna un organismo automáticamente. La botonera telefónica usa los números uruguayos 911, 104 y 105.
 
 ## Solución de problemas
 

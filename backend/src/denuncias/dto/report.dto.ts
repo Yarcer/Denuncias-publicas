@@ -1,5 +1,13 @@
-import { ReportPriority, ReportStatus, ReportType } from '@prisma/client';
-import { IsEnum, IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { ReportStatus, ReportType } from '@prisma/client';
+import {
+  IsEnum,
+  IsLatitude,
+  IsLongitude,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateReportDto {
   @IsString()
@@ -12,10 +20,6 @@ export class CreateReportDto {
 
   @IsEnum(ReportType)
   type!: ReportType;
-
-  @IsEnum(ReportPriority)
-  @IsOptional()
-  priority?: ReportPriority;
 
   @IsLatitude()
   latitude!: number;
@@ -44,10 +48,6 @@ export class UpdateReportDto {
   @IsString()
   @IsOptional()
   description?: string;
-
-  @IsEnum(ReportPriority)
-  @IsOptional()
-  priority?: ReportPriority;
 
   @IsEnum(ReportStatus)
   @IsOptional()

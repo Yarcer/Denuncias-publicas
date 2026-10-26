@@ -67,6 +67,8 @@ async function seedDemoUsers() {
 }
 
 async function seedCategories() {
+  const demoResponsibleEntity =
+    process.env.NODE_ENV === 'production' ? null : 'Municipalidad Demo';
   const categories = [
     { name: 'Infraestructura', type: ReportType.URBANO },
     { name: 'Limpieza', type: ReportType.URBANO },
@@ -81,11 +83,15 @@ async function seedCategories() {
 
     await prisma.category.upsert({
       where: { id: slug },
-      update: { type: category.type },
+      update: {
+        type: category.type,
+        responsibleEntity: demoResponsibleEntity,
+      },
       create: {
         id: slug,
         name: category.name,
         type: category.type,
+        responsibleEntity: demoResponsibleEntity,
       },
     });
   }

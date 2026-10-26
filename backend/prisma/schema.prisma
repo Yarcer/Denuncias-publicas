@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -57,20 +56,22 @@ model User {
   entityName   String?
   jurisdiction String?
 
-  reports         Report[] @relation("reportedBy")
-  assignedReports Report[] @relation("assignedTo")
+  reports         Report[]  @relation("reportedBy")
+  assignedReports Report[]  @relation("assignedTo")
   comments        Comment[]
 }
 
 model Category {
-  id          String      @id @default(uuid())
-  name        String
-  description String?
-  type        ReportType
-  active      Boolean     @default(true)
-  reports     Report[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id                String         @id @default(uuid())
+  name              String
+  description       String?
+  type              ReportType
+  defaultPriority   ReportPriority @default(MEDIA)
+  responsibleEntity String?
+  active            Boolean        @default(true)
+  reports           Report[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 }
 
 model Report {
@@ -95,13 +96,13 @@ model Report {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
-  evidence    Evidence[]
-  comments    Comment[]
-  history     ReportHistory[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  resolvedAt  DateTime?
-    archivedAt  DateTime?
+  evidence   Evidence[]
+  comments   Comment[]
+  history    ReportHistory[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  resolvedAt DateTime?
+  archivedAt DateTime?
 
   @@index([reporterId])
   @@index([assigneeId])

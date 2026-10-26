@@ -22,15 +22,38 @@ export class CategoriasService {
   }
 
   async create(data: CreateCategoryDto) {
-    return this.prisma.category.create({ data });
+    return this.prisma.category.create({
+      data: {
+        ...data,
+        responsibleEntity: this.normalizeResponsibleEntity(
+          data.responsibleEntity,
+        ),
+      },
+    });
   }
 
   async update(id: string, data: UpdateCategoryDto) {
-    return this.prisma.category.update({ where: { id }, data });
+    return this.prisma.category.update({
+      where: { id },
+      data: {
+        ...data,
+        ...(data.responsibleEntity !== undefined
+          ? {
+              responsibleEntity: this.normalizeResponsibleEntity(
+                data.responsibleEntity,
+              ),
+            }
+          : {}),
+      },
+    });
   }
 
   async remove(id: string) {
     await this.prisma.category.delete({ where: { id } });
     return { id, deleted: true };
+  }
+
+  private normalizeResponsibleEntity(entityName?: string | null) {
+    return entityName?.trim() || null;
   }
 }

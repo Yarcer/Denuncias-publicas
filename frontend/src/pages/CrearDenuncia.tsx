@@ -193,6 +193,7 @@ function handleEvidenciaChange(file: File | null) {
         categoryId: categoriaId,
       })
 
+      const createdReport = response.data.data
       let fotoAdjuntada = true
 
 if (evidencia) {
@@ -221,11 +222,22 @@ if (evidencia) {
       setEvidencia(null)
 setVistaPrevia('')
 
+      const confirmationMessage =
+        createdReport.confirmationEmailStatus === 'sent'
+          ? ' Enviamos una confirmación a tu correo registrado.'
+          : createdReport.confirmationEmailStatus === 'failed'
+            ? ' No pudimos enviar el correo de confirmación; guarda el identificador para consultar tu denuncia.'
+            : createdReport.confirmationEmailStatus === 'not_configured'
+              ? ' El correo de confirmación no está configurado; guarda el identificador para consultar tu denuncia.'
+              : createdReport.confirmationEmailStatus === 'skipped'
+                ? ' Las cuentas anónimas no reciben correo de confirmación.'
+                : ''
+      const attachmentMessage = fotoAdjuntada
+        ? ''
+        : ' No se pudo adjuntar la foto.'
       setMensaje(
-  fotoAdjuntada
-    ? `Reporte registrado correctamente. Tu identificador es ${formatReportIdentifier(response.data.data.id)}.`
-    : `El reporte se guardó, pero no se pudo adjuntar la foto. Tu identificador es ${formatReportIdentifier(response.data.data.id)}.`
-)
+        `Denuncia registrada correctamente. Tu identificador es ${formatReportIdentifier(createdReport.id)}.${confirmationMessage}${attachmentMessage}`,
+      )
       onReportCreated?.()
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'No se pudo registrar la denuncia.'))

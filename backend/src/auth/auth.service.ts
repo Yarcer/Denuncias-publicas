@@ -5,6 +5,13 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginUserDto, RegisterUserDto } from './dto/register-user.dto';
 
+const portalRoles: Record<LoginUserDto['portal'], readonly string[]> = {
+  ciudadano: ['CIUDADANO'],
+  funcionario: ['ENTE_PUBLICO'],
+  administrador: ['ADMINISTRADOR'],
+  gestion: ['ENTE_PUBLICO', 'ADMINISTRADOR'],
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -57,12 +64,7 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    if (
-      (dto.portal === 'ciudadano' && user.role !== 'CIUDADANO') ||
-      (dto.portal === 'gestion' &&
-        user.role !== 'ENTE_PUBLICO' &&
-        user.role !== 'ADMINISTRADOR')
-    ) {
+    if (!portalRoles[dto.portal].includes(user.role)) {
       throw new UnauthorizedException('La cuenta no tiene acceso a este portal');
     }
 

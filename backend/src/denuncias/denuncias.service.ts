@@ -23,6 +23,15 @@ type UploadedImage = {
 type AuthenticatedUser = { sub: string; role: string };
 const managementRoles = ['ENTE_PUBLICO', 'ADMINISTRADOR'];
 const terminalStatuses: ReportStatus[] = [ReportStatus.RESUELTO, ReportStatus.RECHAZADO, ReportStatus.CERRADO];
+const reportStatusLabels: Record<ReportStatus, string> = {
+  PENDIENTE: 'Pendiente',
+  EN_REVISION: 'En revisión',
+  ASIGNADO: 'Asignado',
+  EN_PROCESO: 'En proceso',
+  RESUELTO: 'Resuelto',
+  RECHAZADO: 'Rechazado',
+  CERRADO: 'Cerrado',
+};
 
 @Injectable()
 export class DenunciasService {
@@ -35,7 +44,11 @@ export class DenunciasService {
 
   async findAll(user: AuthenticatedUser, status?: string) {
     const where = {
-      ...(user.role === 'CIUDADANO' ? { reporterId: user.sub } : {}),
+      ...(user.role === 'CIUDADANO'
+        ? { reporterId: user.sub }
+        : user.role === 'ENTE_PUBLICO'
+          ? { assigneeId: user.sub }
+          : {}),
       ...(status ? { status: status as never } : {}),
     };
     const items = await this.prisma.report.findMany({
@@ -59,14 +72,14 @@ export class DenunciasService {
         history: true,
       },
     });
-    this.assertCanAccess(report, user);
+    await this.assertCanAccess(report, user);
     return report;
   }
 
   async managementQueue(user: AuthenticatedUser, status?: string) {
     this.assertManagementRole(user);
 
-    const where =
+    const where: Prisma.ReportWhereInput =
       status === 'archived'
         ? { archivedAt: { not: null } }
         : status
@@ -75,6 +88,20 @@ export class DenunciasService {
             status: { notIn: terminalStatuses },
             archivedAt: null,
           };
+    if (user.role === 'ENTE_PUBLICO') {
+      const entityName = await this.getEntityName(user.sub);
+      where.AND = [
+        {
+          OR: [
+            { assignee: { is: { entityName } } },
+            {
+              assigneeId: null,
+              category: { is: { responsibleEntity: entityName } },
+            },
+          ],
+        },
+      ];
+    }
 
     const items = await this.prisma.report.findMany({
       where,
@@ -123,6 +150,127 @@ export class DenunciasService {
     return { items, count: items.length };
   }
 
+  async indicators(user: AuthenticatedUser) {
+    if (user.role !== 'ADMINISTRADOR') {
+      throw new ForbiddenException(
+        'Solo un administrador puede consultar los indicadores generales',
+      );
+    }
+
+    const firstMonth = new Date();
+    firstMonth.setUTCDate(1);
+    firstMonth.setUTCHours(0, 0, 0, 0);
+    firstMonth.setUTCMonth(firstMonth.getUTCMonth() - 11);
+
+    const [
+      total,
+      pending,
+      resolved,
+      categories,
+      statuses,
+      assignedByUser,
+      unassignedByCategory,
+      categoryNames,
+      users,
+      monthlyCounts,
+    ] = await Promise.all([
+      this.prisma.report.count(),
+      this.prisma.report.count({ where: { status: ReportStatus.PENDIENTE } }),
+      this.prisma.report.count({ where: { status: ReportStatus.RESUELTO } }),
+      this.prisma.report.groupBy({
+        by: ['categoryId'],
+        _count: { _all: true },
+      }),
+      this.prisma.report.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+      this.prisma.report.groupBy({
+        by: ['assigneeId'],
+        where: { assigneeId: { not: null } },
+        _count: { _all: true },
+      }),
+      this.prisma.report.groupBy({
+        by: ['categoryId'],
+        where: { assigneeId: null },
+        _count: { _all: true },
+      }),
+      this.prisma.category.findMany({
+        select: { id: true, name: true, responsibleEntity: true },
+      }),
+      this.prisma.user.findMany({
+        where: { role: 'ENTE_PUBLICO' },
+        select: { id: true, entityName: true },
+      }),
+      this.prisma.$queryRaw<Array<{ month: Date; count: number }>>(
+        Prisma.sql`
+          SELECT date_trunc('month', "createdAt") AS month, COUNT(*)::int AS count
+          FROM "Report"
+          WHERE "createdAt" >= ${firstMonth}
+          GROUP BY date_trunc('month', "createdAt")
+          ORDER BY month ASC
+        `,
+      ),
+    ]);
+
+    const categoryById = new Map(categoryNames.map((category) => [category.id, category]));
+    const userById = new Map(users.map((item) => [item.id, item]));
+    const organizationCounts = new Map<string, number>();
+    for (const item of assignedByUser) {
+      const organization =
+        userById.get(item.assigneeId ?? '')?.entityName?.trim() ||
+        'Organismo sin configurar';
+      organizationCounts.set(
+        organization,
+        (organizationCounts.get(organization) ?? 0) + item._count._all,
+      );
+    }
+    for (const item of unassignedByCategory) {
+      const organization =
+        categoryById.get(item.categoryId)?.responsibleEntity?.trim() ||
+        'Sin organismo asignado';
+      organizationCounts.set(
+        organization,
+        (organizationCounts.get(organization) ?? 0) + item._count._all,
+      );
+    }
+
+    const monthlyCountByKey = new Map(
+      monthlyCounts.map((item) => [
+        `${item.month.getUTCFullYear()}-${String(item.month.getUTCMonth() + 1).padStart(2, '0')}`,
+        item.count,
+      ]),
+    );
+    const temporalEvolution = Array.from({ length: 12 }, (_, index) => {
+      const month = new Date(firstMonth);
+      month.setUTCMonth(firstMonth.getUTCMonth() + index);
+      const key = `${month.getUTCFullYear()}-${String(month.getUTCMonth() + 1).padStart(2, '0')}`;
+      return { month: key, count: monthlyCountByKey.get(key) ?? 0 };
+    });
+
+    return {
+      totals: { received: total, pending, resolved },
+      categories: categories
+        .map((item) => ({
+          id: item.categoryId,
+          name: categoryById.get(item.categoryId)?.name ?? 'Categoría eliminada',
+          count: item._count._all,
+        }))
+        .sort((a, b) => b.count - a.count),
+      organizations: [...organizationCounts]
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count),
+      statuses: statuses
+        .map((item) => ({
+          status: item.status,
+          label: reportStatusLabels[item.status],
+          count: item._count._all,
+        }))
+        .sort((a, b) => b.count - a.count),
+      temporalEvolution,
+    };
+  }
+
   async create(reporterId: string, dto: CreateReportDto) {
     const createdAfter = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
@@ -138,21 +286,65 @@ export class DenunciasService {
           );
         }
 
-        return transaction.report.create({
+        const category = await transaction.category.findFirst({
+          where: { id: dto.categoryId, active: true },
+          select: {
+            id: true,
+            type: true,
+            defaultPriority: true,
+            responsibleEntity: true,
+          },
+        });
+        if (!category) {
+          throw new NotFoundException('Categoría no encontrada o inactiva');
+        }
+        if (category.type !== dto.type) {
+          throw new BadRequestException(
+            'El tipo de denuncia no coincide con la categoría seleccionada',
+          );
+        }
+
+        const assignee = category.responsibleEntity
+          ? await transaction.user.findFirst({
+              where: {
+                role: 'ENTE_PUBLICO',
+                status: 'ACTIVO',
+                entityName: category.responsibleEntity,
+              },
+              orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+              select: { id: true },
+            })
+          : null;
+
+        const report = await transaction.report.create({
           data: {
             title: dto.title,
             description: dto.description,
-            type: dto.type,
-            priority: dto.priority,
+            type: category.type,
+            priority: category.defaultPriority,
+            status: assignee ? ReportStatus.ASIGNADO : ReportStatus.PENDIENTE,
             latitude: dto.latitude,
             longitude: dto.longitude,
             address: dto.address,
             reference: dto.reference,
-            reporter: { connect: { id: reporterId } },
-            category: { connect: { id: dto.categoryId } },
+            reporterId,
+            categoryId: category.id,
+            assigneeId: assignee?.id ?? null,
           },
           include: { category: true },
         });
+        if (assignee) {
+          await transaction.reportHistory.create({
+            data: {
+              reportId: report.id,
+              fromStatus: ReportStatus.PENDIENTE,
+              toStatus: ReportStatus.ASIGNADO,
+              changedBy: reporterId,
+              comment: 'Asignación automática según la categoría de la denuncia',
+            },
+          });
+        }
+        return report;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
@@ -163,8 +355,11 @@ export class DenunciasService {
     user: AuthenticatedUser,
     file?: UploadedImage,
   ) {
-    const report = await this.prisma.report.findUnique({ where: { id } });
-    this.assertCanAccess(report, user);
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true },
+    });
+    await this.assertCanAccess(report, user);
 
     if (!file?.buffer) {
       throw new BadRequestException('Adjuntá una imagen JPG, PNG o WebP');
@@ -210,9 +405,10 @@ export class DenunciasService {
   ) {
     const report = await this.prisma.report.findUnique({
       where: { id: reportId },
+      include: { category: true },
     });
 
-    this.assertCanAccess(report, user);
+    await this.assertCanAccess(report, user);
 
     const evidence = await this.prisma.evidence.findFirst({
       where: { id: evidenceId, reportId },
@@ -235,11 +431,13 @@ export class DenunciasService {
 
     const report = await this.prisma.report.findUnique({
       where: { id },
+      include: { category: true },
     });
 
     if (!report) {
       throw new NotFoundException('Denuncia no encontrada');
     }
+    await this.assertCanManageReport(report, user);
 
     if (report.status !== ReportStatus.RECHAZADO) {
       throw new BadRequestException('Solo se pueden archivar denuncias denegadas');
@@ -257,8 +455,12 @@ export class DenunciasService {
 
   async take(id: string, user: AuthenticatedUser) {
     this.assertManagementRole(user);
-    const report = await this.prisma.report.findUnique({ where: { id } });
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true },
+    });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
+    await this.assertCanManageReport(report, user);
     if (user.role === 'ENTE_PUBLICO' && report.assigneeId && report.assigneeId !== user.sub) {
       throw new ForbiddenException('Esta denuncia ya fue tomada por otro ente');
     }
@@ -285,8 +487,12 @@ export class DenunciasService {
 
   async assign(id: string, user: AuthenticatedUser, dto: AssignReportDto) {
     this.assertManagementRole(user);
-    const report = await this.prisma.report.findUnique({ where: { id } });
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true },
+    });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
+    await this.assertCanManageReport(report, user);
     if (terminalStatuses.includes(report.status)) {
       throw new ForbiddenException('Esta denuncia ya está cerrada');
     }
@@ -369,8 +575,11 @@ export class DenunciasService {
   }
 
   async update(id: string, user: AuthenticatedUser, dto: UpdateReportDto) {
-    const report = await this.prisma.report.findUnique({ where: { id } });
-    this.assertCanAccess(report, user);
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true },
+    });
+    await this.assertCanAccess(report, user);
 
     if (dto.status || dto.assigneeId) {
       throw new ForbiddenException('Usa el flujo de gestión para cambiar estado o asignación');
@@ -380,19 +589,70 @@ export class DenunciasService {
   }
 
   async remove(id: string, user: AuthenticatedUser) {
-    const report = await this.prisma.report.findUnique({ where: { id } });
-    this.assertCanAccess(report, user);
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true },
+    });
+    await this.assertCanAccess(report, user);
     await this.prisma.report.delete({ where: { id } });
     return { id, deleted: true };
   }
 
-  private assertCanAccess(report: { reporterId: string } | null, user: AuthenticatedUser) {
+  private async assertCanAccess(
+    report: {
+      reporterId: string;
+      assigneeId: string | null;
+      category: { responsibleEntity: string | null };
+    } | null,
+    user: AuthenticatedUser,
+  ) {
     if (!report) {
       throw new NotFoundException('Denuncia no encontrada');
     }
     if (user.role === 'CIUDADANO' && report.reporterId !== user.sub) {
       throw new ForbiddenException('No tienes acceso a esta denuncia');
     }
+    if (user.role === 'ENTE_PUBLICO') {
+      await this.assertCanManageReport(report, user);
+    }
+  }
+
+  private async assertCanManageReport(
+    report: {
+      assigneeId: string | null;
+      category: { responsibleEntity: string | null };
+    },
+    user: AuthenticatedUser,
+  ) {
+    if (user.role !== 'ENTE_PUBLICO' || report.assigneeId === user.sub) {
+      return;
+    }
+    if (report.assigneeId) {
+      const entityName = await this.getEntityName(user.sub);
+      const assignee = await this.prisma.user.findUnique({
+        where: { id: report.assigneeId },
+        select: { entityName: true },
+      });
+      if (assignee?.entityName === entityName) {
+        return;
+      }
+      throw new ForbiddenException('Esta denuncia corresponde a otro organismo');
+    }
+    const entityName = await this.getEntityName(user.sub);
+    if (report.category.responsibleEntity !== entityName) {
+      throw new ForbiddenException('Esta denuncia no corresponde a tu organismo');
+    }
+  }
+
+  private async getEntityName(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { entityName: true },
+    });
+    if (!user?.entityName) {
+      throw new BadRequestException('Tu cuenta no tiene un organismo configurado');
+    }
+    return user.entityName;
   }
 
   private assertManagementRole(user: AuthenticatedUser) {
