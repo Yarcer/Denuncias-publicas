@@ -1,4 +1,4 @@
-import { Role, UserStatus } from '@prisma/client';
+import { ReportType, Role, UserStatus } from '@prisma/client';
 import {
   IsEmail,
   IsEnum,
@@ -33,6 +33,10 @@ export class CreateAdministrativeUserDto {
   @IsOptional()
   @IsString()
   jurisdiction?: string;
+
+  @IsOptional()
+  @IsEnum(ReportType)
+  managedReportType?: ReportType;
 }
 
 export class UpdateAdministrativeUserDto {
@@ -64,6 +68,10 @@ export class UpdateAdministrativeUserDto {
   @IsOptional()
   @IsString()
   jurisdiction?: string;
+
+  @IsOptional()
+  @IsEnum(ReportType)
+  managedReportType?: ReportType;
 }
 
 export class UpdateAdministrativeUserStatusDto {

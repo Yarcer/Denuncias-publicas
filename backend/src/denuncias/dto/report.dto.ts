@@ -1,4 +1,4 @@
-import { ReportStatus, ReportType } from '@prisma/client';
+import { ReportStatus } from '@prisma/client';
 import { IsEnum, IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateReportDto {
@@ -9,9 +9,6 @@ export class CreateReportDto {
   @IsString()
   @IsNotEmpty()
   description!: string;
-
-  @IsEnum(ReportType)
-  type!: ReportType;
 
   @IsLatitude()
   latitude!: number;

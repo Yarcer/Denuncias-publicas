@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 import './GestionUsuarios.css'
 
 type AdministrativeRole = 'ENTE_PUBLICO' | 'ADMINISTRADOR'
+type ManagedReportType = 'URBANO' | 'BOMBEROS' | 'POLICIAL'
 type UserStatus = 'ACTIVO' | 'INACTIVO' | 'BANEADO'
 
 type AdministrativeUser = {
@@ -14,6 +15,7 @@ type AdministrativeUser = {
   lastName: string | null
   entityName: string | null
   jurisdiction: string | null
+  managedReportType: ManagedReportType | null
 }
 
 type UserForm = {
@@ -24,6 +26,7 @@ type UserForm = {
   lastName: string
   entityName: string
   jurisdiction: string
+  managedReportType: ManagedReportType
 }
 
 const emptyForm: UserForm = {
@@ -34,6 +37,13 @@ const emptyForm: UserForm = {
   lastName: '',
   entityName: '',
   jurisdiction: '',
+  managedReportType: 'URBANO',
+}
+
+const reportTypeLabels: Record<ManagedReportType, string> = {
+  URBANO: 'Urbano',
+  BOMBEROS: 'Bomberos',
+  POLICIAL: 'Policial',
 }
 
 function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
@@ -75,6 +85,7 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
       lastName: user.lastName ?? '',
       entityName: user.entityName ?? '',
       jurisdiction: user.jurisdiction ?? '',
+      managedReportType: user.managedReportType ?? 'URBANO',
     })
     document.getElementById('administrative-user-form')?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -138,7 +149,7 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
     <section className="admin-users-page">
       <header className="admin-users-heading">
         <div>
-          <span className="eyebrow">Administración</span>
+          <span className="eyebrow">Superadministrador</span>
           <h1>Usuarios administrativos</h1>
           <p>Gestiona accesos, roles y organismos.</p>
         </div>
@@ -212,11 +223,23 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
             <label>
               Organismo
               <input
-                required={form.role === 'ENTE_PUBLICO'}
+                required
                 value={form.entityName}
                 onChange={(event) => setForm({ ...form, entityName: event.target.value })}
                 placeholder="Ej. Dirección de Tránsito"
               />
+            </label>
+            <label>
+              Tipo de reportes asignados
+              <select
+                required
+                value={form.managedReportType}
+                onChange={(event) => setForm({ ...form, managedReportType: event.target.value as ManagedReportType })}
+              >
+                <option value="URBANO">Urbano</option>
+                <option value="BOMBEROS">Bomberos</option>
+                <option value="POLICIAL">Policial</option>
+              </select>
             </label>
             <label className="admin-user-field-wide">
               Jurisdicción
@@ -269,6 +292,9 @@ function GestionUsuarios({ currentUserId }: { currentUserId: string }) {
                       <td>
                         <strong>{user.role === 'ADMINISTRADOR' ? 'Administrador' : 'Ente público'}</strong>
                         <span>{user.entityName || user.jurisdiction || 'Sin organismo asignado'}</span>
+                        {user.managedReportType && (
+                          <span>Reportes: {reportTypeLabels[user.managedReportType]}</span>
+                        )}
                       </td>
                       <td>
                         <span className={`admin-user-status admin-user-status-${user.status.toLowerCase()}`}>

@@ -168,14 +168,9 @@ function handleEvidenciaChange(file: File | null) {
     }
 
     try {
-      const categoriaSeleccionada = categories.find(
-        (category) => category.id === categoriaId
-      )
-
       const response = await api.post('/denuncias', {
         title: subcategoria,
         description: descripcion,
-        type: categoriaSeleccionada?.type ?? 'URBANO',
         latitude: Number(latitud),
         longitude: Number(longitud),
         address: ubicacion,

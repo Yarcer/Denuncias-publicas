@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Role, UserStatus } from '@prisma/client';
+import { ReportType, Role, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -26,6 +26,7 @@ const administrativeUserSelection = {
   lastName: true,
   entityName: true,
   jurisdiction: true,
+  managedReportType: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -48,7 +49,7 @@ export class UsuariosService {
   async createAdministrativeUser(actor: AuthenticatedUser, dto: CreateAdministrativeUserDto) {
     this.assertAdministrator(actor);
     this.assertAdministrativeRole(dto.role);
-    this.assertOrganization(dto.role, dto.entityName);
+    this.assertOrganization(dto.role, dto.entityName, dto.managedReportType);
 
     try {
       return await this.prisma.user.create({
@@ -60,6 +61,7 @@ export class UsuariosService {
           lastName: dto.lastName?.trim() || null,
           entityName: dto.entityName?.trim() || null,
           jurisdiction: dto.jurisdiction?.trim() || null,
+          managedReportType: dto.role === Role.ENTE_PUBLICO ? dto.managedReportType : null,
           status: UserStatus.ACTIVO,
         },
         select: administrativeUserSelection,
@@ -78,9 +80,12 @@ export class UsuariosService {
     const current = await this.findManagedUser(id);
     const role = dto.role ?? current.role;
     const entityName = dto.entityName === undefined ? current.entityName : dto.entityName;
+    const managedReportType = dto.managedReportType === undefined
+      ? current.managedReportType
+      : dto.managedReportType;
 
     this.assertAdministrativeRole(role);
-    this.assertOrganization(role, entityName ?? undefined);
+    this.assertOrganization(role, entityName ?? undefined, managedReportType ?? undefined);
 
     if (id === actor.sub && role !== Role.ADMINISTRADOR) {
       throw new BadRequestException('No puedes quitarte tu propio rol de administrador');
@@ -93,6 +98,9 @@ export class UsuariosService {
       ...(dto.lastName !== undefined ? { lastName: dto.lastName.trim() || null } : {}),
       ...(dto.entityName !== undefined ? { entityName: dto.entityName.trim() || null } : {}),
       ...(dto.jurisdiction !== undefined ? { jurisdiction: dto.jurisdiction.trim() || null } : {}),
+      ...(dto.role !== undefined && dto.managedReportType !== undefined
+        ? { managedReportType: dto.managedReportType }
+        : {}),
       ...(dto.password ? { passwordHash: await argon2.hash(dto.password) } : {}),
     };
 
@@ -140,7 +148,7 @@ export class UsuariosService {
   }
 
   private assertAdministrator(actor: AuthenticatedUser) {
-    if (actor.role !== Role.ADMINISTRADOR) {
+    if (actor.role !== Role.SUPERADMINISTRADOR) {
       throw new ForbiddenException('Solo un superadministrador puede gestionar usuarios');
     }
   }
@@ -151,9 +159,16 @@ export class UsuariosService {
     }
   }
 
-  private assertOrganization(role: Role, entityName?: string | null) {
-    if (role === Role.ENTE_PUBLICO && !entityName?.trim()) {
-      throw new BadRequestException('El organismo es obligatorio para usuarios de ente público');
+  private assertOrganization(
+    role: Role,
+    entityName?: string | null,
+    managedReportType?: ReportType,
+  ) {
+    if (!entityName?.trim()) {
+      throw new BadRequestException('El organismo es obligatorio para usuarios administrativos');
+    }
+    if (!managedReportType) {
+      throw new BadRequestException('Asigna el tipo de reportes que puede gestionar este organismo');
     }
   }
 

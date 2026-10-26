@@ -1,4 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import './App.css';
 import { api } from './lib/api';
 import { useAuthStore } from './stores/auth-store';
@@ -33,6 +36,37 @@ type ManagedReport = Report & {
     type: string;
   }[];
 };
+
+function normalizeExportValue(value: string | number | null | undefined): string {
+  const normalized = String(value ?? '').replace(/\r?\n/g, ' ');
+  return normalized.replace(/"/g, '""');
+}
+
+function buildExportRows(reports: ManagedReport[]) {
+  return reports.map((item) => ({
+    'ID': item.id,
+    'Título': item.title,
+    'Descripción': item.description,
+    'Estado': item.status.replace(/_/g, ' '),
+    'Prioridad': item.priority ?? 'Sin prioridad',
+    'Dirección': item.address ?? 'Sin dirección',
+    'Ciudadano': item.reporter?.isAnonymous ? 'Anónimo' : `${item.reporter?.firstName ?? ''} ${item.reporter?.lastName ?? ''}`.trim() || item.reporter?.email || 'Ciudadano',
+    'Email': item.reporter?.email ?? '',
+    'Latitud': item.latitude ?? '',
+    'Longitud': item.longitude ?? '',
+    'Asignado a': item.assignee?.email ?? 'Sin asignar',
+  }));
+}
+
+function downloadExportFile(filename: string, content: string | Blob, mimeType: string) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 function ReportImage({
   reportId,
@@ -169,7 +203,7 @@ function ReportImage({
 
 }
 
-function ManagementDashboard({ isAdmin, currentUserId, onLogout }: { isAdmin: boolean; currentUserId: string; onLogout: () => void }) {
+function ManagementDashboard({ isAdmin, isSuperAdmin, currentUserId, onLogout }: { isAdmin: boolean; isSuperAdmin: boolean; currentUserId: string; onLogout: () => void }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [managementView, setManagementView] = useState<'reports' | 'users'>('reports');
   const [filter, setFilter] = useState('active');
@@ -260,6 +294,57 @@ function ManagementDashboard({ isAdmin, currentUserId, onLogout }: { isAdmin: bo
   const inProgressCount = reports.filter((item) => item.status === 'EN_PROCESO').length;
   const isArchivedView = filter === 'archived';
 
+  function exportReports(format: 'csv' | 'xlsx' | 'pdf') {
+    if (!visibleReports.length) {
+      setError('No hay reportes visibles para exportar.');
+      return;
+    }
+
+    const rows = buildExportRows(visibleReports);
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const baseName = `denuncias-${filter === 'active' ? 'activa' : filter}-${timestamp}`;
+
+    if (format === 'csv') {
+      const headers = Object.keys(rows[0]);
+      const csvContent = [
+        headers.join(','),
+        ...rows.map((row) => headers.map((header) => `"${normalizeExportValue(row[header as keyof typeof row])}"`).join(',')),
+      ].join('\n');
+
+      downloadExportFile(`${baseName}.csv`, csvContent, 'text/csv;charset=utf-8;');
+      return;
+    }
+
+    if (format === 'xlsx') {
+      const sheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, 'Denuncias');
+      XLSX.writeFile(workbook, `${baseName}.xlsx`);
+      return;
+    }
+
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const headers = Object.keys(rows[0]);
+    const tableRows = rows.map((row) => headers.map((header) => row[header as keyof typeof row] ?? ''));
+
+    doc.setFontSize(16);
+    doc.text('Listado de denuncias', 40, 48);
+    doc.setFontSize(10);
+    doc.text(`Exportado: ${new Date().toLocaleString('es-UY')}`, 40, 66);
+
+    autoTable(doc, {
+      head: [headers],
+      body: tableRows,
+      startY: 84,
+      margin: { left: 40, right: 40 },
+      styles: { fontSize: 7, cellPadding: 4 },
+      headStyles: { fillColor: [21, 86, 181], textColor: 255 },
+      alternateRowStyles: { fillColor: [247, 250, 255] },
+    });
+
+    doc.save(`${baseName}.pdf`);
+  }
+
   function scrollToSection(sectionId: string) {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
   }
@@ -295,7 +380,7 @@ function ManagementDashboard({ isAdmin, currentUserId, onLogout }: { isAdmin: bo
             >
               <span aria-hidden="true">▣</span> Archivadas
             </button>
-            {isAdmin && (
+            {isSuperAdmin && (
               <button
                 type="button"
                 className={managementView === 'users' ? 'admin-nav-active' : ''}
@@ -318,7 +403,9 @@ function ManagementDashboard({ isAdmin, currentUserId, onLogout }: { isAdmin: bo
             <>
           <header className="admin-header">
             <div className="admin-page-title">
-              <span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span>
+              <span className="eyebrow">
+                {isSuperAdmin ? 'Funcionario' : isAdmin ? 'Administrador' : 'Ente público'}
+              </span>
               <h1>Bandeja de denuncias</h1>
               <p>Organiza y sigue los reportes de la ciudad.</p>
             </div>
@@ -349,6 +436,17 @@ function ManagementDashboard({ isAdmin, currentUserId, onLogout }: { isAdmin: bo
                 <option value="RECHAZADO">Denegadas</option>
                 <option value="archived">Archivadas</option>
               </select>
+              <div className="admin-export-group" aria-label="Exportar listados de denuncias">
+                <button type="button" className="admin-export-button" onClick={() => exportReports('csv')} disabled={!visibleReports.length}>
+                  CSV
+                </button>
+                <button type="button" className="admin-export-button" onClick={() => exportReports('xlsx')} disabled={!visibleReports.length}>
+                  Excel
+                </button>
+                <button type="button" className="admin-export-button" onClick={() => exportReports('pdf')} disabled={!visibleReports.length}>
+                  PDF
+                </button>
+              </div>
             </div>
           </header>
 
@@ -482,6 +580,7 @@ function App() {
   );
   const registering = authRoute === 'register';
   const [credentials, setCredentials] = useState({ email: '', password: '', firstName: '', lastName: '' });
+  const [showPassword, setShowPassword] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [error, setError] = useState('');
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
@@ -509,6 +608,24 @@ function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  useEffect(() => {
+    const { token } = useAuthStore.getState();
+    if (!token) return;
+
+    let active = true;
+    void api.get('/auth/me')
+      .then((response) => {
+        if (active) {
+          setSession(response.data.data, token);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [setSession]);
 
   useEffect(() => {
     if (!user) return;
@@ -711,21 +828,42 @@ function App() {
 
                 <label htmlFor="auth-password">
                   Contraseña
-                  <input
-                    id="auth-password"
-                    required
-                    minLength={6}
-                    type="password"
-                    autoComplete={registering ? 'new-password' : 'current-password'}
-                    placeholder="Ingresá tu contraseña"
-                    value={credentials.password}
-                    onChange={(event) =>
-                      setCredentials({
-                        ...credentials,
-                        password: event.target.value,
-                      })
-                    }
-                  />
+                  <span className="password-input-wrap">
+                    <input
+                      id="auth-password"
+                      required
+                      minLength={6}
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete={registering ? 'new-password' : 'current-password'}
+                      placeholder="Ingresá tu contraseña"
+                      value={credentials.password}
+                      onChange={(event) =>
+                        setCredentials({
+                          ...credentials,
+                          password: event.target.value,
+                        })
+                      }
+                    />
+                    <button
+                      className="password-visibility-toggle"
+                      type="button"
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      aria-pressed={showPassword}
+                    >
+                      {showPassword ? (
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                          <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 6-.4.8-1.3 2-2.6 3.2M6.2 6.2C3.9 7.6 2.7 9.7 2.5 11c.5.9 3.9 7 9.5 7 1.1 0 2.1-.2 3-.6" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </span>
                 </label>
 
                 {error && <p className="error">{error}</p>}
@@ -740,13 +878,62 @@ function App() {
               Reportá. Informá. Mejorá.
             </p>
           </section>
+
+          <section className="competencias-section" aria-labelledby="competencias-title">
+            <div className="competencias-heading">
+              <span className="competencias-eyebrow">Información institucional</span>
+              <h2 id="competencias-title">¿A qué organismo corresponde tu reporte?</h2>
+              <p>El tipo de situación determina qué organismo debe atenderla.</p>
+            </div>
+
+            <div className="competencias-grid">
+              <article className="competencia-card">
+                <span className="competencia-tipo">URBANO</span>
+                <h3>Gobierno departamental y municipio</h3>
+                <p>Servicios urbanos, infraestructura, limpieza y convivencia.</p>
+                <small>Baches, luminarias, residuos, ruidos molestos y animales sueltos.</small>
+              </article>
+
+              <article className="competencia-card">
+                <span className="competencia-tipo">BOMBEROS</span>
+                <h3>Bomberos</h3>
+                <p>Incendios, presencia de humo y riesgos relacionados con el fuego.</p>
+                <a className="emergency-number" href="tel:46422500">Emergencias: 46422500</a>
+              </article>
+
+              <article className="competencia-card">
+                <span className="competencia-tipo">POLICIAL</span>
+                <h3>Policía</h3>
+                <p>Delitos, robos, violencia y situaciones que afecten la seguridad pública.</p>
+                <a className="emergency-number" href="tel:911">Emergencias: 911</a>
+              </article>
+            </div>
+
+            <div className="emergency-contacts" aria-label="Números de emergencia">
+              <span>Salud (SAM): <a href="tel:105">105</a></span>
+              <span>Policía y emergencias generales: <a href="tel:911">911</a></span>
+              <span>Bomberos: <a href="tel:46422500">46422500</a></span>
+            </div>
+
+            <p className="competencias-notice">
+              Este canal no sustituye la atención inmediata. Si hay una emergencia o peligro en curso,
+              llamá a los números indicados.
+            </p>
+          </section>
         </div>
       </main>
     );
   }
 
-  if (user.role === 'ENTE_PUBLICO' || user.role === 'ADMINISTRADOR') {
-    return <ManagementDashboard isAdmin={user.role === 'ADMINISTRADOR'} currentUserId={user.id} onLogout={clearSession} />;
+  if (user.role === 'ENTE_PUBLICO' || user.role === 'ADMINISTRADOR' || user.role === 'SUPERADMINISTRADOR') {
+    return (
+      <ManagementDashboard
+        isAdmin={user.role !== 'ENTE_PUBLICO'}
+        isSuperAdmin={user.role === 'SUPERADMINISTRADOR'}
+        currentUserId={user.id}
+        onLogout={clearSession}
+      />
+    );
   }
   return (
     <main className="app-shell">

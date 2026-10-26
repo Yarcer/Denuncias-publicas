@@ -71,7 +71,7 @@ El seed crea estas cuentas:
 
 | Rol | Correo | Contraseña |
 |---|---|---|
-| Administrador | `admin@denuncias.local` | `Admin123!` |
+| Superadministrador | `admin@denuncias.local` | `Admin123!` |
 | Ente público | `ente@denuncias.local` | `Ente123!` |
 
 No uses estas contraseñas en producción.
@@ -116,9 +116,14 @@ pnpm --dir frontend dev
 
 ### Administrador
 
-- Ver la bandeja completa.
+- Ver los reportes asignados a su organismo.
 - Gestionar denuncias y estados.
 - Consultar los cambios registrados en el historial.
+
+### Superadministrador
+
+- Ver reportes de todos los organismos.
+- Crear y modificar usuarios administrativos, asignarles rol y organismo, y habilitarlos o deshabilitarlos.
 
 ## Solución de problemas
 

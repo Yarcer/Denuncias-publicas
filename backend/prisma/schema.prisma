@@ -11,6 +11,7 @@ enum Role {
   CIUDADANO
   ENTE_PUBLICO
   ADMINISTRADOR
+  SUPERADMINISTRADOR
 }
 
 enum UserStatus {
@@ -48,6 +49,7 @@ model User {
   passwordHash String
   role         Role       @default(CIUDADANO)
   isAnonymous  Boolean    @default(false)
+  managedReportType ReportType?
   status       UserStatus @default(ACTIVO)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt

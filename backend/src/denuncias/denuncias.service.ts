@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ReportPriority, ReportStatus } from '@prisma/client';
+import { Prisma, ReportPriority, ReportStatus, ReportType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { ManageReportDto } from './dto/manage-report.dto';
@@ -12,8 +12,12 @@ type UploadedImage = {
   mimetype: string;
   size: number;
 };
-type AuthenticatedUser = { sub: string; role: string };
-const managementRoles = ['ENTE_PUBLICO', 'ADMINISTRADOR'];
+type AuthenticatedUser = {
+  sub: string;
+  role: string;
+  managedReportType?: ReportType | null;
+};
+const managementRoles = ['ENTE_PUBLICO', 'ADMINISTRADOR', 'SUPERADMINISTRADOR'];
 const terminalStatuses: ReportStatus[] = [ReportStatus.RESUELTO, ReportStatus.RECHAZADO, ReportStatus.CERRADO];
 
 @Injectable()
@@ -21,8 +25,10 @@ export class DenunciasService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(user: AuthenticatedUser, status?: string) {
+    this.assertAssignedReportType(user);
     const where = {
       ...(user.role === 'CIUDADANO' ? { reporterId: user.sub } : {}),
+      ...this.reportScope(user),
       ...(status ? { status: status as never } : {}),
     };
     const items = await this.prisma.report.findMany({
@@ -51,16 +57,19 @@ export class DenunciasService {
 
 async managementQueue(user: AuthenticatedUser, status?: string) {
   this.assertManagementRole(user);
+  this.assertAssignedReportType(user);
 
-  const where =
-    status === 'archived'
+  const where: Prisma.ReportWhereInput = {
+    ...(status === 'archived'
       ? { archivedAt: { not: null } }
       : status
         ? { status: status as ReportStatus, archivedAt: null }
         : {
             status: { notIn: terminalStatuses },
             archivedAt: null,
-          };
+          }),
+    ...this.reportScope(user),
+  };
 
   const items = await this.prisma.report.findMany({
     where,
@@ -72,7 +81,7 @@ async managementQueue(user: AuthenticatedUser, status?: string) {
       },
       assignee: true,
     },
-    orderBy: user.role === 'ADMINISTRADOR'
+    orderBy: user.role !== 'ENTE_PUBLICO'
       ? [{ priority: 'desc' }, { createdAt: 'asc' }]
       : { createdAt: 'asc' },
   });
@@ -93,12 +102,20 @@ async managementQueue(user: AuthenticatedUser, status?: string) {
       where: { id: reporterId },
       select: { isAnonymous: true, role: true },
     });
+    const category = await this.prisma.category.findFirst({
+      where: { id: dto.categoryId, active: true },
+      select: { type: true },
+    });
+
+    if (!category) {
+      throw new BadRequestException('La categoría seleccionada no existe o está inactiva');
+    }
 
     const report = await this.prisma.report.create({
       data: {
         title: dto.title,
         description: dto.description,
-        type: dto.type,
+        type: category.type,
         priority: reporter?.isAnonymous ? ReportPriority.BAJA : ReportPriority.ALTA,
         latitude: dto.latitude,
         longitude: dto.longitude,
@@ -110,7 +127,7 @@ async managementQueue(user: AuthenticatedUser, status?: string) {
       include: { category: true },
     });
 
-    return reporter?.role === 'ADMINISTRADOR'
+    return reporter?.role === 'ADMINISTRADOR' || reporter?.role === 'SUPERADMINISTRADOR'
       ? report
       : this.withoutPriority(report);
   }
@@ -192,6 +209,7 @@ async getEvidence(
   if (!report) {
     throw new NotFoundException('Denuncia no encontrada');
   }
+  this.assertOrganizationAccess(report, user);
 
   if (report.status !== ReportStatus.RECHAZADO) {
     throw new BadRequestException('Solo se pueden archivar denuncias denegadas');
@@ -206,7 +224,7 @@ async getEvidence(
     data: { archivedAt: new Date() },
   });
 
-  return user.role === 'ADMINISTRADOR'
+  return user.role === 'ADMINISTRADOR' || user.role === 'SUPERADMINISTRADOR'
     ? archivedReport
     : this.withoutPriority(archivedReport);
 }
@@ -215,6 +233,7 @@ async take(id: string, user: AuthenticatedUser) {
     this.assertManagementRole(user);
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
+    this.assertOrganizationAccess(report, user);
     if (user.role === 'ENTE_PUBLICO' && report.assigneeId && report.assigneeId !== user.sub) {
       throw new ForbiddenException('Esta denuncia ya fue tomada por otro ente');
     }
@@ -231,7 +250,7 @@ async take(id: string, user: AuthenticatedUser) {
       await transaction.reportHistory.create({
         data: { reportId: id, fromStatus: report.status, toStatus: ReportStatus.ASIGNADO, changedBy: user.sub },
       });
-      return user.role === 'ADMINISTRADOR'
+      return user.role === 'ADMINISTRADOR' || user.role === 'SUPERADMINISTRADOR'
         ? updated
         : this.withoutPriority(updated);
     });
@@ -241,6 +260,7 @@ async take(id: string, user: AuthenticatedUser) {
     this.assertManagementRole(user);
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
+    this.assertOrganizationAccess(report, user);
     if (user.role === 'ENTE_PUBLICO' && report.assigneeId !== user.sub) {
       throw new ForbiddenException('Primero debes tomar esta denuncia');
     }
@@ -257,7 +277,7 @@ async take(id: string, user: AuthenticatedUser) {
       await transaction.reportHistory.create({
         data: { reportId: id, fromStatus: report.status, toStatus: dto.status, changedBy: user.sub },
       });
-      return user.role === 'ADMINISTRADOR'
+      return user.role === 'ADMINISTRADOR' || user.role === 'SUPERADMINISTRADOR'
         ? updated
         : this.withoutPriority(updated);
     });
@@ -273,7 +293,7 @@ async take(id: string, user: AuthenticatedUser) {
 
     const updatedReport = await this.prisma.report.update({ where: { id }, data: dto });
 
-    return user.role === 'ADMINISTRADOR'
+    return user.role === 'ADMINISTRADOR' || user.role === 'SUPERADMINISTRADOR'
       ? updatedReport
       : this.withoutPriority(updatedReport);
   }
@@ -285,13 +305,41 @@ async take(id: string, user: AuthenticatedUser) {
     return { id, deleted: true };
   }
 
-  private assertCanAccess(report: { reporterId: string } | null, user: AuthenticatedUser) {
+  private assertCanAccess(
+    report: { reporterId: string; type: ReportType } | null,
+    user: AuthenticatedUser,
+  ) {
     if (!report) {
       throw new NotFoundException('Denuncia no encontrada');
     }
     if (user.role === 'CIUDADANO' && report.reporterId !== user.sub) {
       throw new ForbiddenException('No tienes acceso a esta denuncia');
     }
+    this.assertOrganizationAccess(report, user);
+  }
+
+  private assertAssignedReportType(user: AuthenticatedUser) {
+    if (user.role === 'ENTE_PUBLICO' && !user.managedReportType) {
+      throw new ForbiddenException('Tu usuario no tiene un tipo de reportes asignado');
+    }
+  }
+
+  private assertOrganizationAccess(report: { type: ReportType }, user: AuthenticatedUser) {
+    this.assertAssignedReportType(user);
+    if (user.role !== 'SUPERADMINISTRADOR' && managementRoles.includes(user.role) && report.type !== user.managedReportType) {
+      throw new ForbiddenException('No tienes acceso a reportes de otro organismo');
+    }
+  }
+
+  private reportScope(user: AuthenticatedUser): Prisma.ReportWhereInput {
+    if (user.role === 'SUPERADMINISTRADOR') {
+      return {};
+    }
+    if (user.role === 'ENTE_PUBLICO' || user.role === 'ADMINISTRADOR') {
+      this.assertAssignedReportType(user);
+      return { type: user.managedReportType! };
+    }
+    return {};
   }
 
   private assertManagementRole(user: AuthenticatedUser) {
