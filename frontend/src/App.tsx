@@ -415,7 +415,7 @@ function ManagementDashboard({
                   className={managementView === 'create-user' ? 'admin-nav-active' : ''}
                   onClick={() => setManagementView('create-user')}
                 >
-                  <span aria-hidden="true">＋</span> Añadir funcionario
+                  <span aria-hidden="true">＋</span> Solicitudes
                 </button>
               </>
             )}
@@ -431,7 +431,7 @@ function ManagementDashboard({
             <GestionUsuarios
               currentUserId={currentUserId}
               view={managementView === 'create-user' ? 'create-user' : 'users'}
-               onViewChange={(view) => setManagementView(view)}
+              onViewChange={(view) => setManagementView(view)}
             />
           ) : (
             <>
@@ -955,7 +955,11 @@ function App() {
     );
   }
 
-  if (user.role === 'FUNCIONARIO' || user.role === 'SUPERADMINISTRADOR') {
+  if (
+    user.role === 'FUNCIONARIO' ||
+    user.role === 'FUNCIONARIO_ADMINISTRADOR' ||
+    user.role === 'SUPERADMINISTRADOR'
+  ) {
     return (
       <ManagementDashboard
         isAdmin={user.role === 'SUPERADMINISTRADOR'}

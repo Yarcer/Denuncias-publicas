@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../lib/api'
 import './GestionUsuarios.css'
 
-type AdministrativeRole = 'FUNCIONARIO' | 'SUPERADMINISTRADOR'
+type AdministrativeRole = 'FUNCIONARIO' | 'FUNCIONARIO_ADMINISTRADOR' | 'SUPERADMINISTRADOR'
 type UserStatus = 'ACTIVO' | 'INACTIVO' | 'BANEADO'
 
 type AdministrativeUser = {
@@ -147,8 +147,8 @@ function GestionUsuarios({
     <section className="admin-users-page">
       <header className="admin-users-heading">
         <div>
-          <span className="eyebrow">Panel Superadministrador</span>
-          <p>Gestion de accesos, roles y cuentas.</p>
+          <h1>Bienvenido, Superadministrador</h1>
+          <p>Desde acá, podras administrar los funcionarios, organismos y la configuración del sistema.</p>
         </div>
         <span className="admin-users-count">{users.length} cuentas</span>
       </header>

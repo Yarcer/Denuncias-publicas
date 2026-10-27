@@ -61,6 +61,7 @@ export class AuthService {
       (dto.portal === 'ciudadano' && user.role !== 'CIUDADANO') ||
       (dto.portal === 'gestion' &&
         user.role !== 'FUNCIONARIO' &&
+        user.role !== 'FUNCIONARIO_ADMINISTRADOR' &&
         user.role !== 'SUPERADMINISTRADOR')
     ) {
       throw new UnauthorizedException('La cuenta no tiene acceso a este portal');

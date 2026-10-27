@@ -10,6 +10,7 @@ datasource db {
 enum Role {
   CIUDADANO
   FUNCIONARIO
+  FUNCIONARIO_ADMINISTRADOR
   SUPERADMINISTRADOR
 }
 
@@ -17,6 +18,12 @@ enum UserStatus {
   ACTIVO
   INACTIVO
   BANEADO
+}
+
+enum AdministrativeRequestStatus {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
 }
 
 enum ReportType {
@@ -61,6 +68,8 @@ model User {
   reports         Report[] @relation("reportedBy")
   assignedReports Report[] @relation("assignedTo")
   comments        Comment[]
+  submittedRequests AdministrativeUserRequest[] @relation("RequestSubmittedBy")
+  reviewedRequests  AdministrativeUserRequest[] @relation("RequestReviewedBy")
 }
 
 model Category {
@@ -140,4 +149,28 @@ model ReportHistory {
   changedBy  String
   comment    String?
   createdAt  DateTime     @default(now())
+}
+
+model AdministrativeUserRequest {
+  id           String                      @id @default(uuid())
+  email        String
+  firstName    String?
+  lastName     String?
+  entityName   String
+  jurisdiction String?
+  status       AdministrativeRequestStatus @default(PENDIENTE)
+
+  requestedById String
+  requestedBy   User @relation("RequestSubmittedBy", fields: [requestedById], references: [id])
+
+  reviewedById String?
+  reviewedBy   User? @relation("RequestReviewedBy", fields: [reviewedById], references: [id])
+
+  reviewComment String?
+  reviewedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status])
+  @@index([requestedById])
 }
