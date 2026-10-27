@@ -71,7 +71,7 @@ El seed crea estas cuentas:
 
 | Rol | Correo | Contraseña |
 |---|---|---|
-| Administrador | `admin@denuncias.local` | `Admin123!` |
+| Superadministrador | `superadmin@denuncias.local` | `Admin123!` |
 | Ente público | `ente@denuncias.local` | `Ente123!` |
 | Funcionario del ente | `funcionario@denuncias.local` | `Funcionario123!` |
 

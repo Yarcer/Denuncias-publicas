@@ -969,74 +969,77 @@ function App() {
     );
   }
   return (
-    <main className="app-shell">
+    <main className="app-shell ciudadano-shell">
+      <nav className="ciudadano-nav">
+        <div className="ciudadano-nav-logo">
+          <img
+            src={puntoReporteLogo}
+            alt="PuntoReporte"
+          />
+        </div>
+
+
+        <div className="ciudadano-nav-links">
+
+          <button
+            type="button"
+            className={vistaCiudadano === 'crear' ? 'nav-activo' : ''}
+            onClick={() => setVistaCiudadano('crear')}
+          >
+            Crear reporte
+          </button>
+
+          <button
+            type="button"
+            className={vistaCiudadano === 'reportes' ? 'nav-activo' : ''}
+            onClick={() => setVistaCiudadano('reportes')}
+          >
+            Mis reportes
+          </button>
+
+          <div className="cuenta-menu">
+            <button
+              type="button"
+              onClick={() => setMenuCuentaAbierto(!menuCuentaAbierto)}
+            >
+              Mi cuenta
+            </button>
+
+            {menuCuentaAbierto && (
+              <div className="cuenta-dropdown">
+                <span>{user.firstName || user.email}</span>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuCuentaAbierto(false);
+                    clearSession();
+                  }}
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </nav>
+
       <section className="dashboard">
-
-        <nav className="ciudadano-nav">
-          <div className="ciudadano-nav-logo">
-            <img
-              src={puntoReporteLogo}
-              alt="PuntoReporte"
-            />
-          </div>
-
-          <div className="ciudadano-nav-links">
-            <button type="button">
-              Inicio
-            </button>
-
-            <button
-              type="button"
-              className={vistaCiudadano === 'crear' ? 'nav-activo' : ''}
-              onClick={() => setVistaCiudadano('crear')}
-            >
-              Crear reporte
-            </button>
-
-            <button
-              type="button"
-              className={vistaCiudadano === 'reportes' ? 'nav-activo' : ''}
-              onClick={() => setVistaCiudadano('reportes')}
-            >
-              Mis reportes
-            </button>
-
-            <div className="cuenta-menu">
-              <button
-                type="button"
-                onClick={() => setMenuCuentaAbierto(!menuCuentaAbierto)}
-              >
-                Mi cuenta
-              </button>
-
-              {menuCuentaAbierto && (
-                <div className="cuenta-dropdown">
-                  <span>{user.firstName || user.email}</span>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuCuentaAbierto(false);
-                      clearSession();
-                    }}
-                  >
-                    Cerrar sesión
-                  </button>
-                </div>
-              )}
-            </div>
-
-          </div>
-        </nav>
 
         <header className="dashboard-header">
           <div>
-            <span className="eyebrow">Panel ciudadano</span>
-            <h1>Hola, {user.firstName || user.email}</h1>
+            <header className="dashboard-header">
+              <div>
+                <h1 className="saludo-ciudadano">
+                  <span className="saludo-icono" aria-hidden="true">👋</span>
+                  <span>Hola, {user.firstName || user.email}</span>
+                </h1>
+              </div>
+            </header>
           </div>
         </header>
 
-        <EmergencyShortcuts />
 
         {vistaCiudadano === 'crear' && (
           <CrearDenuncia />
@@ -1079,6 +1082,8 @@ function App() {
             )}
           </section>
         )}
+
+        <EmergencyShortcuts />
 
       </section>
     </main>

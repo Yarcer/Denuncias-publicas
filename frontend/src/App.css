@@ -2464,7 +2464,7 @@ textarea {
   outline-offset: 3px;
 }
 
-.institutional-access-link > svg {
+.institutional-access-link>svg {
   flex: 0 0 27px;
   width: 27px;
   height: 27px;
@@ -2475,7 +2475,7 @@ textarea {
   stroke-width: 1.7;
 }
 
-.institutional-access-link > span {
+.institutional-access-link>span {
   display: grid;
   flex: 1;
   gap: 3px;
@@ -2492,7 +2492,7 @@ textarea {
   font-weight: 500;
 }
 
-.institutional-access-link > b {
+.institutional-access-link>b {
   font-size: 1.35rem;
   line-height: 1;
 }
@@ -2509,12 +2509,13 @@ textarea {
   gap: 18px;
   margin: 0 0 22px;
   padding: 16px 18px;
-  border: 1px solid #fecaca;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 16px;
-  background: linear-gradient(110deg, #fff7f5 0%, #fff 100%);
+  background: linear-gradient(110deg, #163b63 0%, #1e4b77 100%);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
 }
 
-.dashboard > .emergency-shortcuts {
+.dashboard>.emergency-shortcuts {
   margin: 18px 42px 22px;
 }
 
@@ -2524,28 +2525,28 @@ textarea {
   gap: 12px;
 }
 
-.emergency-heading > span {
+.emergency-heading>span {
   display: grid;
   flex: 0 0 38px;
   width: 38px;
   height: 38px;
   place-items: center;
   border-radius: 50%;
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #dbeafe;
+  color: #163b63;
   font-size: 1.3rem;
   font-weight: 900;
 }
 
 .emergency-heading h2 {
   margin: 0 0 3px;
-  color: #7f1d1d;
+  color: #ffffff;
   font-size: 1rem;
 }
 
 .emergency-heading p {
   margin: 0;
-  color: #7c5353;
+  color: rgba(255, 255, 255, 0.82);
   font-size: 0.8rem;
 }
 
@@ -2561,17 +2562,23 @@ textarea {
   align-content: center;
   gap: 2px;
   padding: 9px 12px;
-  border: 1px solid #f4c4c0;
+  border: 1px solid #fecaca;
   border-radius: 11px;
-  background: #fff;
+  background: #fff1f0;
   color: #7f1d1d;
   text-decoration: none;
-  transition: border-color 150ms ease, background-color 150ms ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
 }
 
 .emergency-links a:hover {
   border-color: #dc2626;
-  background: #fff1f0;
+  background: #ffe4e6;
+  transform: translateY(-2px);
+  background: #ffe4e6;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.18);
 }
 
 .emergency-links strong {
@@ -2634,7 +2641,7 @@ textarea {
 }
 
 @media (max-width: 640px) {
-  .dashboard > .emergency-shortcuts {
+  .dashboard>.emergency-shortcuts {
     margin-right: 20px;
     margin-left: 20px;
   }
@@ -2660,4 +2667,44 @@ textarea {
   background: linear-gradient(135deg, #f2edff, #e8e0ff);
   color: #5f46ad;
   border-color: #d2c4f2;
+}
+
+.app-shell.ciudadano-shell {
+  padding: 0 0 45px;
+}
+
+.app-shell.ciudadano-shell .ciudadano-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.app-shell.ciudadano-shell .dashboard {
+  margin-top: 28px;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+.app-shell:has(.denuncia-page) .dashboard-header {
+  margin-bottom: 6px;
+  padding: 6px 42px 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.saludo-ciudadano {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #64748b;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.saludo-icono {
+  font-size: 1.15rem;
 }
