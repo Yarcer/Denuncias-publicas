@@ -27,9 +27,29 @@ JWT_EXPIRES_IN=1h
 CORS_ORIGIN=http://localhost:5173
 ```
 
+Para enviar confirmaciones por correo, configura también los datos de tu proveedor SMTP en `backend/.env`:
+
+```env
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=usuario-smtp
+SMTP_PASSWORD=contraseña-smtp
+SMTP_FROM="Denuncias Públicas <no-reply@example.com>"
+```
+
+`SMTP_HOST`, `SMTP_PORT` y `SMTP_FROM` son obligatorios en conjunto; `SMTP_USER` y `SMTP_PASSWORD` también deben configurarse juntos. El puerto 465 usa TLS implícito. Sin SMTP configurado, la denuncia se registra normalmente y la pantalla informa que no se pudo enviar el correo. Las sesiones anónimas no reciben correo.
+
+
 ## Iniciar PostgreSQL
 
-Abre Docker Desktop y espera a que el motor esté listo. Después crea el contenedor:
+Abre Docker Desktop y espera a que el motor esté listo. Si ya existe el contenedor,
+inícialo:
+
+```powershell
+docker start denuncias-postgres
+```
+
+En una instalación nueva, créalo:
 
 ```powershell
 docker run --name denuncias-postgres `
@@ -40,10 +60,11 @@ docker run --name denuncias-postgres `
   -d postgres:16
 ```
 
-Si el contenedor ya existe, solo inícialo:
+También puedes usar Docker Compose; ese método publica PostgreSQL en el puerto
+5433, por lo que `DATABASE_URL` debe apuntar a `localhost:5433`:
 
 ```powershell
-docker start denuncias-postgres
+docker compose up -d
 ```
 
 Para comprobarlo:
@@ -63,7 +84,7 @@ docker stop denuncias-postgres
 Ejecuta estos comandos desde la raíz `Denuncias-publicas`:
 
 ```powershell
-pnpm --dir backend exec prisma migrate dev --name initial_schema
+pnpm --dir backend exec prisma migrate deploy
 pnpm --dir backend db:seed
 ```
 
@@ -71,9 +92,9 @@ El seed crea estas cuentas:
 
 | Rol | Correo | Contraseña |
 |---|---|---|
-| Administrador | `admin@denuncias.local` | `Admin123!` |
-| Ente público | `ente@denuncias.local` | `Ente123!` |
-| Funcionario del ente | `funcionario@denuncias.local` | `Funcionario123!` |
+| Superadministrador | `admin@denuncias.local` | `Admin123!` |
+| Administrador de ente | `ente@denuncias.local` | `Ente123!` |
+| Funcionario | `funcionario@denuncias.local` | `Funcionario123!` |
 
 No uses estas contraseñas en producción.
 
@@ -104,8 +125,9 @@ pnpm --dir frontend dev
 
 - Registrarse e iniciar sesión desde `/login`.
 - Entrar como visitante mediante una sesión temporal.
-- Crear denuncias.
-- Recibir un identificador de seguimiento y consultar sus propias denuncias.
+- Crear denuncias, recibir prioridad automática y derivación al organismo correspondiente.
+- Recibir el identificador de seguimiento en pantalla y confirmación por email cuando la cuenta tenga correo y SMTP esté configurado.
+- Consultar sus propias denuncias.
 - Llamar a emergencias, bomberos o asistencia médica desde los accesos directos.
 
 ### Ente público
@@ -119,11 +141,11 @@ pnpm --dir frontend dev
 ### Administrador
 
 - Iniciar sesión desde `/gestion/login`.
-- Ver la bandeja completa.
+- Consultar estadísticas generales por fechas, estado, tipo, prioridad y evolución mensual.
 - Gestionar denuncias y estados.
 - Consultar los cambios registrados en el historial.
 
-Las operaciones de gestión de categorías y usuarios están restringidas a administradores. La asignación interna requiere cuentas `ENTE_PUBLICO` activas con el mismo nombre de ente; el seed incluye un funcionario demo para probar ese flujo. La botonera telefónica usa los números uruguayos 911, 104 y 105.
+Las estadísticas generales están restringidas al superadministrador. Las denuncias se derivan a Municipalidad Demo (URBANO), bombero demo (BOMBEROS) o policia demo (POLICIAL) si existe una cuenta institucional activa para ese organismo; en caso contrario quedan sin asignar y disponibles para gestión institucional. El seed configura Municipalidad Demo; bombero demo y policia demo deben configurarse desde la administración de funcionarios. La prioridad se calcula según términos de riesgo del título y descripción; las denuncias anónimas reciben prioridad baja. Las operaciones de gestión de categorías y usuarios están restringidas a administradores. La asignación interna requiere cuentas activas del mismo organismo; el seed incluye un funcionario demo para probar ese flujo. La botonera telefónica usa los números uruguayos 911, 104 y 105.
 
 ## Solución de problemas
 

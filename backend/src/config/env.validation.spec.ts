@@ -47,3 +47,34 @@ describe('production environment validation', () => {
     ).toThrow('STORAGE_DRIVER must be r2 in production');
   });
 });
+
+it('accepts SMTP configuration for report confirmations', () => {
+  expect(
+    validate({
+      ...productionConfig,
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_PORT: '587',
+      SMTP_USER: 'mailer',
+      SMTP_PASSWORD: 'mail-secret',
+      SMTP_FROM: 'reports@example.com',
+    }).SMTP_HOST,
+  ).toBe('smtp.example.com');
+});
+
+it('rejects partial SMTP configuration', () => {
+  expect(() =>
+    validate({ ...productionConfig, SMTP_HOST: 'smtp.example.com' }),
+  ).toThrow('SMTP_HOST, SMTP_PORT and SMTP_FROM must be configured together');
+});
+
+it('requires SMTP credentials to be configured as a pair', () => {
+  expect(() =>
+    validate({
+      ...productionConfig,
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_PORT: '587',
+      SMTP_FROM: 'reports@example.com',
+      SMTP_USER: 'mailer',
+    }),
+  ).toThrow('SMTP_USER and SMTP_PASSWORD must be configured together');
+});

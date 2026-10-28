@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, ReportType } from '@prisma/client';
+import { PrismaClient, ReportType, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient({
@@ -16,7 +16,7 @@ async function seedDemoUsers() {
     where: { email: 'admin@denuncias.local' },
     update: {
       passwordHash: adminPassword,
-      role: 'ADMINISTRADOR',
+      role: Role.SUPERADMINISTRADOR,
       status: 'ACTIVO',
     },
     create: {
@@ -24,7 +24,7 @@ async function seedDemoUsers() {
       passwordHash: adminPassword,
       firstName: 'Admin',
       lastName: 'Demo',
-      role: 'ADMINISTRADOR',
+      role: Role.SUPERADMINISTRADOR,
     },
   });
 
@@ -32,7 +32,7 @@ async function seedDemoUsers() {
     where: { email: 'ente@denuncias.local' },
     update: {
       passwordHash: entityPassword,
-      role: 'ENTE_PUBLICO',
+      role: Role.FUNCIONARIO_ADMINISTRADOR,
       status: 'ACTIVO',
     },
     create: {
@@ -41,7 +41,7 @@ async function seedDemoUsers() {
       firstName: 'Ente',
       lastName: 'Demo',
       entityName: 'Municipalidad Demo',
-      role: 'ENTE_PUBLICO',
+      role: Role.FUNCIONARIO_ADMINISTRADOR,
     },
   });
 
@@ -49,7 +49,7 @@ async function seedDemoUsers() {
     where: { email: 'funcionario@denuncias.local' },
     update: {
       passwordHash: staffPassword,
-      role: 'ENTE_PUBLICO',
+      role: Role.FUNCIONARIO,
       status: 'ACTIVO',
       entityName: 'Municipalidad Demo',
       jurisdiction: 'Melo',
@@ -61,7 +61,7 @@ async function seedDemoUsers() {
       lastName: 'Demo',
       entityName: 'Municipalidad Demo',
       jurisdiction: 'Melo',
-      role: 'ENTE_PUBLICO',
+      role: Role.FUNCIONARIO,
     },
   });
 }

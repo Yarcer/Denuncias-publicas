@@ -1,17 +1,17 @@
 services:
   denuncias-postgres:
-    image: postgres:16
-    container_name: denuncias-postgres
+    image: postgres:17
+    container_name: puntoreporte-postgres17
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=reportes_db
       - PGDATA=/var/lib/postgresql/data
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - puntoreporte_pg17_data:/var/lib/postgresql/data
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  puntoreporte_pg17_data:

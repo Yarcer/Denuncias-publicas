@@ -1,29 +1,35 @@
 .denuncia-page {
   min-height: auto;
-  padding: 45px 28px 55px;
-
-  background:
-    radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.12), transparent 32%),
-    linear-gradient(135deg, #eaf3ff 0%, #dfeeff 50%, #edf6ff 100%);
-
+  padding: 14px 28px 55px;
+  background: transparent;
   border-radius: 22px;
 }
 
 .denuncia-page h1 {
   text-align: center;
-  margin: 0 0 10px;
-
-  color: #0f172a;
-
-  font-size: 2.2rem;
+  margin: 0 0 8px;
+  color: #123456;
+  font-size: clamp(2.1rem, 3.5vw, 2.7rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
 }
 
-.denuncia-page > p {
+.denuncia-page h1::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 4px;
+  margin: 10px auto 0;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #2563eb, #0ea5e9);
+}
+
+.denuncia-page>p {
   text-align: center;
 
   max-width: 650px;
 
-  margin: 0 auto 34px;
+  margin: 0 auto 24px;
 
   color: #475569;
 
@@ -31,39 +37,31 @@
 }
 
 .denuncia-form {
-  max-width: 780px;
-
+  max-width: 960px;
   margin: 0 auto;
+  padding: 28px;
 
-  padding: 38px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 18px;
+  align-items: start;
 
-  background:
-    linear-gradient(
-      160deg,
-      rgba(255, 255, 255, 0.88) 0%,
-      rgba(239, 246, 255, 0.94) 100%
-    );
-
-  border: 1px solid rgba(37, 99, 235, 0.14);
-
-  border-radius: 22px;
-
-  box-shadow:
-    0 18px 45px rgba(15, 23, 42, 0.10);
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+  border-radius: 20px;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.09);
 }
 
-.denuncia-form div {
+.denuncia-form>div {
   display: flex;
   flex-direction: column;
-
-  margin-bottom: 24px;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 .denuncia-form label {
   margin-bottom: 9px;
-
   font-weight: 700;
-
   color: #1e293b;
 }
 
@@ -93,7 +91,7 @@
 }
 
 .denuncia-form textarea {
-  min-height: 140px;
+  min-height: 120px;
 
   resize: vertical;
 }
@@ -129,11 +127,9 @@
   border-radius: 12px;
 
   background:
-    linear-gradient(
-      135deg,
+    linear-gradient(135deg,
       #2563eb 0%,
-      #0ea5e9 100%
-    );
+      #0ea5e9 100%);
 
   color: white;
 
@@ -164,12 +160,16 @@
 
 .denuncia-form .error {
   padding: 12px 14px;
-
   border-radius: 10px;
-
   background: #fee2e2;
-
   color: #b91c1c;
+
+  .denuncia-form>div:nth-of-type(n + 3),
+  .denuncia-form>.error,
+  .denuncia-form>.notice,
+  .denuncia-form>button {
+    grid-column: 1 / -1;
+  }
 }
 
 .denuncia-form .notice {
@@ -193,8 +193,10 @@
 
   .denuncia-form {
     padding: 24px;
+    grid-template-columns: 1fr;
   }
 }
+
 .mapa-ayuda {
   margin-top: 0;
   margin-bottom: 12px;
@@ -204,7 +206,7 @@
 
 .mapa-ubicacion {
   width: 100%;
-  height: 350px;
+  height: 300px;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid #ddd;
@@ -221,10 +223,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 36px;
-  background: #ffffff;
+  padding: 8px 32px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.65);
   box-sizing: border-box;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.14);
 }
 
 .ciudadano-nav-logo {
@@ -233,7 +238,7 @@
 }
 
 .ciudadano-nav-logo img {
-  width: 230px;
+  width: 180px;
   height: auto;
   display: block;
 }
@@ -245,50 +250,116 @@
 .ciudadano-nav-links {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
 }
 
-.ciudadano-nav-links button {
-  padding: 12px 17px;
+.ciudadano-nav .ciudadano-nav-links>button,
+.ciudadano-nav .ciudadano-nav-links>.cuenta-menu>button {
+  padding: 9px 12px;
   border: none;
+  border-radius: 8px;
   background: transparent;
+  box-shadow: none;
   color: #475569;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  border-radius: 8px;
-  transition: 0.2s;
+  transition: color 0.2s ease, background 0.2s ease;
 }
 
-.ciudadano-nav-links button:hover {
-  background: #f1f5f9;
-  color: #1e3a5f;
-}
-
-.ciudadano-nav-links .nav-activo {
-  background: #eaf3ff;
+.ciudadano-nav .ciudadano-nav-links>button:hover,
+.ciudadano-nav .ciudadano-nav-links>.cuenta-menu>button:hover {
+  background: #eff6ff;
   color: #2563eb;
 }
 
-@media (max-width: 720px) {
-  .ciudadano-nav {
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px;
-  }
+.ciudadano-nav .ciudadano-nav-links>button.nav-activo {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 -2px 0 #2563eb;
+  color: #2563eb;
+}
 
-  .ciudadano-nav-logo img {
-    width: min(210px, 70vw);
-  }
+.ciudadano-nav .ciudadano-nav-links>button,
+.ciudadano-nav .ciudadano-nav-links>.cuenta-menu>button {
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
 
-  .ciudadano-nav-links {
-    width: 100%;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
+.ciudadano-nav .ciudadano-nav-links>button:hover,
+.ciudadano-nav .ciudadano-nav-links>.cuenta-menu>button:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
 
-  .ciudadano-nav-links button {
-    padding: 10px 12px;
-    font-size: 0.88rem;
-  }
+.ciudadano-nav .ciudadano-nav-links>button.nav-activo {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 -2px 0 #2563eb;
+  color: #2563eb;
+}
+
+.ciudadano-nav .ciudadano-nav-links>button,
+.ciudadano-nav .ciudadano-nav-links>.cuenta-menu>button {
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.ciudadano-nav .ciudadano-nav-links>button:hover,
+.ciudadano-nav .ciudadano-nav-links>.cuenta-menu>button:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.ciudadano-nav .ciudadano-nav-links>button.nav-activo {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 -2px 0 #2563eb;
+  color: #2563eb;
+}
+
+.ciudadano-nav-title {
+  margin: 0;
+  text-align: center;
+  color: #0f172a;
+  font-size: 1.15rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.app-shell:has(.denuncia-page) {
+  background: url('/fondo-plaza-puntoreporte.png') center / cover fixed no-repeat;
+}
+
+.app-shell:has(.denuncia-page) .dashboard {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.app-shell:has(.denuncia-page) .denuncia-page {
+  background: transparent;
+}
+
+.app-shell:has(.denuncia-page) .denuncia-form {
+  background: #f1efef;
 }

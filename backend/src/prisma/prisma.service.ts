@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
@@ -20,7 +25,7 @@ export class PrismaService
   async onModuleInit() {
     try {
       await this.$connect();
-    } catch (error) {
+    } catch {
       this.logger.warn(
         'PostgreSQL no está disponible. La API básica seguirá iniciando.',
       );

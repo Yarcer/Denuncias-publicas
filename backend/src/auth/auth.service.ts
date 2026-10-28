@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { randomUUID } from 'node:crypto';
@@ -35,7 +40,7 @@ export class AuthService {
 
     return {
       user: this.publicUser(user),
-      accessToken: await this.signToken(user.id, user.email, user.role),
+      accessToken: this.signToken(user.id, user.email, user.role),
     };
   }
 
@@ -60,15 +65,18 @@ export class AuthService {
     if (
       (dto.portal === 'ciudadano' && user.role !== 'CIUDADANO') ||
       (dto.portal === 'gestion' &&
-        user.role !== 'ENTE_PUBLICO' &&
-        user.role !== 'ADMINISTRADOR')
+        user.role !== 'FUNCIONARIO' &&
+        user.role !== 'FUNCIONARIO_ADMINISTRADOR' &&
+        user.role !== 'SUPERADMINISTRADOR')
     ) {
-      throw new UnauthorizedException('La cuenta no tiene acceso a este portal');
+      throw new UnauthorizedException(
+        'La cuenta no tiene acceso a este portal',
+      );
     }
 
     return {
       user: this.publicUser(user),
-      accessToken: await this.signToken(user.id, user.email, user.role),
+      accessToken: this.signToken(user.id, user.email, user.role),
     };
   }
 
@@ -81,6 +89,7 @@ export class AuthService {
           email: `anon-${anonymousId}@anonymous.local`,
           passwordHash: await argon2.hash(randomUUID()),
           firstName: 'Visitante',
+          isAnonymous: true,
           role: 'CIUDADANO',
         },
       });
@@ -92,7 +101,7 @@ export class AuthService {
 
     return {
       user: this.publicUser(user),
-      accessToken: await this.signToken(user.id, user.email, user.role),
+      accessToken: this.signToken(user.id, user.email, user.role),
     };
   }
 
@@ -108,7 +117,7 @@ export class AuthService {
     return this.publicUser(user);
   }
 
-  private async signToken(userId: string, email: string, role: string) {
+  private signToken(userId: string, email: string, role: string) {
     return this.jwtService.sign({
       sub: userId,
       email,
@@ -116,8 +125,29 @@ export class AuthService {
     });
   }
 
-  private publicUser(user: { id: string; email: string; role: string; status: string; firstName: string | null; lastName: string | null; phone: string | null; createdAt: Date; updatedAt: Date; }) {
-    const { passwordHash, ...rest } = user as typeof user & { passwordHash?: string };
-    return rest;
+  private publicUser(user: {
+    id: string;
+    email: string;
+    role: string;
+    isAnonymous: boolean;
+    status: string;
+    firstName: string | null;
+    lastName: string | null;
+    phone: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      isAnonymous: user.isAnonymous,
+      status: user.status,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 }

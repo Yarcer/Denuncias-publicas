@@ -50,7 +50,10 @@ export class AuthController {
   @Post('anonymous')
   @Throttle({ default: { limit: 3, ttl: 60 * 60 * 1000 } })
   async anonymousLogin(@Res({ passthrough: true }) response: Response) {
-    return this.createSession(await this.authService.anonymousLogin(), response);
+    return this.createSession(
+      await this.authService.anonymousLogin(),
+      response,
+    );
   }
 
   @Get('me')
@@ -111,7 +114,8 @@ export class AuthController {
   }
 
   private cookieOptions(httpOnly: boolean): CookieOptions {
-    const isProduction = this.configService.get<string>('nodeEnv') === 'production';
+    const isProduction =
+      this.configService.get<string>('nodeEnv') === 'production';
     return {
       httpOnly,
       secure: isProduction,

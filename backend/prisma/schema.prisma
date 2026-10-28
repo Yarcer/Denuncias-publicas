@@ -9,14 +9,21 @@ datasource db {
 
 enum Role {
   CIUDADANO
-  ENTE_PUBLICO
-  ADMINISTRADOR
+  FUNCIONARIO
+  FUNCIONARIO_ADMINISTRADOR
+  SUPERADMINISTRADOR
 }
 
 enum UserStatus {
   ACTIVO
   INACTIVO
   BANEADO
+}
+
+enum AdministrativeRequestStatus {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
 }
 
 enum ReportType {
@@ -47,6 +54,7 @@ model User {
   email        String     @unique
   passwordHash String
   role         Role       @default(CIUDADANO)
+  isAnonymous  Boolean    @default(false)
   status       UserStatus @default(ACTIVO)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -60,6 +68,8 @@ model User {
   reports         Report[] @relation("reportedBy")
   assignedReports Report[] @relation("assignedTo")
   comments        Comment[]
+  submittedRequests AdministrativeUserRequest[] @relation("RequestSubmittedBy")
+  reviewedRequests  AdministrativeUserRequest[] @relation("RequestReviewedBy")
 }
 
 model Category {
@@ -85,6 +95,7 @@ model Report {
   longitude Float
   address   String?
   reference String?
+  entityName String?
 
   reporterId String
   reporter   User   @relation("reportedBy", fields: [reporterId], references: [id])
@@ -107,6 +118,8 @@ model Report {
   @@index([assigneeId])
   @@index([status])
   @@index([type])
+  @@index([priority])
+  @@index([entityName])
 }
 
 model Evidence {
@@ -138,4 +151,28 @@ model ReportHistory {
   changedBy  String
   comment    String?
   createdAt  DateTime     @default(now())
+}
+
+model AdministrativeUserRequest {
+  id           String                      @id @default(uuid())
+  email        String
+  firstName    String?
+  lastName     String?
+  entityName   String
+  jurisdiction String?
+  status       AdministrativeRequestStatus @default(PENDIENTE)
+
+  requestedById String
+  requestedBy   User @relation("RequestSubmittedBy", fields: [requestedById], references: [id])
+
+  reviewedById String?
+  reviewedBy   User? @relation("RequestReviewedBy", fields: [reviewedById], references: [id])
+
+  reviewComment String?
+  reviewedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status])
+  @@index([requestedById])
 }

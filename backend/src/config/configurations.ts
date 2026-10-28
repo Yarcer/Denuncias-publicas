@@ -22,4 +22,13 @@ export default () => ({
     r2AccessKeyId: process.env.R2_ACCESS_KEY_ID,
     r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   },
+  email: {
+    smtpHost: process.env.SMTP_HOST,
+    smtpPort: process.env.SMTP_PORT
+      ? parseInt(process.env.SMTP_PORT, 10)
+      : undefined,
+    smtpUser: process.env.SMTP_USER,
+    smtpPassword: process.env.SMTP_PASSWORD,
+    from: process.env.SMTP_FROM,
+  },
 });

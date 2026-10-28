@@ -3,10 +3,10 @@ import { IsEnum, IsUUID } from 'class-validator';
 
 export class ManageReportDto {
   @IsEnum(ReportStatus)
-  status: ReportStatus;
+  status!: ReportStatus;
 }
 
 export class AssignReportDto {
   @IsUUID()
-  assigneeId: string;
+  assigneeId!: string;
 }

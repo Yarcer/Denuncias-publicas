@@ -1,16 +1,18 @@
-import axios from 'axios';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import './App.css';
 import { api } from './lib/api';
 import { getApiErrorMessage } from './lib/api-error';
 import { useAuthStore } from './stores/auth-store';
 import CrearDenuncia from './pages/CrearDenuncia'
 import { formatReportIdentifier } from './lib/report-id';
+import GestionUsuarios from './pages/GestionUsuarios';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
 type AuthRoute = 'login' | 'register' | 'anonymous' | 'management-login';
-type CitizenView = 'inicio' | 'crear' | 'reportes';
 
 function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   if (pathname === '/gestion/login') return 'management-login';
@@ -19,27 +21,16 @@ function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   return 'login';
 }
 
-type Report = { id: string; title: string; description: string; status: string };
-const reportStatusLabels: Record<string, string> = {
-  PENDIENTE: 'Pendiente',
-  EN_REVISION: 'En revisión',
-  ASIGNADO: 'Asignado',
-  EN_PROCESO: 'En proceso',
-  RESUELTO: 'Resuelto',
-  RECHAZADO: 'Rechazado',
-  CERRADO: 'Cerrado',
-};
-
-function isAnonymousUser(email: string) {
-  return email.startsWith('anon-') && email.endsWith('@anonymous.local');
-}
-
-async function fetchCitizenReports(): Promise<Report[]> {
-  const response = await api.get<{ data: { items: Report[] } }>('/denuncias');
-  return response.data.data.items;
-}
-
+type Report = { id: string; title: string; description: string; status: string; priority?: string };
 type ManagedReport = Report & {
+  type?: string;
+  entityName?: string | null;
+  createdAt: string;
+  category?: {
+    id: string;
+    name: string;
+    type: string;
+  }
   address?: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -47,6 +38,7 @@ type ManagedReport = Report & {
     email: string;
     firstName?: string | null;
     lastName?: string | null;
+    isAnonymous: boolean;
   };
   assignee?: {
     id: string;
@@ -60,6 +52,39 @@ type ManagedReport = Report & {
     type: string;
   }[];
 };
+
+function normalizeExportValue(value: string | number | null | undefined): string {
+  const normalized = String(value ?? '').replace(/\r?\n/g, ' ');
+  return normalized.replace(/"/g, '""');
+}
+
+function buildExportRows(reports: ManagedReport[]) {
+  return reports.map((item) => ({
+    'ID': item.id,
+    'Título': item.title,
+    'Descripción': item.description,
+    'Estado': item.status.replace(/_/g, ' '),
+    'Prioridad': item.priority ?? 'Sin prioridad',
+    'Organismo': item.entityName ?? 'Sin asignar',
+    'Dirección': item.address ?? 'Sin dirección',
+    'Ciudadano': item.reporter?.isAnonymous ? 'Anónimo' : `${item.reporter?.firstName ?? ''} ${item.reporter?.lastName ?? ''}`.trim() || item.reporter?.email || 'Ciudadano',
+    'Email': item.reporter?.email ?? '',
+    'Latitud': item.latitude ?? '',
+    'Longitud': item.longitude ?? '',
+    'Asignado a': item.assignee?.email ?? 'Sin asignar',
+  }));
+}
+
+function downloadExportFile(filename: string, content: string | Blob, mimeType: string) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 
 type AssignableUser = {
   id: string;
@@ -94,6 +119,162 @@ function EmergencyShortcuts() {
           </a>
         ))}
       </div>
+    </section>
+  );
+}
+
+type StatisticGroup = { status?: string; type?: string; priority?: string; count: number };
+type StatisticsData = {
+  total: number;
+  byStatus: StatisticGroup[];
+  byType: StatisticGroup[];
+  byPriority: StatisticGroup[];
+  byMonth: { month: string; count: number }[];
+};
+
+function GeneralStatistics() {
+  const [statistics, setStatistics] = useState<StatisticsData | null>(null);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadStatistics() {
+      try {
+        const response = await api.get('/denuncias/gestion/estadisticas', {
+          params: { ...(from ? { from } : {}), ...(to ? { to } : {}) },
+        });
+        if (active) {
+          setStatistics(response.data.data);
+          setError('');
+        }
+      } catch (loadError: unknown) {
+        if (active) {
+          setError(
+            getApiErrorMessage(
+              loadError,
+              'No se pudieron cargar las estadísticas.',
+            ),
+          );
+        }
+      }
+    }
+
+    void loadStatistics();
+    return () => {
+      active = false;
+    };
+  }, [from, to]);
+
+  const sections = statistics
+    ? [
+        {
+          title: 'Por estado',
+          items: statistics.byStatus.map((item) => ({
+            label: item.status?.replace(/_/g, ' ') ?? '',
+            count: item.count,
+          })),
+        },
+        {
+          title: 'Por tipo',
+          items: statistics.byType.map((item) => ({
+            label: item.type ?? '',
+            count: item.count,
+          })),
+        },
+        {
+          title: 'Por prioridad',
+          items: statistics.byPriority.map((item) => ({
+            label: item.priority ?? '',
+            count: item.count,
+          })),
+        },
+      ]
+    : [];
+  const maximumMonthlyCount = Math.max(
+    1,
+    ...(statistics?.byMonth.map((item) => item.count) ?? []),
+  );
+
+  return (
+    <section className="statistics-page">
+      <header className="statistics-header">
+        <div>
+          <span className="statistics-eyebrow">Administración</span>
+          <h1>Estadísticas generales</h1>
+          <p>Resumen de denuncias registradas en el sistema.</p>
+        </div>
+        <div className="statistics-date-filters">
+          <label>
+            Desde
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(event) => setFrom(event.target.value)}
+            />
+          </label>
+          <label>
+            Hasta
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(event) => setTo(event.target.value)}
+            />
+          </label>
+        </div>
+      </header>
+
+      {error && <p className="error">{error}</p>}
+      {statistics && (
+        <>
+          <article className="statistics-total">
+            <span>Total de denuncias</span>
+            <strong>{statistics.total}</strong>
+          </article>
+          <div className="statistics-grid">
+            {sections.map((section) => (
+              <article className="statistics-card" key={section.title}>
+                <h2>{section.title}</h2>
+                {section.items.length ? (
+                  section.items.map((item) => (
+                    <div className="statistics-row" key={item.label}>
+                      <span>{item.label}</span>
+                      <strong>{item.count}</strong>
+                    </div>
+                  ))
+                ) : (
+                  <p>No hay datos para el período.</p>
+                )}
+              </article>
+            ))}
+            <article className="statistics-card statistics-monthly">
+              <h2>Evolución mensual</h2>
+              {statistics.byMonth.length ? (
+                statistics.byMonth.map((item) => (
+                  <div className="statistics-row" key={item.month}>
+                    <span>{item.month}</span>
+                    <div className="statistics-bar-track">
+                      <div
+                        className="statistics-bar"
+                        style={{
+                          width: `${(item.count / maximumMonthlyCount) * 100}%`,
+                        }}
+                      />
+                    </div>
+                    <strong>{item.count}</strong>
+                  </div>
+                ))
+              ) : (
+                <p>No hay datos para el período.</p>
+              )}
+            </article>
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -244,11 +425,20 @@ function ManagementDashboard({
 }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const [managementView, setManagementView] = useState<
+    'reports' | 'users' | 'create-user' | 'statistics'
+  >(isAdmin ? 'users' : 'reports');
+  const [dateOrder, setDateOrder] = useState<'newest' | 'oldest'>('newest');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [modalityFilter, setModalityFilter] = useState('');
   const [filter, setFilter] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
 
   async function loadReports(selectedStatus = filter) {
+    if (isAdmin) return;
     try {
       const response = await api.get(
         '/denuncias/gestion/bandeja',
@@ -262,6 +452,7 @@ function ManagementDashboard({
   }
 
   useEffect(() => {
+    if (isAdmin) return;
     let active = true;
 
     async function fetchReports() {
@@ -285,9 +476,61 @@ function ManagementDashboard({
     return () => {
       active = false;
     };
-  }, [filter]);
+  }, [filter, isAdmin]);
+
+  function exportReports(format: 'csv' | 'xlsx' | 'pdf') {
+    if (!visibleReports.length) {
+      setError('No hay reportes visibles para exportar.');
+      return;
+    }
+
+    const rows = buildExportRows(visibleReports);
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const baseName = `denuncias-${filter === 'active' ? 'activa' : filter}-${timestamp}`;
+
+    if (format === 'csv') {
+      const headers = Object.keys(rows[0]);
+      const csvContent = [
+        headers.join(','),
+        ...rows.map((row) => headers.map((header) => `"${normalizeExportValue(row[header as keyof typeof row])}"`).join(',')),
+      ].join('\n');
+
+      downloadExportFile(`${baseName}.csv`, csvContent, 'text/csv;charset=utf-8;');
+      return;
+    }
+
+    if (format === 'xlsx') {
+      const sheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, 'Denuncias');
+      XLSX.writeFile(workbook, `${baseName}.xlsx`);
+      return;
+    }
+
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const headers = Object.keys(rows[0]);
+    const tableRows = rows.map((row) => headers.map((header) => row[header as keyof typeof row] ?? ''));
+
+    doc.setFontSize(16);
+    doc.text('Listado de denuncias', 40, 48);
+    doc.setFontSize(10);
+    doc.text(`Exportado: ${new Date().toLocaleString('es-UY')}`, 40, 66);
+
+    autoTable(doc, {
+      head: [headers],
+      body: tableRows,
+      startY: 84,
+      margin: { left: 40, right: 40 },
+      styles: { fontSize: 7, cellPadding: 4 },
+      headStyles: { fillColor: [21, 86, 181], textColor: 255 },
+      alternateRowStyles: { fillColor: [247, 250, 255] },
+    });
+
+    doc.save(`${baseName}.pdf`);
+  }
 
   useEffect(() => {
+    if (isAdmin) return;
     async function loadAssignableUsers() {
       try {
         const response = await api.get('/denuncias/gestion/funcionarios');
@@ -298,7 +541,7 @@ function ManagementDashboard({
     }
 
     void loadAssignableUsers();
-  }, []);
+  }, [isAdmin]);
 
   async function archiveReport(id: string) {
     try {
@@ -358,17 +601,54 @@ function ManagementDashboard({
     : [{ title: filterLabels[filter] ?? 'Reportes', status: '' }];
 
   const search = searchTerm.trim().toLowerCase();
-  const visibleReports = reports.filter((item) => {
-    const searchableText = [
-      item.title,
-      item.description,
-      item.address,
-      item.reporter?.firstName,
-      item.reporter?.lastName,
-      item.reporter?.email,
-    ].filter(Boolean).join(' ').toLowerCase();
-    return searchableText.includes(search);
-  });
+ const categories = reports.reduce<NonNullable<ManagedReport['category']>[]>(
+  (unique, report) => {
+    const category = report.category;
+
+    if (category && !unique.some((item) => item.id === category.id)) {
+      unique.push(category);
+    }
+
+    return unique;
+  },
+  [],
+).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+  const startOfRange = dateFrom
+  ? new Date(`${dateFrom}T00:00:00`).getTime()
+  : null;
+
+  const endOfRange = dateTo
+  ? new Date(`${dateTo}T23:59:59.999`).getTime()
+  : null;
+
+  const visibleReports = reports
+    .filter((item) => {
+      const createdAt = new Date(item.createdAt).getTime();
+      const reporterEmail = item.reporter?.email ?? '';
+      const isAnonymous = /^anon-.+@anonymous\.local$/i.test(reporterEmail);
+      const searchableText = [
+        item.title,
+        item.description,
+        item.address,
+        item.reporter?.firstName,
+        item.reporter?.lastName,
+        item.reporter?.email,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return (
+        searchableText.includes(search) &&
+        (!startOfRange || createdAt >= startOfRange) &&
+        (!endOfRange || createdAt <= endOfRange) &&
+        (!categoryFilter || item.category?.id === categoryFilter) &&
+        (!modalityFilter ||
+          (modalityFilter === 'anonymous' ? isAnonymous : !isAnonymous))
+      );
+
+    })
+    .sort((a, b) => {
+      const dateDifference = Date.parse(a.createdAt) - Date.parse(b.createdAt);
+      return dateOrder === 'newest' ? -dateDifference : dateDifference;
+    });
 
   const pendingCount = reports.filter((item) => item.status === 'PENDIENTE').length;
   const inProgressCount = reports.filter((item) => item.status === 'EN_PROCESO').length;
@@ -388,26 +668,57 @@ function ManagementDashboard({
           </div>
 
           <nav className="admin-nav" aria-label="Navegación de administración">
-            <button type="button" onClick={() => scrollToSection('admin-summary')}>
-              <span aria-hidden="true">⌂</span> Inicio
-            </button>
-            <button
-              type="button"
-              className={!isArchivedView ? 'admin-nav-active' : ''}
-              onClick={() => {
-                setFilter('active');
-                scrollToSection('admin-board');
-              }}
-            >
-              <span aria-hidden="true">▤</span> Bandeja de reportes
-            </button>
-            <button
-              type="button"
-              className={isArchivedView ? 'admin-nav-active' : ''}
-              onClick={() => setFilter('archived')}
-            >
-              <span aria-hidden="true">▣</span> Archivadas
-            </button>
+            {!isAdmin && (
+              <>
+                <button type="button" onClick={() => scrollToSection('admin-summary')}>
+                  <span aria-hidden="true">⌂</span> Inicio
+                </button>
+                <button
+                  type="button"
+                  className={managementView === 'reports' && !isArchivedView ? 'admin-nav-active' : ''}
+                  onClick={() => {
+                    setManagementView('reports');
+                    setFilter('active');
+                    scrollToSection('admin-board');
+                  }}
+                >
+                  <span aria-hidden="true">▤</span> Bandeja de reportes
+                </button>
+                <button
+                  type="button"
+                  className={managementView === 'reports' && isArchivedView ? 'admin-nav-active' : ''}
+                  onClick={() => { setManagementView('reports'); setFilter('archived'); }}
+                >
+                  <span aria-hidden="true">▣</span> Archivadas
+                </button>
+              </>
+            )}
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  className={managementView === 'statistics' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('statistics')}
+                >
+                  <span aria-hidden="true">▥</span> Estadísticas generales
+                </button>
+                <button
+                  type="button"
+                  className={managementView === 'users' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('users')}
+                >
+                  <span aria-hidden="true">◉</span> Cuentas de funcionarios
+                </button>
+
+                <button
+                  type="button"
+                  className={managementView === 'create-user' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('create-user')}
+                >
+                  <span aria-hidden="true">＋</span> Solicitudes
+                </button>
+              </>
+            )}
           </nav>
 
           <button type="button" className="admin-logout" onClick={onLogout}>
@@ -416,187 +727,302 @@ function ManagementDashboard({
         </aside>
 
         <section className="admin-main">
-          <header className="admin-header">
-            <div className="admin-page-title">
-              <span className="eyebrow">{isAdmin ? 'Superadministrador' : 'Ente público'}</span>
-              <h1>Bandeja de reportes</h1>
-              <p>Organiza y sigue los reportes de la ciudad.</p>
-            </div>
+          {isAdmin ? (
+            managementView === 'statistics' ? (
+              <GeneralStatistics />
+            ) : (
+              <GestionUsuarios
+                currentUserId={currentUserId}
+                view={managementView === 'create-user' ? 'create-user' : 'users'}
+                onViewChange={(view) => setManagementView(view)}
+              />
+            )
+          ) : (
+            <>
+             <div className="admin-page-layout">
+            <div className="admin-page-content">
+              <header className="admin-header">
+                <div className="admin-page-title">
+                  <span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span>
+                  <h1>Bandeja de denuncias</h1>
+                  <p>Organiza y sigue los reportes de la ciudad.</p>
+                </div>
 
-            <div className="admin-header-tools">
-              <label className="admin-search">
-                <span aria-hidden="true">⌕</span>
-                <input
-                  type="search"
-                  placeholder="Buscar denuncias..."
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  aria-label="Buscar denuncias"
-                />
-              </label>
-              <select
-                className="admin-filter"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                aria-label="Filtrar denuncias por estado"
-              >
-                <option value="active">Activas · tablero</option>
-                <option value="PENDIENTE">Pendientes</option>
-                <option value="ASIGNADO">Asignadas</option>
-                <option value="EN_REVISION">En revisión</option>
-                <option value="EN_PROCESO">En proceso</option>
-                <option value="RESUELTO">Resueltas</option>
-                <option value="RECHAZADO">Denegadas</option>
-                <option value="archived">Archivadas</option>
-              </select>
-            </div>
-          </header>
-
-          <EmergencyShortcuts />
-
-          {error && <p className="error management-error">{error}</p>}
-
-          <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
-            <article className="admin-summary-card admin-summary-blue">
-              <span className="admin-summary-icon" aria-hidden="true">▤</span>
-              <div><span>Casos en esta vista</span><strong>{reports.length}</strong></div>
-            </article>
-            <article className="admin-summary-card admin-summary-amber">
-              <span className="admin-summary-icon" aria-hidden="true">◷</span>
-              <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
-            </article>
-            <article className="admin-summary-card admin-summary-green">
-              <span className="admin-summary-icon" aria-hidden="true">✓</span>
-              <div><span>En proceso</span><strong>{inProgressCount}</strong></div>
-            </article>
-          </section>
-
-          <div className="admin-board-heading" id="admin-board">
-            <div>
-              <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
-              <p>{visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}</p>
-            </div>
-          </div>
-
-          <section className={`admin-board ${filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}>
-            {columns.map((column) => {
-              const columnReports = column.status
-                ? visibleReports.filter((item) => item.status === column.status)
-                : visibleReports;
-
-              return (
-                <div className="admin-column" key={column.title}>
-                  <header className="admin-column-header">
-                    <h3>{column.title}</h3>
-                    <span>{columnReports.length}</span>
-                  </header>
-
-                  <div className="admin-column-cards">
-                    {columnReports.length === 0 ? (
-                      <p className="admin-column-empty">
-                        {search ? 'No hay coincidencias.' : 'No hay denuncias aquí.'}
-                      </p>
-                    ) : columnReports.map((item) => (
-                      <article className="admin-report-card" key={item.id}>
-                        <div className="admin-report-copy">
-                          <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
-                            {item.status.replace(/_/g, ' ')}
-                          </span>
-                          <small className="report-identifier">
-                            Identificador: {formatReportIdentifier(item.id)}
-                          </small>
-                          <h4>{item.title}</h4>
-                          <p>{item.description}</p>
-                          <div className="admin-report-meta">
-                            <span><b aria-hidden="true">⌖</b>{item.address || 'Ubicación sin dirección'}</span>
-                            <span><b aria-hidden="true">♙</b>{item.reporter?.firstName || item.reporter?.email || 'Ciudadano'}</span>
-                          </div>
-
-                          {item.latitude != null && item.longitude != null && (
-                            <a
-                              className="admin-map-link"
-                              href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <span aria-hidden="true">⌖</span> Ver mapa
-                            </a>
-                          )}
-
-                          {item.evidence?.map((photo) => (
-                            <ReportImage
-                              key={photo.id}
-                              reportId={item.id}
-                              evidenceId={photo.id}
-                            />
-                          ))}
-                        </div>
-
-                        <div className="admin-report-actions">
-                          <label className="report-assignment">
-                            Asignar a funcionario
-                            <select
-                              value={item.assignee?.id ?? ''}
-                              onChange={(event) => {
-                                if (event.target.value) {
-                                  void assignReport(item.id, event.target.value);
-                                }
-                              }}
-                              aria-label={`Asignar denuncia ${formatReportIdentifier(item.id)}`}
-                            >
-                              <option value="">Seleccionar funcionario</option>
-                              {item.assignee && !assignableUsers.some((staff) => staff.id === item.assignee?.id) && (
-                                <option value={item.assignee.id}>
-                                  {item.assignee.firstName || item.assignee.email}
-                                </option>
-                              )}
-                              {assignableUsers.map((staff) => (
-                                <option key={staff.id} value={staff.id}>
-                                  {staff.firstName
-                                    ? `${staff.firstName} ${staff.lastName ?? ''}`.trim()
-                                    : staff.email}
-                                  {isAdmin && staff.entityName ? ` · ${staff.entityName}` : ''}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          {!item.assignee && (
-                            <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
-                          )}
-                          {item.assignee && (
-                            <p className="assigned-to">
-                              Asignada a {item.assignee.firstName || item.assignee.email}
-                            </p>
-                          )}
-                          {(isAdmin || item.assignee?.id === currentUserId) && item.assignee && (
-                            <>
-                              <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
-                                En revisión
-                              </button>
-                              <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
-                                Iniciar trabajo
-                              </button>
-                              <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
-                                Marcar resuelta
-                              </button>
-                              <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
-                                Denegar
-                              </button>
-                            </>
-                          )}
-                          {item.status === 'RECHAZADO' && filter !== 'archived' && (
-                            <button className="secondary" onClick={() => archiveReport(item.id)}>
-                              Archivar
-                            </button>
-                          )}
-                        </div>
-                      </article>
-                    ))}
+                <div className="admin-header-tools">
+                  <label className="admin-search">
+                    <span aria-hidden="true">⌕</span>
+                    <input
+                      type="search"
+                      placeholder="Buscar denuncias..."
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      aria-label="Buscar denuncias"
+                    />
+                  </label>
+                  <select
+                    className="admin-filter"
+                    value={filter}
+                    onChange={(event) => setFilter(event.target.value)}
+                    aria-label="Filtrar denuncias por estado"
+                  >
+                    <option value="active">Activas · tablero</option>
+                    <option value="PENDIENTE">Pendientes</option>
+                    <option value="ASIGNADO">Asignadas</option>
+                    <option value="EN_REVISION">En revisión</option>
+                    <option value="EN_PROCESO">En proceso</option>
+                    <option value="RESUELTO">Resueltas</option>
+                    <option value="RECHAZADO">Denegadas</option>
+                    <option value="archived">Archivadas</option>
+                  </select>
+                  <div className="admin-export-actions" aria-label="Exportar denuncias">
+                    <button type="button" onClick={() => exportReports('csv')}>CSV</button>
+                    <button type="button" onClick={() => exportReports('xlsx')}>Excel</button>
+                    <button type="button" onClick={() => exportReports('pdf')}>PDF</button>
                   </div>
                 </div>
-              );
-            })}
-          </section>
+              </header>
+
+              <EmergencyShortcuts />
+
+              {error && <p className="error management-error">{error}</p>}
+
+              <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
+                <article className="admin-summary-card admin-summary-blue">
+                  <span className="admin-summary-icon" aria-hidden="true">▤</span>
+                  <div><span>Casos en esta vista</span><strong>{reports.length}</strong></div>
+                </article>
+                <article className="admin-summary-card admin-summary-amber">
+                  <span className="admin-summary-icon" aria-hidden="true">◷</span>
+                  <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
+                </article>
+                <article className="admin-summary-card admin-summary-green">
+                  <span className="admin-summary-icon" aria-hidden="true">✓</span>
+                  <div><span>En proceso</span><strong>{inProgressCount}</strong></div>
+                </article>
+              </section>
+
+              <div className="admin-results">
+                <div className="admin-board-heading" id="admin-board">
+                  <div>
+                    <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
+                    <p>{visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}</p>
+                  </div>
+                </div>
+
+                <section className={`admin-board ${filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}>
+                  {columns.map((column) => {
+                    const columnReports = column.status
+                      ? visibleReports.filter((item) => item.status === column.status)
+                      : visibleReports;
+
+                    return (
+                      <div className="admin-column" key={column.title}>
+                        <header className="admin-column-header">
+                          <h3>{column.title}</h3>
+                          <span>{columnReports.length}</span>
+                        </header>
+
+                        <div className="admin-column-cards">
+                          {columnReports.length === 0 ? (
+                            <p className="admin-column-empty">
+                              {search ? 'No hay coincidencias.' : 'No hay denuncias aquí.'}
+                            </p>
+                          ) : columnReports.map((item) => (
+                            <article className="admin-report-card" key={item.id}>
+                              <div className="admin-report-copy">
+                                <div className="admin-report-chips">
+                                  <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
+                                    {item.status.replace(/_/g, ' ')}
+                                  </span>
+                                  {item.priority && (
+                                    <span className={`admin-priority-chip admin-priority-${item.priority.toLowerCase()}`}>
+                                      Prioridad {item.priority.toLowerCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <h4>{item.title}</h4>
+                                <p>{item.description}</p>
+                                <div className="admin-report-meta">
+                                  <span><b aria-hidden="true">▣</b>{item.entityName || 'Organismo sin asignar'}</span>
+                                  <span><b aria-hidden="true">⌖</b>{item.address || 'Ubicación sin dirección'}</span>
+                                  <span><b aria-hidden="true">♙</b>{item.reporter?.firstName || item.reporter?.email || 'Ciudadano'}</span>
+                                  <span>
+                                    Enviado: {new Intl.DateTimeFormat('es-UY', {
+                                      dateStyle: 'short',
+                                      timeStyle: 'short',
+                                    }).format(new Date(item.createdAt))}
+                                    </span>
+                                </div>
+
+                                {item.latitude != null && item.longitude != null && (
+                                  <a
+                                    className="admin-map-link"
+                                    href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <span aria-hidden="true">⌖</span> Ver mapa
+                                  </a>
+                                )}
+
+                                {item.evidence?.map((photo) => (
+                                  <ReportImage
+                                    key={photo.id}
+                                    reportId={item.id}
+                                    evidenceId={photo.id}
+                                  />
+                                ))}
+                              </div>
+
+                              <div className="admin-report-actions">
+                                <label className="report-assignment">
+                                  <span>Asignar a</span>
+                                  <select
+                                    value={item.assignee?.id ?? ''}
+                                    onChange={(event) => {
+                                      if (event.target.value) {
+                                        void assignReport(item.id, event.target.value);
+                                      }
+                                    }}
+                                  >
+                                    <option value="">Seleccionar funcionario</option>
+                                    {assignableUsers.map((assignableUser) => (
+                                      <option key={assignableUser.id} value={assignableUser.id}>
+                                        {[assignableUser.firstName, assignableUser.lastName]
+                                          .filter(Boolean)
+                                          .join(' ') || assignableUser.email}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                {!item.assignee && (
+                                  <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
+                                )}
+                                {item.assignee && (
+                                  <>
+                                    <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
+                                      En revisión
+                                    </button>
+                                    <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
+                                      Iniciar trabajo
+                                    </button>
+                                    <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
+                                      Marcar resuelta
+                                    </button>
+                                    <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
+                                      Denegar
+                                    </button>
+                                  </>
+                                )}
+                                {item.status === 'RECHAZADO' && filter !== 'archived' && (
+                                  <button className="secondary" onClick={() => archiveReport(item.id)}>
+                                    Archivar
+                                  </button>
+                                )}
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </section>
+              </div>
+            </div>
+
+            <aside className="admin-filter-panel" aria-label="Filtros de denuncias">
+              <details open>
+                <summary className="admin-filter-heading">
+                  <span aria-hidden="true">☷</span>
+                  <span className="admin-filter-title">
+                    <strong>Filtros</strong>
+                  </span>
+                  <span className="admin-filter-chevron" aria-hidden="true">⌄</span>
+                </summary>
+
+                <div className="admin-filter-fields">
+                <label className="admin-filter-control">
+                  <span>Estado</span>
+                  <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+                    <option value="active">Activas · tablero</option>
+                    <option value="PENDIENTE">Pendientes</option>
+                    <option value="ASIGNADO">Asignadas</option>
+                    <option value="EN_REVISION">En revisión</option>
+                    <option value="EN_PROCESO">En proceso</option>
+                    <option value="RESUELTO">Resueltas</option>
+                    <option value="RECHAZADO">Denegadas</option>
+                    <option value="archived">Archivadas</option>
+                  </select>
+                </label>
+
+                <fieldset className="admin-filter-group">
+                  <legend>Fecha de reporte</legend>
+
+                  <label className="admin-filter-control">
+                    <span>Desde</span>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      max={dateTo || undefined}
+                      onChange={(event) => setDateFrom(event.target.value)}
+                    />
+                  </label>
+
+                  <label className="admin-filter-control">
+                    <span>Hasta</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      min={dateFrom || undefined}
+                      onChange={(event) => setDateTo(event.target.value)}
+                    />
+                  </label>
+
+                  <label className="admin-filter-control">
+                    <span>Ordenar por fecha</span>
+                    <select
+                      value={dateOrder}
+                      onChange={(event) =>
+                        setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'newest')
+                      }
+                    >
+                      <option value="newest">Más recientes</option>
+                      <option value="oldest">Más antiguas</option>
+                    </select>
+                  </label>
+                </fieldset>
+
+                <label className="admin-filter-control">
+                  <span>Tipo de denuncia</span>
+                  <select
+                    value={categoryFilter}
+                    onChange={(event) => setCategoryFilter(event.target.value)}
+                  >
+                    <option value="">Todos los tipos</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="admin-filter-control">
+                  <span>Modalidad</span>
+                  <select
+                    value={modalityFilter}
+                    onChange={(event) => setModalityFilter(event.target.value)}
+                  >
+                    <option value="">Todas</option>
+                    <option value="identified">Identificadas</option>
+                    <option value="anonymous">Anónimas</option>
+                  </select>
+                </label>
+                </div>
+              </details>
+            </aside>
+          </div>
+            </>
+          )}
         </section>
       </div>
     </main>
@@ -605,20 +1031,20 @@ function ManagementDashboard({
 
 function App() {
   const { user, setSession, clearSession } = useAuthStore();
-  const [isHome, setIsHome] = useState(() => window.location.pathname === '/');
-  const [authReady, setAuthReady] = useState(false);
   const [authRoute, setAuthRoute] = useState<AuthRoute>(() =>
     getAuthRoute(),
   );
   const registering = authRoute === 'register';
   const managementLogin = authRoute === 'management-login';
   const [credentials, setCredentials] = useState({ email: '', password: '', firstName: '', lastName: '' });
+  const [showPassword, setShowPassword] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
-  const [reportsLoading, setReportsLoading] = useState(true);
-  const [reportsError, setReportsError] = useState('');
   const [error, setError] = useState('');
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
-  const [vistaCiudadano, setVistaCiudadano] = useState<CitizenView>('crear');
+   const [actualizandoReportes, setActualizandoReportes] = useState(false);
+  const [errorReportes, setErrorReportes] = useState('');
+  const [vistaCiudadano, setVistaCiudadano] =
+    useState<'crear' | 'reportes'>('crear');
 
   function navigateAuth(route: AuthRoute) {
     const routePaths: Record<AuthRoute, string> = {
@@ -629,41 +1055,12 @@ function App() {
     };
 
     window.history.pushState({}, '', routePaths[route]);
-    setIsHome(false);
     setAuthRoute(route);
     setError('');
   }
 
-  function navigateHome() {
-    window.history.pushState({}, '', '/');
-    setIsHome(true);
-    setError('');
-  }
-
-  function resetCitizenReports() {
-    setReports([]);
-    setReportsError('');
-    setReportsLoading(true);
-  }
-
-  function clearCurrentSession() {
-    resetCitizenReports();
-    clearSession();
-  }
-
-  async function logoutCitizen() {
-    try {
-      await api.post('/auth/logout');
-      clearCurrentSession();
-      navigateHome();
-    } catch (logoutError: unknown) {
-      setError(getApiErrorMessage(logoutError, 'No se pudo cerrar la sesión en el servidor.'));
-    }
-  }
-
   useEffect(() => {
     function handlePopState() {
-      setIsHome(window.location.pathname === '/');
       setAuthRoute(getAuthRoute());
       setError('');
     }
@@ -672,71 +1069,37 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  useEffect(() => {
-    let active = true;
-
-    api.get('/auth/me')
-      .then((response) => {
-        if (active) {
-          setSession(response.data.data.user, response.data.data.csrfToken);
-        }
-      })
-      .catch((authError: unknown) => {
-        if (!active) return;
-        clearSession();
-        if (
-          !axios.isAxiosError(authError) ||
-          authError.response?.status !== 401
-        ) {
-          setError(getApiErrorMessage(authError, 'No se pudo verificar la sesión.'));
-        }
-      })
-      .finally(() => {
-        if (active) setAuthReady(true);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [clearSession, setSession]);
-
-  const loadCitizenReports = useCallback(async () => {
+  const cargarDatos = useCallback(async () => {
     try {
-      setReports(await fetchCitizenReports());
-      setReportsError('');
+      const response = await api.get('/denuncias');
+      setReports(response.data.data.items);
+      setErrorReportes('');
     } catch (loadError: unknown) {
-      console.error('Error cargando reportes:', loadError);
-      setReportsError(getApiErrorMessage(loadError, 'No se pudieron cargar tus reportes.'));
+      setErrorReportes(getApiErrorMessage(loadError, 'No se pudieron cargar los reportes.'));
     } finally {
-      setReportsLoading(false);
+      setActualizandoReportes(false);
     }
   }, []);
 
-  function refreshCitizenReports() {
-    setReportsLoading(true);
-    setReportsError('');
-    void loadCitizenReports();
-  }
-
   useEffect(() => {
     if (!user) return;
-
     let active = true;
-    fetchCitizenReports()
-      .then((items) => {
-        if (!active) return;
-        setReports(items);
-        setReportsError('');
-      })
-      .catch((loadError: unknown) => {
-        if (!active) return;
-        console.error('Error cargando reportes:', loadError);
-        setReportsError(getApiErrorMessage(loadError, 'No se pudieron cargar tus reportes.'));
-      })
-      .finally(() => {
-        if (active) setReportsLoading(false);
-      });
 
+    async function fetchReports() {
+      try {
+        const response = await api.get('/denuncias');
+        if (active) {
+          setReports(response.data.data.items);
+          setErrorReportes('');
+        }
+      } catch (loadError: unknown) {
+        if (active) {
+          setErrorReportes(getApiErrorMessage(loadError, 'No se pudieron cargar los reportes.'));
+        }
+      }
+    }
+
+    void fetchReports();
     return () => {
       active = false;
     };
@@ -762,7 +1125,6 @@ function App() {
           : { ...payload, portal: managementLogin ? 'gestion' : 'ciudadano' },
       );
 
-      resetCitizenReports();
       setSession(response.data.data.user, response.data.data.csrfToken);
     } catch (authError: unknown) {
       setError(getApiErrorMessage(authError, 'No se pudo iniciar sesión.'));
@@ -773,85 +1135,13 @@ function App() {
     setError('');
     try {
       const response = await api.post('/auth/anonymous');
-      resetCitizenReports();
       setSession(response.data.data.user, response.data.data.csrfToken);
     } catch (anonymousError: unknown) {
       setError(getApiErrorMessage(anonymousError, 'No se pudo crear la sesión temporal.'));
     }
   }
 
-  if (!authReady) {
-    return (
-      <main className="app-shell auth-shell" aria-busy="true">
-        <p>Verificando sesión…</p>
-      </main>
-    );
-  }
-
   if (!user) {
-    if (isHome) {
-      return (
-        <main className="app-shell auth-shell home-shell">
-          <div className="auth-background" aria-hidden="true">
-            <img className="auth-photo-image" src={plazaConstitucionMelo} alt="" />
-            <div className="auth-photo-overlay" />
-          </div>
-
-          <section className="home-panel" aria-labelledby="home-title">
-            <img
-              src={puntoReporteLogo}
-              alt="PuntoReporte"
-              className="home-logo"
-            />
-            <span className="home-eyebrow">Tu comunidad, más escuchada</span>
-            <h1 id="home-title">Reportar es el primer paso para mejorar.</h1>
-            <p className="home-intro">
-              PuntoReporte conecta a la ciudadanía con los organismos públicos.
-              Registrá problemas de tu comunidad, compartí los detalles y consultá
-              el seguimiento de cada denuncia.
-            </p>
-
-            <nav className="home-actions" aria-label="Elegí cómo continuar">
-              <a
-                className="home-action home-action-primary"
-                href="/registro"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('register');
-                }}
-              >
-                Crear una cuenta
-              </a>
-              <a
-                className="home-action"
-                href="/login"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('login');
-                }}
-              >
-                Iniciar sesión
-              </a>
-              <a
-                className="home-action"
-                href="/anonimo"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('anonymous');
-                }}
-              >
-                Continuar como anónimo
-              </a>
-            </nav>
-
-            <p className="home-note">
-              También podés reportar sin crear una cuenta.
-            </p>
-          </section>
-        </main>
-      );
-    }
-
     return (
       <main className="app-shell auth-shell">
         <div className="auth-background" aria-hidden="true">
@@ -864,21 +1154,11 @@ function App() {
         </div>
 
         <div className="auth-access-stack">
-          <a
-            className="auth-home-link"
-            href="/"
-            aria-label="Volver al inicio de PuntoReporte"
-            onClick={(event) => {
-              event.preventDefault();
-              navigateHome();
-            }}
-          >
-            <img
-              src={puntoReporteLogo}
-              alt="PuntoReporte"
-              className="auth-brand-logo"
-            />
-          </a>
+          <img
+            src={puntoReporteLogo}
+            alt="PuntoReporte"
+            className="auth-brand-logo"
+          />
 
           <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
 
@@ -898,48 +1178,48 @@ function App() {
                 </a>
               ) : (
                 <>
-              <a
-                href="/login"
-                className={authRoute === 'login' ? 'active' : ''}
-                aria-current={authRoute === 'login' ? 'page' : undefined}
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('login');
-                }}
-              >
-                <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
-                  <path d="M10 17l5-5-5-5M15 12H4" />
-                </svg>
-                <span>Iniciar sesión</span>
-              </a>
-              <a
-                href="/registro"
-                className={authRoute === 'register' ? 'active' : ''}
-                aria-current={authRoute === 'register' ? 'page' : undefined}
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('register');
-                }}
-              >
-                <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M15 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-4A4.5 4.5 0 0 0 2 18.5V20" />
-                  <circle cx="8.5" cy="6.5" r="4" />
-                  <path d="M19 8v6M16 11h6" />
-                </svg>
-                <span>Crear cuenta</span>
-              </a>
-              <a
-                href="/anonimo"
-                className={authRoute === 'anonymous' ? 'active' : ''}
-                aria-current={authRoute === 'anonymous' ? 'page' : undefined}
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('anonymous');
-                }}
-              >
-                Entrar como anónimo
-              </a>
+                  <a
+                    href="/login"
+                    className={authRoute === 'login' ? 'active' : ''}
+                    aria-current={authRoute === 'login' ? 'page' : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateAuth('login');
+                    }}
+                  >
+                    <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
+                      <path d="M10 17l5-5-5-5M15 12H4" />
+                    </svg>
+                    <span>Iniciar sesión</span>
+                  </a>
+                  <a
+                    href="/registro"
+                    className={authRoute === 'register' ? 'active' : ''}
+                    aria-current={authRoute === 'register' ? 'page' : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateAuth('register');
+                    }}
+                  >
+                    <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M15 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-4A4.5 4.5 0 0 0 2 18.5V20" />
+                      <circle cx="8.5" cy="6.5" r="4" />
+                      <path d="M19 8v6M16 11h6" />
+                    </svg>
+                    <span>Crear cuenta</span>
+                  </a>
+                  <a
+                    href="/anonimo"
+                    className={authRoute === 'anonymous' ? 'active' : ''}
+                    aria-current={authRoute === 'anonymous' ? 'page' : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateAuth('anonymous');
+                    }}
+                  >
+                    Entrar como anónimo
+                  </a>
                 </>
               )}
             </nav>
@@ -963,7 +1243,6 @@ function App() {
                 <b aria-hidden="true">→</b>
               </a>
             )}
-
             {authRoute === 'anonymous' ? (
               <div className="auth-anonymous-content">
                 <h2>Ingresar como anónimo</h2>
@@ -1061,21 +1340,42 @@ function App() {
 
                 <label htmlFor="auth-password">
                   Contraseña
-                  <input
-                    id="auth-password"
-                    required
-                    minLength={6}
-                    type="password"
-                    autoComplete={registering ? 'new-password' : 'current-password'}
-                    placeholder="Ingresá tu contraseña"
-                    value={credentials.password}
-                    onChange={(event) =>
-                      setCredentials({
-                        ...credentials,
-                        password: event.target.value,
-                      })
-                    }
-                  />
+                  <span className="password-input-wrap">
+                    <input
+                      id="auth-password"
+                      required
+                      minLength={6}
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete={registering ? 'new-password' : 'current-password'}
+                      placeholder="Ingresá tu contraseña"
+                      value={credentials.password}
+                      onChange={(event) =>
+                        setCredentials({
+                          ...credentials,
+                          password: event.target.value,
+                        })
+                      }
+                    />
+                    <button
+                      className="password-visibility-toggle"
+                      type="button"
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      aria-pressed={showPassword}
+                    >
+                      {showPassword ? (
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                          <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 6-.4.8-1.3 2-2.6 3.2M6.2 6.2C3.9 7.6 2.7 9.7 2.5 11c.5.9 3.9 7 9.5 7 1.1 0 2.1-.2 3-.6" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </span>
                 </label>
 
                 {error && <p className="error">{error}</p>}
@@ -1095,188 +1395,122 @@ function App() {
     );
   }
 
-  if (user.role === 'ENTE_PUBLICO' || user.role === 'ADMINISTRADOR') {
+  if (
+    user.role === 'FUNCIONARIO' ||
+    user.role === 'FUNCIONARIO_ADMINISTRADOR' ||
+    user.role === 'SUPERADMINISTRADOR'
+  ) {
     return (
       <ManagementDashboard
-        isAdmin={user.role === 'ADMINISTRADOR'}
+        isAdmin={user.role === 'SUPERADMINISTRADOR'}
         currentUserId={user.id}
-        onLogout={clearCurrentSession}
+        onLogout={clearSession}
       />
     );
   }
-  const isAnonymous = isAnonymousUser(user.email);
-
   return (
-    <main className="app-shell">
+    <main className="app-shell ciudadano-shell">
+      <nav className="ciudadano-nav">
+        <div className="ciudadano-nav-logo">
+          <img
+            src={puntoReporteLogo}
+            alt="PuntoReporte"
+          />
+        </div>
+
+
+        <div className="ciudadano-nav-links">
+
+          <button
+            type="button"
+            className={vistaCiudadano === 'crear' ? 'nav-activo' : ''}
+            onClick={() => setVistaCiudadano('crear')}
+          >
+            Crear reporte
+          </button>
+
+          <button
+            type="button"
+            className={vistaCiudadano === 'reportes' ? 'nav-activo' : ''}
+            onClick={() => setVistaCiudadano('reportes')}
+          >
+            Mis reportes
+          </button>
+
+          <div className="cuenta-menu">
+            <button
+              type="button"
+              onClick={() => setMenuCuentaAbierto(!menuCuentaAbierto)}
+            >
+              Mi cuenta
+            </button>
+
+            {menuCuentaAbierto && (
+              <div className="cuenta-dropdown">
+                <span>{user.firstName || user.email}</span>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuCuentaAbierto(false);
+                    clearSession();
+                  }}
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </nav>
+
       <section className="dashboard">
 
-        <nav className="ciudadano-nav">
-          <div className="ciudadano-nav-logo">
-            <img
-              src={puntoReporteLogo}
-              alt="PuntoReporte"
-            />
-          </div>
-
-          <div className="ciudadano-nav-links">
-            <button
-              type="button"
-              className={vistaCiudadano === 'inicio' ? 'nav-activo' : ''}
-              onClick={() => setVistaCiudadano('inicio')}
-            >
-              Inicio
-            </button>
-
-            <button
-              type="button"
-              className={vistaCiudadano === 'crear' ? 'nav-activo' : ''}
-              onClick={() => setVistaCiudadano('crear')}
-            >
-              Crear reporte
-            </button>
-
-            <button
-              type="button"
-              className={vistaCiudadano === 'reportes' ? 'nav-activo' : ''}
-              onClick={() => setVistaCiudadano('reportes')}
-            >
-              Mis reportes
-            </button>
-
-            <div className="cuenta-menu">
-              <button
-                type="button"
-                onClick={() => setMenuCuentaAbierto(!menuCuentaAbierto)}
-              >
-                Mi cuenta
-              </button>
-
-              {menuCuentaAbierto && (
-                <div className="cuenta-dropdown">
-                  <span>{user.firstName || user.email}</span>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuCuentaAbierto(false);
-                      logoutCitizen();
-                    }}
-                  >
-                    Cerrar sesión
-                  </button>
-                </div>
-              )}
-            </div>
-
-          </div>
-        </nav>
-
-        {vistaCiudadano === 'inicio' && (
-          <section className="citizen-home" aria-labelledby="citizen-home-title">
-            <div className="citizen-home-intro">
-              <span className="eyebrow">Inicio</span>
-              <h1 id="citizen-home-title">
-                {isAnonymous ? 'Tu voz ayuda a mejorar la comunidad.' : `Hola, ${user.firstName || 'ciudadano'}`}
-              </h1>
-              <p>
-                {isAnonymous
-                  ? 'PuntoReporte conecta a la ciudadanía con los organismos públicos para comunicar problemas de la comunidad.'
-                  : 'Desde aquí podés consultar el estado de tus reportes y seguir sus novedades.'}
-              </p>
-            </div>
-
-            {!isAnonymous && (
-              <section className="citizen-status-panel" aria-labelledby="citizen-status-title">
-                <div className="citizen-status-heading">
-                  <div>
-                    <span className="eyebrow">Seguimiento</span>
-                    <h2 id="citizen-status-title">Estado de tus reportes</h2>
-                  </div>
-                  {!reportsLoading && !reportsError && <strong>{reports.length}</strong>}
-                </div>
-
-                {reportsLoading ? (
-                  <p className="citizen-status-message" role="status">Cargando tus reportes…</p>
-                ) : reportsError ? (
-                  <div className="citizen-status-error" role="alert">
-                    <p>{reportsError}</p>
-                    <button type="button" onClick={refreshCitizenReports}>
-                      Reintentar
-                    </button>
-                  </div>
-                ) : reports.length === 0 ? (
-                  <p className="citizen-status-message">
-                    Todavía no tienes reportes. Cuando registres uno, podrás seguir su estado aquí.
-                  </p>
-                ) : (
-                  <div className="citizen-status-list">
-                    {reports.slice(0, 3).map((report) => (
-                      <article className="citizen-status-item" key={report.id}>
-                        <div>
-                          <small>{formatReportIdentifier(report.id)}</small>
-                          <strong>{report.title}</strong>
-                        </div>
-                        <span>{reportStatusLabels[report.status] ?? report.status.replace(/_/g, ' ')}</span>
-                      </article>
-                    ))}
-                  </div>
-                )}
-
-                {reports.length > 0 && !reportsError && (
-                  <button
-                    className="citizen-status-link"
-                    type="button"
-                    onClick={() => setVistaCiudadano('reportes')}
-                  >
-                    Ver todos mis reportes
-                  </button>
-                )}
-              </section>
-            )}
-
-            {!isAnonymous && (
-              <button className="citizen-home-logout" type="button" onClick={logoutCitizen}>
-                Cerrar sesión
-              </button>
-            )}
-          </section>
-        )}
-
-        {vistaCiudadano !== 'inicio' && (
-          <>
+        <header className="dashboard-header">
+          <div>
             <header className="dashboard-header">
               <div>
-                <span className="eyebrow">Panel ciudadano</span>
-                <h1>Hola, {user.firstName || user.email}</h1>
+                <h1 className="saludo-ciudadano">
+                  <span className="saludo-icono" aria-hidden="true">👋</span>
+                  <span>Hola, {user.firstName || user.email}</span>
+                </h1>
               </div>
             </header>
+          </div>
+        </header>
 
-            <EmergencyShortcuts />
-          </>
-        )}
 
         {vistaCiudadano === 'crear' && (
-          <CrearDenuncia onReportCreated={refreshCitizenReports} />
+          <CrearDenuncia />
         )}
 
         {vistaCiudadano === 'reportes' && (
           <section className="reports-panel">
             <div className="panel-heading">
               <div>
-                <span className="eyebrow" style={{ color: '#000000' }}>
-                  Historial
-                </span>
                 <h2>Mis reportes</h2>
               </div>
 
-              <strong>{reports.length}</strong>
+              <div className="reports-actions">
+                <strong>{reports.length}</strong>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActualizandoReportes(true);
+                    void cargarDatos();
+                  }}
+                  disabled={actualizandoReportes}
+                >
+                  <span aria-hidden="true">⟳ </span>
+                  {actualizandoReportes ? 'Actualizando...' : 'Actualizar'}
+                </button>
+              </div>
             </div>
 
-            {reportsError ? (
-              <p className="empty-state" role="alert">{reportsError}</p>
-            ) : reportsLoading ? (
-              <p className="empty-state" role="status">Cargando tus reportes…</p>
-            ) : reports.length === 0 ? (
+            {errorReportes && <p className="error">{errorReportes}</p>}
+            
+            {reports.length === 0 ? (
               <p className="empty-state">
                 Todavía no tienes reportes registrados.
               </p>
@@ -1294,12 +1528,14 @@ function App() {
                     <p>{item.description}</p>
                   </div>
 
-                  <span>{reportStatusLabels[item.status] ?? item.status.replace(/_/g, ' ')}</span>
+                  <span>{item.status}</span>
                 </article>
               ))
             )}
           </section>
         )}
+
+        <EmergencyShortcuts />
 
       </section>
     </main>

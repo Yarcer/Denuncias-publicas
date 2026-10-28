@@ -1,22 +1,38 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
-import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
-import { Public } from '../auth/decorators/public.decorator';
+import { ConfirmationMailService } from './confirmation-mail.service';
 import { DenunciasService } from './denuncias.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
 
 type AuthenticatedRequest = Request & {
-  user: { sub: string; role: string };
+  user: { sub: string; role: string; email?: string };
 };
 
 @Controller('denuncias')
 export class DenunciasController {
-  constructor(private readonly denunciasService: DenunciasService) {}
+  constructor(
+    private readonly denunciasService: DenunciasService,
+    private readonly confirmationMailService: ConfirmationMailService,
+  ) {}
 
   @Get()
   @UseGuards(AuthGuard('jwt'))
@@ -26,7 +42,10 @@ export class DenunciasController {
 
   @Get('gestion/bandeja')
   @UseGuards(AuthGuard('jwt'))
-  managementQueue(@Req() req: AuthenticatedRequest, @Query('status') status?: string) {
+  managementQueue(
+    @Req() req: AuthenticatedRequest,
+    @Query('status') status?: string,
+  ) {
     return this.denunciasService.managementQueue(req.user, status);
   }
 
@@ -34,6 +53,17 @@ export class DenunciasController {
   @UseGuards(AuthGuard('jwt'))
   assignableUsers(@Req() req: AuthenticatedRequest) {
     return this.denunciasService.assignableUsers(req.user);
+  }
+
+  @Get('gestion/estadisticas')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('SUPERADMINISTRADOR')
+  statistics(
+    @Req() req: AuthenticatedRequest,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.denunciasService.statistics(req.user, from, to);
   }
 
   @Get(':id/evidencia/:evidenceId')
@@ -52,7 +82,7 @@ export class DenunciasController {
 
     res.type(image.type).send(image.buffer);
   }
-  
+
   @Get(':id')
   @UseGuards(AuthGuard('jwt'))
   findOne(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
@@ -62,15 +92,25 @@ export class DenunciasController {
   @Post()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CIUDADANO')
-  @Throttle({ default: { limit: 5, ttl: 60 * 1000 } })
-  create(@Req() req: AuthenticatedRequest, @Body() dto: CreateReportDto) {
-    return this.denunciasService.create(req.user.sub, dto);
+  async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateReportDto) {
+    const report = await this.denunciasService.create(req.user.sub, dto);
+    const emailConfirmation = req.user.email
+      ? await this.confirmationMailService.sendReportConfirmation({
+          email: req.user.email,
+          reportId: report.id,
+          title: report.title,
+        })
+      : 'skipped';
+
+    return { ...report, emailConfirmation };
   }
 
-    @Post(':id/evidencia')
-    @UseGuards(AuthGuard('jwt'), RolesGuard)
-    @Roles('CIUDADANO')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @Post(':id/evidencia')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CIUDADANO')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   uploadEvidence(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
@@ -79,12 +119,9 @@ export class DenunciasController {
     return this.denunciasService.uploadEvidence(id, req.user, file);
   }
 
-    @Patch(':id/archivar')
+  @Patch(':id/archivar')
   @UseGuards(AuthGuard('jwt'))
-  archive(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
-  ) {
+  archive(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.denunciasService.archive(id, req.user);
   }
 
@@ -106,14 +143,22 @@ export class DenunciasController {
 
   @Patch(':id/estado')
   @UseGuards(AuthGuard('jwt'))
-  changeStatus(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: ManageReportDto) {
+  changeStatus(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: ManageReportDto,
+  ) {
     return this.denunciasService.changeStatus(id, req.user, dto);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CIUDADANO')
-  update(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdateReportDto) {
+  update(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateReportDto,
+  ) {
     return this.denunciasService.update(id, req.user, dto);
   }
 

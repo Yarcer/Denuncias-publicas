@@ -1,12 +1,19 @@
 import { plainToInstance } from 'class-transformer';
-import { IsString, IsNumber, IsOptional, validateSync } from 'class-validator';
-
+import {
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  validateSync,
+} from 'class-validator';
 class EnvironmentVariables {
   @IsString()
-  DATABASE_URL: string;
+  DATABASE_URL!: string;
 
   @IsString()
-  JWT_SECRET: string;
+  JWT_SECRET!: string;
 
   @IsString()
   @IsOptional()
@@ -43,6 +50,28 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   R2_SECRET_ACCESS_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_HOST?: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  @IsOptional()
+  SMTP_PORT?: number;
+
+  @IsString()
+  @IsOptional()
+  SMTP_USER?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_PASSWORD?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_FROM?: string;
 }
 
 export function validate(config: Record<string, unknown>) {
@@ -56,6 +85,23 @@ export function validate(config: Record<string, unknown>) {
 
   if (errors.length > 0) {
     throw new Error(errors.toString());
+  }
+
+  const smtpSettings = [
+    validatedConfig.SMTP_HOST,
+    validatedConfig.SMTP_PORT,
+    validatedConfig.SMTP_FROM,
+  ];
+  if (smtpSettings.some(Boolean) && smtpSettings.some((setting) => !setting)) {
+    throw new Error(
+      'SMTP_HOST, SMTP_PORT and SMTP_FROM must be configured together',
+    );
+  }
+  if (
+    Boolean(validatedConfig.SMTP_USER) !==
+    Boolean(validatedConfig.SMTP_PASSWORD)
+  ) {
+    throw new Error('SMTP_USER and SMTP_PASSWORD must be configured together');
   }
 
   if (validatedConfig.NODE_ENV === 'production') {

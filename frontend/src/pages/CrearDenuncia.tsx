@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import './CrearDenuncia.css'
 import { api } from '../lib/api'
 import { getApiErrorMessage } from '../lib/api-error'
@@ -21,8 +21,12 @@ type Category = {
   type: string
 }
 
-type CrearDenunciaProps = {
-  onReportCreated?: () => void
+type CreateReportResponse = {
+  data: {
+    id: string
+    entityName: string | null
+    emailConfirmation: 'sent' | 'failed' | 'not_configured' | 'skipped'
+  }
 }
 
 const subcategorias = {
@@ -79,7 +83,7 @@ function SelectorUbicacion({
   )
 }
 
-function CrearDenuncia({ onReportCreated }: CrearDenunciaProps) {
+function CrearDenuncia() {
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriaId, setCategoriaId] = useState('')
   const [categoriaNombre, setCategoriaNombre] = useState('')
@@ -90,10 +94,8 @@ function CrearDenuncia({ onReportCreated }: CrearDenunciaProps) {
   const [longitud, setLongitud] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [mensaje, setMensaje] = useState('')
-  const [enviando, setEnviando] = useState(false)
   const [evidencia, setEvidencia] = useState<File | null>(null)
   const [vistaPrevia, setVistaPrevia] = useState('')
-  const enviandoRef = useRef(false)
 
 
   useEffect(() => {
@@ -160,7 +162,6 @@ function handleEvidenciaChange(file: File | null) {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (enviandoRef.current) return
 
     setError('')
     setMensaje('')
@@ -176,14 +177,12 @@ function handleEvidenciaChange(file: File | null) {
       return
     }
 
-    enviandoRef.current = true
-    setEnviando(true)
     try {
       const categoriaSeleccionada = categories.find(
         (category) => category.id === categoriaId
       )
 
-      const response = await api.post('/denuncias', {
+      const response = await api.post<CreateReportResponse>('/denuncias', {
         title: subcategoria,
         description: descripcion,
         type: categoriaSeleccionada?.type ?? 'URBANO',
@@ -221,17 +220,23 @@ if (evidencia) {
       setEvidencia(null)
 setVistaPrevia('')
 
+      const { emailConfirmation, entityName, id } = response.data.data;
+      const routingMessage = entityName
+        ? ` Organismo asignado: ${entityName}.`
+        : ' La denuncia quedó sin organismo asignado.';
+      const confirmationMessage =
+        emailConfirmation === 'sent'
+          ? ' Se envió la confirmación a tu correo.'
+          : emailConfirmation === 'skipped'
+            ? ''
+            : ' No se pudo enviar la confirmación por correo; guarda el identificador.';
       setMensaje(
   fotoAdjuntada
-    ? `Reporte registrado correctamente. Tu identificador es ${formatReportIdentifier(response.data.data.id)}.`
-    : `El reporte se guardó, pero no se pudo adjuntar la foto. Tu identificador es ${formatReportIdentifier(response.data.data.id)}.`
+    ? `Reporte registrado correctamente. Tu identificador es ${formatReportIdentifier(id)}.${routingMessage}${confirmationMessage}`
+    : `El reporte se guardó, pero no se pudo adjuntar la foto. Tu identificador es ${formatReportIdentifier(id)}.${routingMessage}${confirmationMessage}`
 )
-      onReportCreated?.()
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'No se pudo registrar la denuncia.'))
-    } finally {
-      enviandoRef.current = false
-      setEnviando(false)
     }
   }
 
@@ -380,9 +385,7 @@ return (
         {error && <p className="error">{error}</p>}
         {mensaje && <p className="notice">{mensaje}</p>}
 
-        <button type="submit" disabled={enviando}>
-          {enviando ? 'Enviando…' : 'Enviar reporte'}
-        </button>
+        <button type="submit">Enviar reporte</button>
          </form>
     </main>
   )

@@ -31,7 +31,11 @@ export class CsrfGuard implements CanActivate {
     );
 
     if (origin !== allowedOrigin) {
-      if (origin || hasCookieSession || (!hasBearerToken && !isCsrfExemptPath)) {
+      if (
+        origin ||
+        hasCookieSession ||
+        (!hasBearerToken && !isCsrfExemptPath)
+      ) {
         throw new ForbiddenException('Origen de solicitud no permitido');
       }
       return true;

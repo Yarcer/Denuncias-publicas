@@ -16,7 +16,7 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-    origin: configService.get('cors.origin'),
+    origin: configService.get<string>('cors.origin'),
     credentials: true,
   });
 
@@ -39,11 +39,11 @@ async function bootstrap() {
   // Prefijo global
   app.setGlobalPrefix('api');
 
-  const port = configService.get('port');
+  const port = configService.getOrThrow<number>('port');
   await app.listen(port);
-  
+
   logger.log(` Backend corriendo en: http://localhost:${port}/api`);
   logger.log(` Health check: http://localhost:${port}/api/health`);
 }
 
-bootstrap();
+void bootstrap();
