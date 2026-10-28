@@ -1,11 +1,23 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SolicitudesUsuariosService } from './solicitudes-usuarios.service';
-import { CreateSolicitudUsuarioDto } from './create-solicitud-usuario.dto';
+import {
+  CreateSolicitudUsuarioDto,
+  ReviewSolicitudUsuarioDto,
+} from './create-solicitud-usuario.dto';
 
 type AuthenticatedRequest = Request & {
   user: {
@@ -28,5 +40,24 @@ export class SolicitudesUsuariosController {
     @Body() dto: CreateSolicitudUsuarioDto,
   ) {
     return this.solicitudesService.crearSolicitud(req.user.sub, dto);
+  }
+
+  @Get()
+  @Roles('FUNCIONARIO_ADMINISTRADOR', 'SUPERADMINISTRADOR')
+  listarSolicitudes(@Req() req: AuthenticatedRequest) {
+    return this.solicitudesService.listarSolicitudes(
+      req.user.sub,
+      req.user.role,
+    );
+  }
+
+  @Patch(':id/revision')
+  @Roles('SUPERADMINISTRADOR')
+  revisarSolicitud(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: ReviewSolicitudUsuarioDto,
+  ) {
+    return this.solicitudesService.revisarSolicitud(req.user.sub, id, dto);
   }
 }
