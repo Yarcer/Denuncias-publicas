@@ -93,7 +93,12 @@ function CrearDenuncia() {
   const [latitud, setLatitud] = useState<number | null>(null)
   const [longitud, setLongitud] = useState<number | null>(null)
   const [error, setError] = useState('')
-  const [mensaje, setMensaje] = useState('')
+  const [resultado, setResultado] = useState<{
+    codigo: string
+    detalles: string
+    aviso: string
+  } | null>(null)
+  const [codigoCopiado, setCodigoCopiado] = useState(false)
   const [evidencia, setEvidencia] = useState<File | null>(null)
   const [vistaPrevia, setVistaPrevia] = useState('')
 
@@ -140,31 +145,44 @@ function CrearDenuncia() {
     setCategoriaNombre(categoriaSeleccionada?.name ?? '')
   }
 
-function seleccionarUbicacion(
-  nuevaLatitud: number,
-  nuevaLongitud: number
-) {
-  setLatitud(nuevaLatitud)
-  setLongitud(nuevaLongitud)
-}
-
-function handleEvidenciaChange(file: File | null) {
-  setEvidencia(file)
-
-  if (!file) {
-    setVistaPrevia('')
-    return
+  function seleccionarUbicacion(
+    nuevaLatitud: number,
+    nuevaLongitud: number
+  ) {
+    setLatitud(nuevaLatitud)
+    setLongitud(nuevaLongitud)
   }
 
-  const url = URL.createObjectURL(file)
-  setVistaPrevia(url)
-}
+  function handleEvidenciaChange(file: File | null) {
+    setEvidencia(file)
+
+    if (!file) {
+      setVistaPrevia('')
+      return
+    }
+
+    const url = URL.createObjectURL(file)
+    setVistaPrevia(url)
+  }
+
+  async function copiarCodigoSeguimiento() {
+    if (!resultado) return
+
+    try {
+      await navigator.clipboard.writeText(resultado.codigo)
+      setCodigoCopiado(true)
+      window.setTimeout(() => setCodigoCopiado(false), 1800)
+    } catch {
+      setCodigoCopiado(false)
+    }
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
 
     setError('')
-    setMensaje('')
+    setResultado(null)
+    setCodigoCopiado(false)
 
     if (
       !categoriaId ||
@@ -194,20 +212,20 @@ function handleEvidenciaChange(file: File | null) {
 
       let fotoAdjuntada = true
 
-if (evidencia) {
-  const formData = new FormData()
-  formData.append('file', evidencia)
+      if (evidencia) {
+        const formData = new FormData()
+        formData.append('file', evidencia)
 
-  try {
-    await api.post(
-      `/denuncias/${response.data.data.id}/evidencia`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
-    )
-  } catch {
-    fotoAdjuntada = false
-  }
-}
+        try {
+          await api.post(
+            `/denuncias/${response.data.data.id}/evidencia`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+          )
+        } catch {
+          fotoAdjuntada = false
+        }
+      }
 
       setCategoriaId('')
       setCategoriaNombre('')
@@ -218,7 +236,7 @@ if (evidencia) {
       setLongitud(null)
 
       setEvidencia(null)
-setVistaPrevia('')
+      setVistaPrevia('')
 
       const { emailConfirmation, entityName, id } = response.data.data;
       const routingMessage = entityName
@@ -230,11 +248,15 @@ setVistaPrevia('')
           : emailConfirmation === 'skipped'
             ? ''
             : ' No se pudo enviar la confirmación por correo; guarda el identificador.';
-      setMensaje(
-  fotoAdjuntada
-    ? `Reporte registrado correctamente. Tu identificador es ${formatReportIdentifier(id)}.${routingMessage}${confirmationMessage}`
-    : `El reporte se guardó, pero no se pudo adjuntar la foto. Tu identificador es ${formatReportIdentifier(id)}.${routingMessage}${confirmationMessage}`
-)
+      setResultado({
+        codigo: formatReportIdentifier(id),
+        detalles: [routingMessage.trim(), confirmationMessage.trim()]
+          .filter(Boolean)
+          .join(' '),
+        aviso: fotoAdjuntada
+          ? ''
+          : 'El reporte se guardó, pero no se pudo adjuntar la foto.',
+      })
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'No se pudo registrar la denuncia.'))
     }
@@ -242,8 +264,8 @@ setVistaPrevia('')
 
   const claveCategoria = obtenerClaveCategoria(categoriaNombre)
 
-return (
-<main className="denuncia-page">
+  return (
+    <main className="denuncia-page">
 
       <h1>Crear reporte</h1>
       <p>Completá los datos para registrar un nuevo reporte.</p>
@@ -319,75 +341,144 @@ return (
           />
         </div>
 
-              <div>
-  <label>Ubicación en el mapa</label>
+        <div>
+          <label>
+            <span className="denuncia-label-content">
+              <svg className="denuncia-label-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
+                <circle cx="12" cy="10" r="2.5" />
+              </svg>
+              Ubicación en el mapa
+            </span>
+          </label>
 
-  <p className="mapa-ayuda">
-    Hacé clic en el mapa para marcar dónde ocurre el problema.
-  </p>
+          <p className="mapa-ayuda">
+            Hacé clic en el mapa para marcar dónde ocurre el problema.
+          </p>
 
-<MapContainer
-  center={[-32.3667, -54.1833]}
-  zoom={14}
-  minZoom={13}
-  maxBounds={[
-    [-32.42, -54.25],
-    [-32.31, -54.11],
-  ]}
-  maxBoundsViscosity={1.0}
-  className="mapa-ubicacion"
->
-    <TileLayer
-      attribution="&copy; OpenStreetMap contributors"
-      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    />
+          <MapContainer
+            center={[-32.3667, -54.1833]}
+            zoom={14}
+            minZoom={13}
+            maxBounds={[
+              [-32.42, -54.25],
+              [-32.31, -54.11],
+            ]}
+            maxBoundsViscosity={1.0}
+            className="mapa-ubicacion"
+          >
+            <TileLayer
+              attribution="&copy; OpenStreetMap contributors"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
 
-    <SelectorUbicacion
-      latitud={latitud}
-      longitud={longitud}
-      onSeleccionar={seleccionarUbicacion}
-    />
-  </MapContainer>
+            <SelectorUbicacion
+              latitud={latitud}
+              longitud={longitud}
+              onSeleccionar={seleccionarUbicacion}
+            />
+          </MapContainer>
 
-  {latitud !== null && longitud !== null && (
-    <p className="ubicacion-seleccionada">
-      ✓ Ubicación seleccionada
-    </p>
-  )}
-</div>
+          {latitud !== null && longitud !== null && (
+            <p className="ubicacion-seleccionada">
+              ✓ Ubicación seleccionada
+            </p>
+          )}
+        </div>
 
-<div>
-  <label htmlFor="evidencia">Evidencia</label>
+        <div>
+          <label htmlFor="evidencia">
+            <span className="denuncia-label-content">
+              <svg className="denuncia-label-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 4h-4L8.5 6H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.5L14 4Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              Evidencia
+            </span>
+          </label>
 
-  <input
-    id="evidencia"
-    type="file"
-    accept="image/*"
-    onChange={(e) =>
-      handleEvidenciaChange(e.target.files?.[0] ?? null)
-    }
-  />
+          <input
+            id="evidencia"
+            type="file"
+            accept="image/*"
+            onChange={(e) =>
+              handleEvidenciaChange(e.target.files?.[0] ?? null)
+            }
+          />
 
-  <p className="evidencia-ayuda">
-    Podés adjuntar una foto del problema.
-  </p>
+          <p className="evidencia-ayuda">
+            Podés adjuntar una foto del problema.
+          </p>
 
-  {vistaPrevia && (
-    <div className="evidencia-preview">
-      <img
-        src={vistaPrevia}
-        alt="Vista previa de la evidencia"
-      />
-    </div>
-  )}
-</div>
+          {vistaPrevia && (
+            <div className="evidencia-preview">
+              <img
+                src={vistaPrevia}
+                alt="Vista previa de la evidencia"
+              />
+            </div>
+          )}
+        </div>
 
         {error && <p className="error">{error}</p>}
-        {mensaje && <p className="notice">{mensaje}</p>}
 
         <button type="submit">Enviar reporte</button>
-         </form>
+      </form>
+
+      {resultado && (
+        <div className="reporte-success-overlay">
+          <section
+            className="reporte-success-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reporte-success-title"
+          >
+            <div className="reporte-success-check" aria-hidden="true">✓</div>
+
+            <h2 id="reporte-success-title">Reporte enviado con éxito</h2>
+            <p className="reporte-success-description">
+              Tu reporte fue registrado correctamente.
+            </p>
+
+            {resultado.aviso && (
+              <p className="reporte-success-warning">{resultado.aviso}</p>
+            )}
+
+            <div className="tracking-code-group">
+              <span>Código de seguimiento</span>
+              <div className="tracking-code-box">
+                <code>{resultado.codigo}</code>
+                <button
+                  type="button"
+                  className={`tracking-copy-button${codigoCopiado ? ' is-copied' : ''}`}
+                  aria-label={codigoCopiado ? 'Código copiado' : 'Copiar código'}
+                  title={codigoCopiado ? 'Copiado' : 'Copiar código'}
+                  onClick={() => void copiarCodigoSeguimiento()}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="8" y="8" width="12" height="12" rx="2" />
+                    <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {resultado.detalles && (
+              <p className="reporte-success-details">{resultado.detalles}</p>
+            )}
+
+            <button
+              type="button"
+              className="reporte-success-accept"
+              onClick={() => setResultado(null)}
+            >
+              Aceptar
+            </button>
+          </section>
+        </div>
+      )}
+
     </main>
   )
-  }
+}
 export default CrearDenuncia

@@ -118,19 +118,16 @@
 }
 
 .denuncia-form button {
-  width: 100%;
-
+  width: min(320px, 100%);
+  grid-column: 1 / -1;
+  justify-self: center;
   padding: 16px;
 
   border: none;
 
   border-radius: 12px;
 
-  background:
-    linear-gradient(135deg,
-      #2563eb 0%,
-      #0ea5e9 100%);
-
+  background: #174f82;
   color: white;
 
   font-size: 16px;
@@ -362,4 +359,176 @@
 
 .app-shell:has(.denuncia-page) .denuncia-form {
   background: #f1efef;
+}
+
+.denuncia-form>div:nth-of-type(n + 3) {
+  grid-column: 1 / -1;
+}
+
+.denuncia-form>button {
+  grid-column: 1 / -1;
+}
+
+.denuncia-label-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.denuncia-label-icon {
+  display: block;
+  width: 17px;
+  height: 17px;
+  flex: none;
+  fill: none;
+  stroke: #174f82;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.reporte-success-overlay {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(12, 30, 52, 0.68);
+  backdrop-filter: blur(3px);
+}
+
+.reporte-success-modal {
+  width: min(480px, 100%);
+  padding: 32px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(3, 17, 35, 0.32);
+  text-align: center;
+}
+
+.reporte-success-check {
+  display: grid;
+  width: 76px;
+  height: 76px;
+  place-items: center;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #fff;
+  font-size: 48px;
+  font-weight: 700;
+}
+
+.reporte-success-modal h2 {
+  margin: 0;
+  color: #123456;
+  font-size: 1.6rem;
+}
+
+.reporte-success-description {
+  margin: 10px 0 26px;
+  color: #475569;
+}
+
+.tracking-code-group {
+  margin-bottom: 14px;
+}
+
+.tracking-code-group > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.tracking-code-box {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 10px;
+  background: #f1f3f5;
+}
+
+.tracking-code-box code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #263b55;
+  font-family: inherit;
+  font-size: 0.88rem;
+}
+
+.tracking-copy-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #174f82;
+  cursor: pointer;
+}
+
+.tracking-copy-button:hover {
+  background: #e2eaf2;
+}
+
+.tracking-copy-button.is-copied {
+  color: #16a34a;
+}
+
+.tracking-copy-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.reporte-success-warning {
+  margin: -10px 0 18px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.88rem;
+  text-align: left;
+}
+
+.reporte-success-details {
+  margin: 12px 0 18px;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.reporte-success-accept {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 10px;
+  background: #174f82;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.reporte-success-accept:hover {
+  background: #123f6b;
+}
+
+@media (max-width: 520px) {
+  .reporte-success-modal {
+    padding: 28px 20px 22px;
+  }
 }
