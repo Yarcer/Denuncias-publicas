@@ -156,6 +156,7 @@ model ReportHistory {
 model AdministrativeUserRequest {
   id           String                      @id @default(uuid())
   email        String
+  passwordHash String?
   firstName    String?
   lastName     String?
   entityName   String

@@ -9,6 +9,7 @@ import { useAuthStore } from './stores/auth-store';
 import CrearDenuncia from './pages/CrearDenuncia'
 import { formatReportIdentifier } from './lib/report-id';
 import GestionUsuarios from './pages/GestionUsuarios';
+import SolicitudesFuncionarios from './pages/SolicitudesFuncionarios';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
@@ -416,17 +417,19 @@ function ReportImage({
 
 function ManagementDashboard({
   isAdmin,
+  isEntityAdmin,
   currentUserId,
   onLogout,
 }: {
   isAdmin: boolean;
+  isEntityAdmin: boolean;
   currentUserId: string;
   onLogout: () => void;
 }) {
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [managementView, setManagementView] = useState<
-    'reports' | 'users' | 'create-user' | 'statistics'
+    'reports' | 'users' | 'create-user' | 'statistics' | 'requests'
   >(isAdmin ? 'users' : 'reports');
   const [dateOrder, setDateOrder] = useState<'newest' | 'oldest'>('newest');
   const [dateFrom, setDateFrom] = useState('');
@@ -712,12 +715,21 @@ function ManagementDashboard({
 
                 <button
                   type="button"
-                  className={managementView === 'create-user' ? 'admin-nav-active' : ''}
-                  onClick={() => setManagementView('create-user')}
+                  className={managementView === 'requests' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('requests')}
                 >
-                  <span aria-hidden="true">＋</span> Solicitudes
+                  <span aria-hidden="true">＋</span> Solicitudes de funcionarios
                 </button>
               </>
+            )}
+            {isEntityAdmin && (
+              <button
+                type="button"
+                className={managementView === 'requests' ? 'admin-nav-active' : ''}
+                onClick={() => setManagementView('requests')}
+              >
+                <span aria-hidden="true">＋</span> Solicitar funcionario
+              </button>
             )}
           </nav>
 
@@ -727,7 +739,9 @@ function ManagementDashboard({
         </aside>
 
         <section className="admin-main">
-          {isAdmin ? (
+          {managementView === 'requests' ? (
+            <SolicitudesFuncionarios isSuperAdmin={isAdmin} />
+          ) : isAdmin ? (
             managementView === 'statistics' ? (
               <GeneralStatistics />
             ) : (
@@ -1036,13 +1050,19 @@ function App() {
   );
   const registering = authRoute === 'register';
   const managementLogin = authRoute === 'management-login';
-  const [credentials, setCredentials] = useState({ email: '', password: '', firstName: '', lastName: '' });
+  const [credentials, setCredentials] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: '',
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [error, setError] = useState('');
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
   const [menuCiudadanoAbierto, setMenuCiudadanoAbierto] = useState(false);
-   const [actualizandoReportes, setActualizandoReportes] = useState(false);
+  const [actualizandoReportes, setActualizandoReportes] = useState(false);
   const [errorReportes, setErrorReportes] = useState('');
   const [vistaCiudadano, setVistaCiudadano] =
     useState<'crear' | 'reportes'>('crear');
@@ -1124,9 +1144,19 @@ function App() {
 
     setError('');
 
+    if (registering && credentials.password !== credentials.confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+
     try {
       const payload = registering
-        ? credentials
+        ? {
+          email: credentials.email,
+          password: credentials.password,
+          firstName: credentials.firstName,
+          lastName: credentials.lastName,
+        }
         : {
           email: credentials.email,
           password: credentials.password,
@@ -1392,6 +1422,27 @@ function App() {
                   </span>
                 </label>
 
+                {registering && (
+                  <label htmlFor="auth-confirm-password">
+                    Confirmar contraseña
+                    <input
+                      id="auth-confirm-password"
+                      required
+                      minLength={6}
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="Ingresá nuevamente tu contraseña"
+                      value={credentials.confirmPassword}
+                      onChange={(event) =>
+                        setCredentials({
+                          ...credentials,
+                          confirmPassword: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                )}
+
                 {error && <p className="error">{error}</p>}
 
                 <button type="submit" className="auth-submit">
@@ -1417,6 +1468,7 @@ function App() {
     return (
       <ManagementDashboard
         isAdmin={user.role === 'SUPERADMINISTRADOR'}
+        isEntityAdmin={user.role === 'FUNCIONARIO_ADMINISTRADOR'}
         currentUserId={user.id}
         onLogout={clearSession}
       />
@@ -1459,12 +1511,10 @@ function App() {
             onClick={() => setMenuCiudadanoAbierto(false)}
           />
         )}
-
         <div
           className={`ciudadano-nav-links${menuCiudadanoAbierto ? ' menu-abierto' : ''}`}
           id="ciudadano-nav-links"
         >
-
           <button
             type="button"
             className={vistaCiudadano === 'crear' ? 'nav-activo' : ''}
