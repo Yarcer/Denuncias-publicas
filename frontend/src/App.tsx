@@ -1061,10 +1061,24 @@ function App() {
   const [reports, setReports] = useState<Report[]>([]);
   const [error, setError] = useState('');
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
+   const [menuCiudadanoAbierto, setMenuCiudadanoAbierto] = useState(false);
    const [actualizandoReportes, setActualizandoReportes] = useState(false);
   const [errorReportes, setErrorReportes] = useState('');
   const [vistaCiudadano, setVistaCiudadano] =
     useState<'crear' | 'reportes'>('crear');
+
+    useEffect(() => {
+    if (!menuCiudadanoAbierto) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setMenuCiudadanoAbierto(false);
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [menuCiudadanoAbierto]);
 
   function navigateAuth(route: AuthRoute) {
     const routePaths: Record<AuthRoute, string> = {
@@ -1470,9 +1484,39 @@ function App() {
           />
         </div>
 
+         <button
+          type="button"
+          className="ciudadano-menu-toggle"
+          aria-label={menuCiudadanoAbierto ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={menuCiudadanoAbierto}
+          aria-controls="ciudadano-nav-links"
+          onClick={() => setMenuCiudadanoAbierto((abierto) => !abierto)}
+        >
+          <svg
+            className="ciudadano-menu-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path className="menu-icon-line menu-icon-line-top" d="M4 6.5h16" />
+            <path className="menu-icon-line menu-icon-line-middle" d="M4 12h16" />
+            <path className="menu-icon-line menu-icon-line-bottom" d="M4 17.5h16" />
+          </svg>
+        </button>
 
-        <div className="ciudadano-nav-links">
+        {menuCiudadanoAbierto && (
+          <button
+            type="button"
+            className="ciudadano-menu-backdrop"
+            aria-label="Cerrar menú"
+            onClick={() => setMenuCiudadanoAbierto(false)}
+          />
+        )}
 
+
+        <div
+          className={`ciudadano-nav-links${menuCiudadanoAbierto ? ' menu-abierto' : ''}`}
+          id="ciudadano-nav-links"
+        >
           <button
             type="button"
             className={vistaCiudadano === 'crear' ? 'nav-activo' : ''}
@@ -1484,7 +1528,10 @@ function App() {
           <button
             type="button"
             className={vistaCiudadano === 'reportes' ? 'nav-activo' : ''}
-            onClick={() => setVistaCiudadano('reportes')}
+             onClick={() => {
+              setVistaCiudadano('crear');
+              setMenuCiudadanoAbierto(false);
+            }}
           >
             Mis reportes
           </button>
@@ -1492,7 +1539,7 @@ function App() {
           <div className="cuenta-menu">
             <button
               type="button"
-              onClick={() => setMenuCuentaAbierto(!menuCuentaAbierto)}
+             onClick={() => setMenuCuentaAbierto((abierto) => !abierto)}
             >
               Mi cuenta
             </button>
