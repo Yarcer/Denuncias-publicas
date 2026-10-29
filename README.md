@@ -137,6 +137,7 @@ pnpm --dir frontend dev
 - Filtrar por estado.
 - Tomar una denuncia o asignarla a un funcionario activo del mismo ente.
 - Marcarla como `EN_REVISION`, `RESUELTO` o `RECHAZADO`.
+- El administrador de ente puede solicitar altas de funcionarios desde su panel; el superadministrador debe aprobarlas antes de que las cuentas puedan iniciar sesión.
 
 ### Administrador
 
@@ -144,6 +145,7 @@ pnpm --dir frontend dev
 - Consultar estadísticas generales por fechas, estado, tipo, prioridad y evolución mensual.
 - Gestionar denuncias y estados.
 - Consultar los cambios registrados en el historial.
+- Revisar solicitudes de funcionarios y aprobar o rechazar su creación.
 
 Las estadísticas generales están restringidas al superadministrador. Las denuncias se derivan a Municipalidad Demo (URBANO), bombero demo (BOMBEROS) o policia demo (POLICIAL) si existe una cuenta institucional activa para ese organismo; en caso contrario quedan sin asignar y disponibles para gestión institucional. El seed configura Municipalidad Demo; bombero demo y policia demo deben configurarse desde la administración de funcionarios. La prioridad se calcula según términos de riesgo del título y descripción; las denuncias anónimas reciben prioridad baja. Las operaciones de gestión de categorías y usuarios están restringidas a administradores. La asignación interna requiere cuentas activas del mismo organismo; el seed incluye un funcionario demo para probar ese flujo. La botonera telefónica usa los números uruguayos 911, 104 y 105.
 
