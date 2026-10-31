@@ -757,8 +757,8 @@ function ManagementDashboard({
             <div className="admin-page-content">
               <header className="admin-header">
                 <div className="admin-page-title">
-                  <span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span>
-                  <h1>Bandeja de denuncias</h1>
+                  <span className="eyebrow">{isAdmin ? 'Administración' : 'Funcionarios'}</span>
+                  <h1>Bandeja de reportes</h1>
                   <p>Organiza y sigue los reportes de la ciudad.</p>
                 </div>
 
@@ -781,12 +781,8 @@ function ManagementDashboard({
                   >
                     <option value="active">Activas · tablero</option>
                     <option value="PENDIENTE">Pendientes</option>
-                    <option value="ASIGNADO">Asignadas</option>
-                    <option value="EN_REVISION">En revisión</option>
                     <option value="EN_PROCESO">En proceso</option>
                     <option value="RESUELTO">Resueltas</option>
-                    <option value="RECHAZADO">Denegadas</option>
-                    <option value="archived">Archivadas</option>
                   </select>
                   <div className="admin-export-actions" aria-label="Exportar denuncias">
                     <button type="button" onClick={() => exportReports('csv')}>CSV</button>
@@ -960,12 +956,8 @@ function ManagementDashboard({
                   <select value={filter} onChange={(event) => setFilter(event.target.value)}>
                     <option value="active">Activas · tablero</option>
                     <option value="PENDIENTE">Pendientes</option>
-                    <option value="ASIGNADO">Asignadas</option>
-                    <option value="EN_REVISION">En revisión</option>
                     <option value="EN_PROCESO">En proceso</option>
                     <option value="RESUELTO">Resueltas</option>
-                    <option value="RECHAZADO">Denegadas</option>
-                    <option value="archived">Archivadas</option>
                   </select>
                 </label>
 

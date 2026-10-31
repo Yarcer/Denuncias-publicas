@@ -160,7 +160,7 @@ export class UsuariosService {
   private assertAdministrator(actor: AuthenticatedUser) {
     if (actor.role !== Role.SUPERADMINISTRADOR) {
       throw new ForbiddenException(
-        'Solo un superSUPERADMINISTRADOR puede gestionar usuarios',
+        'Solo un SUPERADMINISTRADOR puede gestionar usuarios',
       );
     }
   }
@@ -189,7 +189,7 @@ export class UsuariosService {
       error.code === 'P2002'
     ) {
       throw new ConflictException(
-        'Ya existe un usuario con ese correo electrónico',
+        'Vuelva a intentarlo',
       );
     }
     throw error;

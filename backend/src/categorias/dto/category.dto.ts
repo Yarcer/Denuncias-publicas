@@ -4,10 +4,10 @@ import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
 export class CreateCategoryDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name?: string;
 
   @IsEnum(ReportType)
-  type: ReportType;
+  type?: ReportType;
 
   @IsString()
   @IsNotEmpty()
