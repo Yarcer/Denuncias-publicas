@@ -13,9 +13,10 @@ import SolicitudesFuncionarios from './pages/SolicitudesFuncionarios';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
-type AuthRoute = 'login' | 'register' | 'anonymous' | 'management-login';
+type AuthRoute = 'home' | 'login' | 'register' | 'anonymous' | 'management-login';
 
 function getAuthRoute(pathname = window.location.pathname): AuthRoute {
+  if (pathname === '/') return 'home';
   if (pathname === '/gestion/login') return 'management-login';
   if (pathname === '/registro') return 'register';
   if (pathname === '/anonimo') return 'anonymous';
@@ -171,28 +172,28 @@ function GeneralStatistics() {
 
   const sections = statistics
     ? [
-        {
-          title: 'Por estado',
-          items: statistics.byStatus.map((item) => ({
-            label: item.status?.replace(/_/g, ' ') ?? '',
-            count: item.count,
-          })),
-        },
-        {
-          title: 'Por tipo',
-          items: statistics.byType.map((item) => ({
-            label: item.type ?? '',
-            count: item.count,
-          })),
-        },
-        {
-          title: 'Por prioridad',
-          items: statistics.byPriority.map((item) => ({
-            label: item.priority ?? '',
-            count: item.count,
-          })),
-        },
-      ]
+      {
+        title: 'Por estado',
+        items: statistics.byStatus.map((item) => ({
+          label: item.status?.replace(/_/g, ' ') ?? '',
+          count: item.count,
+        })),
+      },
+      {
+        title: 'Por tipo',
+        items: statistics.byType.map((item) => ({
+          label: item.type ?? '',
+          count: item.count,
+        })),
+      },
+      {
+        title: 'Por prioridad',
+        items: statistics.byPriority.map((item) => ({
+          label: item.priority ?? '',
+          count: item.count,
+        })),
+      },
+    ]
     : [];
   const maximumMonthlyCount = Math.max(
     1,
@@ -203,7 +204,6 @@ function GeneralStatistics() {
     <section className="statistics-page">
       <header className="statistics-header">
         <div>
-          <span className="statistics-eyebrow">Administración</span>
           <h1>Estadísticas generales</h1>
           <p>Resumen de denuncias registradas en el sistema.</p>
         </div>
@@ -429,8 +429,8 @@ function ManagementDashboard({
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [managementView, setManagementView] = useState<
-    'reports' | 'users' | 'create-user' | 'statistics' | 'requests'
-  >(isAdmin ? 'users' : 'reports');
+    'home' | 'reports' | 'users' | 'create-user' | 'statistics' | 'requests'
+  >('home');
   const [dateOrder, setDateOrder] = useState<'newest' | 'oldest'>('newest');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -489,7 +489,7 @@ function ManagementDashboard({
 
     const rows = buildExportRows(visibleReports);
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-    const baseName = `denuncias-${filter === 'active' ? 'activa' : filter}-${timestamp}`;
+    const baseName = `denuncias-${filter === 'active' ? 'todas' : filter}-${timestamp}`;
 
     if (format === 'csv') {
       const headers = Object.keys(rows[0]);
@@ -582,14 +582,8 @@ function ManagementDashboard({
     }
   }
 
-  const activeColumns = [
-    { title: 'Pendientes', status: 'PENDIENTE' },
-    { title: 'En revisión', status: 'EN_REVISION' },
-    { title: 'Asignadas', status: 'ASIGNADO' },
-    { title: 'En proceso', status: 'EN_PROCESO' },
-  ];
-
   const filterLabels: Record<string, string> = {
+    active: 'Todos los reportes',
     PENDIENTE: 'Pendientes',
     ASIGNADO: 'Asignadas',
     EN_REVISION: 'En revisión',
@@ -599,31 +593,29 @@ function ManagementDashboard({
     archived: 'Archivadas',
   };
 
-  const columns = filter === 'active'
-    ? activeColumns
-    : [{ title: filterLabels[filter] ?? 'Reportes', status: '' }];
+  const columns = [{ title: filterLabels[filter] ?? 'Reportes', status: '' }];
 
   const search = searchTerm.trim().toLowerCase();
- const categories = reports.reduce<NonNullable<ManagedReport['category']>[]>(
-  (unique, report) => {
-    const category = report.category;
+  const categories = reports.reduce<NonNullable<ManagedReport['category']>[]>(
+    (unique, report) => {
+      const category = report.category;
 
-    if (category && !unique.some((item) => item.id === category.id)) {
-      unique.push(category);
-    }
+      if (category && !unique.some((item) => item.id === category.id)) {
+        unique.push(category);
+      }
 
-    return unique;
-  },
-  [],
-).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+      return unique;
+    },
+    [],
+  ).sort((a, b) => a.name.localeCompare(b.name, 'es'));
 
   const startOfRange = dateFrom
-  ? new Date(`${dateFrom}T00:00:00`).getTime()
-  : null;
+    ? new Date(`${dateFrom}T00:00:00`).getTime()
+    : null;
 
   const endOfRange = dateTo
-  ? new Date(`${dateTo}T23:59:59.999`).getTime()
-  : null;
+    ? new Date(`${dateTo}T23:59:59.999`).getTime()
+    : null;
 
   const visibleReports = reports
     .filter((item) => {
@@ -673,7 +665,11 @@ function ManagementDashboard({
           <nav className="admin-nav" aria-label="Navegación de administración">
             {!isAdmin && (
               <>
-                <button type="button" onClick={() => scrollToSection('admin-summary')}>
+                <button
+                  type="button"
+                  className={managementView === 'home' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('home')}
+                >
                   <span aria-hidden="true">⌂</span> Inicio
                 </button>
                 <button
@@ -682,7 +678,7 @@ function ManagementDashboard({
                   onClick={() => {
                     setManagementView('reports');
                     setFilter('active');
-                    scrollToSection('admin-board');
+                    requestAnimationFrame(() => scrollToSection('admin-board'));
                   }}
                 >
                   <span aria-hidden="true">▤</span> Bandeja de reportes
@@ -698,6 +694,13 @@ function ManagementDashboard({
             )}
             {isAdmin && (
               <>
+                <button
+                  type="button"
+                  className={managementView === 'home' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('home')}
+                >
+                  <span aria-hidden="true">⌂</span> Inicio
+                </button>
                 <button
                   type="button"
                   className={managementView === 'statistics' ? 'admin-nav-active' : ''}
@@ -739,7 +742,75 @@ function ManagementDashboard({
         </aside>
 
         <section className="admin-main">
-          {managementView === 'requests' ? (
+          {managementView === 'home' ? (
+            <section className="management-home">
+              <header className="management-home-header">
+                <span className="eyebrow">
+                  {isAdmin ? 'Administración general' : 'Gestión de reportes'}
+                </span>
+                <h1>{isAdmin ? 'Inicio del superadministrador' : 'Inicio del funcionario'}</h1>
+                <p>
+                  {isAdmin
+                    ? 'Administra las cuentas, solicitudes y estadísticas de la plataforma.'
+                    : 'Consulta y gestiona los reportes asignados a tu organismo.'}
+                </p>
+              </header>
+
+              <div className="management-home-cards">
+                {isAdmin ? (
+                  <>
+                    <button type="button" onClick={() => setManagementView('users')}>
+                      <span aria-hidden="true">◉</span>
+                      <strong>Cuentas de funcionarios</strong>
+                      <small>Crear y administrar accesos.</small>
+                    </button>
+                    <button type="button" onClick={() => setManagementView('requests')}>
+                      <span aria-hidden="true">＋</span>
+                      <strong>Solicitudes</strong>
+                      <small>Revisar solicitudes de funcionarios.</small>
+                    </button>
+                    <button type="button" onClick={() => setManagementView('statistics')}>
+                      <span aria-hidden="true">▥</span>
+                      <strong>Estadísticas</strong>
+                      <small>Ver el resumen general de reportes.</small>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilter('active');
+                        setManagementView('reports');
+                      }}
+                    >
+                      <span aria-hidden="true">▤</span>
+                      <strong>Bandeja de reportes</strong>
+                      <small>Consultar y gestionar reportes activos.</small>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilter('archived');
+                        setManagementView('reports');
+                      }}
+                    >
+                      <span aria-hidden="true">▣</span>
+                      <strong>Reportes archivados</strong>
+                      <small>Consultar reportes ya archivados.</small>
+                    </button>
+                    {isEntityAdmin && (
+                      <button type="button" onClick={() => setManagementView('requests')}>
+                        <span aria-hidden="true">＋</span>
+                        <strong>Solicitar funcionario</strong>
+                        <small>Enviar una solicitud de acceso.</small>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
+          ) : managementView === 'requests' ? (
             <SolicitudesFuncionarios isSuperAdmin={isAdmin} />
           ) : isAdmin ? (
             managementView === 'statistics' ? (
@@ -773,17 +844,19 @@ function ManagementDashboard({
                       aria-label="Buscar denuncias"
                     />
                   </label>
-                  <select
-                    className="admin-filter"
-                    value={filter}
-                    onChange={(event) => setFilter(event.target.value)}
-                    aria-label="Filtrar denuncias por estado"
-                  >
-                    <option value="active">Activas · tablero</option>
-                    <option value="PENDIENTE">Pendientes</option>
-                    <option value="EN_PROCESO">En proceso</option>
-                    <option value="RESUELTO">Resueltas</option>
-                  </select>
+                  {!isArchivedView && (
+                    <select
+                      className="admin-filter"
+                      value={filter}
+                      onChange={(event) => setFilter(event.target.value)}
+                      aria-label="Filtrar denuncias por estado"
+                    >
+                      <option value="active">Todas</option>
+                      <option value="PENDIENTE">Pendientes</option>
+                      <option value="EN_PROCESO">En proceso</option>
+                      <option value="RESUELTO">Resueltas</option>
+                    </select>
+                  )}
                   <div className="admin-export-actions" aria-label="Exportar denuncias">
                     <button type="button" onClick={() => exportReports('csv')}>CSV</button>
                     <button type="button" onClick={() => exportReports('xlsx')}>Excel</button>
@@ -791,8 +864,6 @@ function ManagementDashboard({
                   </div>
                 </div>
               </header>
-
-              <EmergencyShortcuts />
 
               {error && <p className="error management-error">{error}</p>}
 
@@ -811,222 +882,224 @@ function ManagementDashboard({
                 </article>
               </section>
 
-              <div className="admin-results">
-                <div className="admin-board-heading" id="admin-board">
-                  <div>
-                    <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
-                    <p>{visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}</p>
+                  <div className="admin-results">
+                    <div className="admin-board-heading" id="admin-board">
+                      <div>
+                        <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
+                        <p>{visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}</p>
+                      </div>
+                    </div>
+
+                    <section className={`admin-board ${filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}>
+                      {columns.map((column) => {
+                        const columnReports = column.status
+                          ? visibleReports.filter((item) => item.status === column.status)
+                          : visibleReports;
+
+                        return (
+                          <div className="admin-column" key={column.title}>
+                            <header className="admin-column-header">
+                              <h3>{column.title}</h3>
+                              <span>{columnReports.length}</span>
+                            </header>
+
+                            <div className="admin-column-cards">
+                              {columnReports.length === 0 ? (
+                                <p className="admin-column-empty">
+                                  {search ? 'No hay coincidencias.' : 'No hay denuncias aquí.'}
+                                </p>
+                              ) : columnReports.map((item) => (
+                                <article className="admin-report-card" key={item.id}>
+                                  <div className="admin-report-copy">
+                                    <div className="admin-report-chips">
+                                      <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
+                                        {item.status.replace(/_/g, ' ')}
+                                      </span>
+                                      {item.priority && (
+                                        <span className={`admin-priority-chip admin-priority-${item.priority.toLowerCase()}`}>
+                                          Prioridad {item.priority.toLowerCase()}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <h4>{item.title}</h4>
+                                    <p>{item.description}</p>
+                                    <div className="admin-report-meta">
+                                      <span><b aria-hidden="true">▣</b>{item.entityName || 'Organismo sin asignar'}</span>
+                                      <span><b aria-hidden="true">⌖</b>{item.address || 'Ubicación sin dirección'}</span>
+                                      <span><b aria-hidden="true">♙</b>{item.reporter?.firstName || item.reporter?.email || 'Ciudadano'}</span>
+                                      <span>
+                                        Enviado: {new Intl.DateTimeFormat('es-UY', {
+                                          dateStyle: 'short',
+                                          timeStyle: 'short',
+                                        }).format(new Date(item.createdAt))}
+                                      </span>
+                                    </div>
+
+                                    {item.latitude != null && item.longitude != null && (
+                                      <a
+                                        className="admin-map-link"
+                                        href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        <span aria-hidden="true">⌖</span> Ver mapa
+                                      </a>
+                                    )}
+
+                                    {item.evidence?.map((photo) => (
+                                      <ReportImage
+                                        key={photo.id}
+                                        reportId={item.id}
+                                        evidenceId={photo.id}
+                                      />
+                                    ))}
+                                  </div>
+
+                                  <div className="admin-report-actions">
+                                    <label className="report-assignment">
+                                      <span>Asignar a</span>
+                                      <select
+                                        value={item.assignee?.id ?? ''}
+                                        onChange={(event) => {
+                                          if (event.target.value) {
+                                            void assignReport(item.id, event.target.value);
+                                          }
+                                        }}
+                                      >
+                                        <option value="">Seleccionar funcionario</option>
+                                        {assignableUsers.map((assignableUser) => (
+                                          <option key={assignableUser.id} value={assignableUser.id}>
+                                            {[assignableUser.firstName, assignableUser.lastName]
+                                              .filter(Boolean)
+                                              .join(' ') || assignableUser.email}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    {!item.assignee && (
+                                      <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
+                                    )}
+                                    {item.assignee && (
+                                      <>
+                                        <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
+                                          En revisión
+                                        </button>
+                                        <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
+                                          Iniciar trabajo
+                                        </button>
+                                        <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
+                                          Marcar resuelta
+                                        </button>
+                                        <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
+                                          Denegar
+                                        </button>
+                                      </>
+                                    )}
+                                    {item.status === 'RECHAZADO' && filter !== 'archived' && (
+                                      <button className="secondary" onClick={() => archiveReport(item.id)}>
+                                        Archivar
+                                      </button>
+                                    )}
+                                  </div>
+                                </article>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </section>
                   </div>
                 </div>
 
-                <section className={`admin-board ${filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}>
-                  {columns.map((column) => {
-                    const columnReports = column.status
-                      ? visibleReports.filter((item) => item.status === column.status)
-                      : visibleReports;
+                <aside className="admin-filter-panel" aria-label="Filtros de denuncias">
+                  <details open>
+                    <summary className="admin-filter-heading">
+                      <span aria-hidden="true">☷</span>
+                      <span className="admin-filter-title">
+                        <strong>Filtros</strong>
+                      </span>
+                      <span className="admin-filter-chevron" aria-hidden="true">⌄</span>
+                    </summary>
 
-                    return (
-                      <div className="admin-column" key={column.title}>
-                        <header className="admin-column-header">
-                          <h3>{column.title}</h3>
-                          <span>{columnReports.length}</span>
-                        </header>
+                    <div className="admin-filter-fields">
+                      {!isArchivedView && (
+                        <label className="admin-filter-control">
+                          <span>Estado</span>
+                          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+                            <option value="active">Todas</option>
+                            <option value="PENDIENTE">Pendientes</option>
+                            <option value="EN_PROCESO">En proceso</option>
+                            <option value="RESUELTO">Resueltas</option>
+                          </select>
+                        </label>
+                      )}
 
-                        <div className="admin-column-cards">
-                          {columnReports.length === 0 ? (
-                            <p className="admin-column-empty">
-                              {search ? 'No hay coincidencias.' : 'No hay denuncias aquí.'}
-                            </p>
-                          ) : columnReports.map((item) => (
-                            <article className="admin-report-card" key={item.id}>
-                              <div className="admin-report-copy">
-                                <div className="admin-report-chips">
-                                  <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
-                                    {item.status.replace(/_/g, ' ')}
-                                  </span>
-                                  {item.priority && (
-                                    <span className={`admin-priority-chip admin-priority-${item.priority.toLowerCase()}`}>
-                                      Prioridad {item.priority.toLowerCase()}
-                                    </span>
-                                  )}
-                                </div>
-                                <h4>{item.title}</h4>
-                                <p>{item.description}</p>
-                                <div className="admin-report-meta">
-                                  <span><b aria-hidden="true">▣</b>{item.entityName || 'Organismo sin asignar'}</span>
-                                  <span><b aria-hidden="true">⌖</b>{item.address || 'Ubicación sin dirección'}</span>
-                                  <span><b aria-hidden="true">♙</b>{item.reporter?.firstName || item.reporter?.email || 'Ciudadano'}</span>
-                                  <span>
-                                    Enviado: {new Intl.DateTimeFormat('es-UY', {
-                                      dateStyle: 'short',
-                                      timeStyle: 'short',
-                                    }).format(new Date(item.createdAt))}
-                                    </span>
-                                </div>
+                      <fieldset className="admin-filter-group">
+                        <legend>Fecha de reporte</legend>
 
-                                {item.latitude != null && item.longitude != null && (
-                                  <a
-                                    className="admin-map-link"
-                                    href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <span aria-hidden="true">⌖</span> Ver mapa
-                                  </a>
-                                )}
+                        <label className="admin-filter-control">
+                          <span>Desde</span>
+                          <input
+                            type="date"
+                            value={dateFrom}
+                            max={dateTo || undefined}
+                            onChange={(event) => setDateFrom(event.target.value)}
+                          />
+                        </label>
 
-                                {item.evidence?.map((photo) => (
-                                  <ReportImage
-                                    key={photo.id}
-                                    reportId={item.id}
-                                    evidenceId={photo.id}
-                                  />
-                                ))}
-                              </div>
+                        <label className="admin-filter-control">
+                          <span>Hasta</span>
+                          <input
+                            type="date"
+                            value={dateTo}
+                            min={dateFrom || undefined}
+                            onChange={(event) => setDateTo(event.target.value)}
+                          />
+                        </label>
 
-                              <div className="admin-report-actions">
-                                <label className="report-assignment">
-                                  <span>Asignar a</span>
-                                  <select
-                                    value={item.assignee?.id ?? ''}
-                                    onChange={(event) => {
-                                      if (event.target.value) {
-                                        void assignReport(item.id, event.target.value);
-                                      }
-                                    }}
-                                  >
-                                    <option value="">Seleccionar funcionario</option>
-                                    {assignableUsers.map((assignableUser) => (
-                                      <option key={assignableUser.id} value={assignableUser.id}>
-                                        {[assignableUser.firstName, assignableUser.lastName]
-                                          .filter(Boolean)
-                                          .join(' ') || assignableUser.email}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                {!item.assignee && (
-                                  <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
-                                )}
-                                {item.assignee && (
-                                  <>
-                                    <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
-                                      En revisión
-                                    </button>
-                                    <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
-                                      Iniciar trabajo
-                                    </button>
-                                    <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
-                                      Marcar resuelta
-                                    </button>
-                                    <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
-                                      Denegar
-                                    </button>
-                                  </>
-                                )}
-                                {item.status === 'RECHAZADO' && filter !== 'archived' && (
-                                  <button className="secondary" onClick={() => archiveReport(item.id)}>
-                                    Archivar
-                                  </button>
-                                )}
-                              </div>
-                            </article>
+                        <label className="admin-filter-control">
+                          <span>Ordenar por fecha</span>
+                          <select
+                            value={dateOrder}
+                            onChange={(event) =>
+                              setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'newest')
+                            }
+                          >
+                            <option value="newest">Más recientes</option>
+                            <option value="oldest">Más antiguas</option>
+                          </select>
+                        </label>
+                      </fieldset>
+
+                      <label className="admin-filter-control">
+                        <span>Tipo de denuncia</span>
+                        <select
+                          value={categoryFilter}
+                          onChange={(event) => setCategoryFilter(event.target.value)}
+                        >
+                          <option value="">Todos los tipos</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {category.name}
+                            </option>
                           ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </section>
+                        </select>
+                      </label>
+                      <label className="admin-filter-control">
+                        <span>Modalidad</span>
+                        <select
+                          value={modalityFilter}
+                          onChange={(event) => setModalityFilter(event.target.value)}
+                        >
+                          <option value="">Todas</option>
+                          <option value="identified">Identificadas</option>
+                          <option value="anonymous">Anónimas</option>
+                        </select>
+                      </label>
+                    </div>
+                  </details>
+                </aside>
               </div>
-            </div>
-
-            <aside className="admin-filter-panel" aria-label="Filtros de denuncias">
-              <details open>
-                <summary className="admin-filter-heading">
-                  <span aria-hidden="true">☷</span>
-                  <span className="admin-filter-title">
-                    <strong>Filtros</strong>
-                  </span>
-                  <span className="admin-filter-chevron" aria-hidden="true">⌄</span>
-                </summary>
-
-                <div className="admin-filter-fields">
-                <label className="admin-filter-control">
-                  <span>Estado</span>
-                  <select value={filter} onChange={(event) => setFilter(event.target.value)}>
-                    <option value="active">Activas · tablero</option>
-                    <option value="PENDIENTE">Pendientes</option>
-                    <option value="EN_PROCESO">En proceso</option>
-                    <option value="RESUELTO">Resueltas</option>
-                  </select>
-                </label>
-
-                <fieldset className="admin-filter-group">
-                  <legend>Fecha de reporte</legend>
-
-                  <label className="admin-filter-control">
-                    <span>Desde</span>
-                    <input
-                      type="date"
-                      value={dateFrom}
-                      max={dateTo || undefined}
-                      onChange={(event) => setDateFrom(event.target.value)}
-                    />
-                  </label>
-
-                  <label className="admin-filter-control">
-                    <span>Hasta</span>
-                    <input
-                      type="date"
-                      value={dateTo}
-                      min={dateFrom || undefined}
-                      onChange={(event) => setDateTo(event.target.value)}
-                    />
-                  </label>
-
-                  <label className="admin-filter-control">
-                    <span>Ordenar por fecha</span>
-                    <select
-                      value={dateOrder}
-                      onChange={(event) =>
-                        setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'newest')
-                      }
-                    >
-                      <option value="newest">Más recientes</option>
-                      <option value="oldest">Más antiguas</option>
-                    </select>
-                  </label>
-                </fieldset>
-
-                <label className="admin-filter-control">
-                  <span>Tipo de denuncia</span>
-                  <select
-                    value={categoryFilter}
-                    onChange={(event) => setCategoryFilter(event.target.value)}
-                  >
-                    <option value="">Todos los tipos</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="admin-filter-control">
-                  <span>Modalidad</span>
-                  <select
-                    value={modalityFilter}
-                    onChange={(event) => setModalityFilter(event.target.value)}
-                  >
-                    <option value="">Todas</option>
-                    <option value="identified">Identificadas</option>
-                    <option value="anonymous">Anónimas</option>
-                  </select>
-                </label>
-                </div>
-              </details>
-            </aside>
-          </div>
             </>
           )}
         </section>
@@ -1053,13 +1126,13 @@ function App() {
   const [reports, setReports] = useState<Report[]>([]);
   const [error, setError] = useState('');
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
-   const [menuCiudadanoAbierto, setMenuCiudadanoAbierto] = useState(false);
-   const [actualizandoReportes, setActualizandoReportes] = useState(false);
+  const [menuCiudadanoAbierto, setMenuCiudadanoAbierto] = useState(false);
+  const [actualizandoReportes, setActualizandoReportes] = useState(false);
   const [errorReportes, setErrorReportes] = useState('');
   const [vistaCiudadano, setVistaCiudadano] =
     useState<'crear' | 'reportes'>('crear');
 
-    useEffect(() => {
+  useEffect(() => {
     if (!menuCiudadanoAbierto) return;
 
     function handleEscape(event: KeyboardEvent) {
@@ -1074,6 +1147,7 @@ function App() {
 
   function navigateAuth(route: AuthRoute) {
     const routePaths: Record<AuthRoute, string> = {
+      home: '/',
       login: '/login',
       register: '/registro',
       anonymous: '/anonimo',
@@ -1196,7 +1270,76 @@ function App() {
             className="auth-brand-logo"
           />
 
+          {authRoute === 'home' ? (
+            <section className="public-home" aria-labelledby="public-home-title">
+              <span className="public-home-kicker">PuntoReporte · Melo</span>
+              <h1 id="public-home-title">Tu ciudad, un lugar mejor</h1>
+              <p>
+                Reportá problemas de tu entorno y ayudá a mejorar los espacios
+                y servicios de la comunidad.
+              </p>
+
+              <div className="public-home-actions">
+                <a
+                  className="public-home-action public-home-action-primary"
+                  href="/anonimo"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('anonymous');
+                  }}
+                >
+                  Crear reporte
+                  <small>Podés continuar sin una cuenta</small>
+                </a>
+                <a
+                  className="public-home-action"
+                  href="/login"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('login');
+                  }}
+                >
+                  Iniciar sesión
+                  <small>Seguí tus reportes</small>
+                </a>
+                <a
+                  className="public-home-action"
+                  href="/registro"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('register');
+                  }}
+                >
+                  Crear cuenta
+                  <small>Registrate como ciudadano</small>
+                </a>
+              </div>
+
+              <a
+                className="public-home-staff-link"
+                href="/gestion/login"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('management-login');
+                }}
+              >
+                Acceso para funcionarios
+              </a>
+
+              <EmergencyShortcuts />
+            </section>
+          ) : (
           <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
+            <a
+              className="auth-home-link"
+              href="/"
+              onClick={(event) => {
+                event.preventDefault();
+                navigateAuth('home');
+              }}
+            >
+              ← Volver al inicio
+            </a>
 
             <nav
               className={`auth-route-nav ${managementLogin ? 'auth-route-nav-management' : ''}`}
@@ -1357,7 +1500,13 @@ function App() {
                 )}
 
                 <label htmlFor="auth-email">
-                  Correo electrónico
+                  <span className="auth-field-label">
+                    <svg className="auth-field-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="3" y="5" width="18" height="14" rx="2" />
+                      <path d="m3 7 9 6 9-6" />
+                    </svg>
+                    Correo electrónico
+                  </span>
                   <input
                     id="auth-email"
                     required
@@ -1375,7 +1524,13 @@ function App() {
                 </label>
 
                 <label htmlFor="auth-password">
-                  Contraseña
+                  <span className="auth-field-label">
+                    <svg className="auth-field-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="3" y="10" width="18" height="11" rx="2" />
+                      <path d="M7 10V7a5 5 0 0 1 10 0v3" />
+                    </svg>
+                    Contraseña
+                  </span>
                   <span className="password-input-wrap">
                     <input
                       id="auth-password"
@@ -1447,6 +1602,7 @@ function App() {
               Reportá. Informá. Mejorá.
             </p>
           </section>
+          )}
         </div>
       </main>
     );
@@ -1476,7 +1632,7 @@ function App() {
           />
         </div>
 
-         <button
+        <button
           type="button"
           className="ciudadano-menu-toggle"
           aria-label={menuCiudadanoAbierto ? 'Cerrar menú' : 'Abrir menú'}
@@ -1512,7 +1668,10 @@ function App() {
           <button
             type="button"
             className={vistaCiudadano === 'crear' ? 'nav-activo' : ''}
-            onClick={() => setVistaCiudadano('crear')}
+            onClick={() => {
+              setVistaCiudadano('crear');
+              setMenuCiudadanoAbierto(false);
+            }}
           >
             Crear reporte
           </button>
@@ -1520,8 +1679,8 @@ function App() {
           <button
             type="button"
             className={vistaCiudadano === 'reportes' ? 'nav-activo' : ''}
-             onClick={() => {
-              setVistaCiudadano('crear');
+            onClick={() => {
+              setVistaCiudadano('reportes');
               setMenuCiudadanoAbierto(false);
             }}
           >
@@ -1531,7 +1690,7 @@ function App() {
           <div className="cuenta-menu">
             <button
               type="button"
-             onClick={() => setMenuCuentaAbierto((abierto) => !abierto)}
+              onClick={() => setMenuCuentaAbierto((abierto) => !abierto)}
             >
               Mi cuenta
             </button>
@@ -1557,18 +1716,11 @@ function App() {
       </nav>
 
       <section className="dashboard">
-
         <header className="dashboard-header">
-          <div>
-            <header className="dashboard-header">
-              <div>
-                <h1 className="saludo-ciudadano">
-                  <span className="saludo-icono" aria-hidden="true">👋</span>
-                  <span>Hola, {user.firstName || user.email}</span>
-                </h1>
-              </div>
-            </header>
-          </div>
+          <h1 className="saludo-ciudadano">
+            <span className="saludo-icono" aria-hidden="true">👋</span>
+            <span>Hola, {user.firstName || user.email}</span>
+          </h1>
         </header>
 
 
@@ -1600,7 +1752,7 @@ function App() {
             </div>
 
             {errorReportes && <p className="error">{errorReportes}</p>}
-            
+
             {reports.length === 0 ? (
               <p className="empty-state">
                 Todavía no tienes reportes registrados.
@@ -1626,7 +1778,7 @@ function App() {
           </section>
         )}
 
-        <EmergencyShortcuts />
+        {vistaCiudadano === 'crear' && <EmergencyShortcuts />}
 
       </section>
     </main>
