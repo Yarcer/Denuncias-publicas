@@ -1,193 +1,62 @@
 # Denuncias Públicas
 
-Plataforma para registrar denuncias ciudadanas y permitir que entes públicos y administradores las gestionen.
+Una plataforma web pensada para que cualquier ciudadano pueda reportar problemas de su entorno y para que los organismos públicos encargados puedan recibirlos, priorizarlos y darles seguimiento de forma ordenada y transparente.
 
-## Requisitos
+## ¿Qué es?
 
-- Node.js
-- pnpm 10+
-- Docker Desktop
+Denuncias Públicas conecta a la ciudadanía con las instituciones que deben resolver los problemas cotidianos: luminarias rotas, basura acumulada, baches, situaciones de riesgo, emergencias y mucho más. En lugar de que un reclamo se pierda entre llamadas y papeles, la plataforma lo registra, le asigna un identificador de seguimiento y lo deriva automáticamente al organismo que corresponde.
 
-## Instalación
+El sistema está dividido en tres grandes experiencias, según quién lo use:
 
-Desde la raíz del proyecto:
+- **Ciudadanía:** crea denuncias y sigue su estado.
+- **Entes públicos:** reciben y gestionan las denuncias de su área.
+- **Administración:** supervisa todo, controla usuarios y consulta estadísticas.
 
-```powershell
-pnpm install
-```
+## ¿Cómo funciona?
 
-El backend necesita un archivo `backend/.env`. Usa esta configuración para desarrollo local:
+1. **El ciudadano ingresa** con su cuenta o como visitante mediante una sesión temporal.
+2. **Completa el formulario** de denuncia con título, descripción y categoría.
+3. **El sistema calcula una prioridad** según palabras de riesgo en el texto, y deriva la denuncia al organismo correspondiente.
+4. **Recibe un identificador de seguimiento** en pantalla y, si configuró un correo, una confirmación por email.
+5. **El ente público** ve la denuncia en su bandeja, la toma o la asigna a un funcionario, y la mueve entre estados: `EN_REVISION`, `RESUELTO` o `RECHAZADO`.
+6. **El ciudadano puede consultar** el avance de sus denuncias en cualquier momento.
+7. **La administración** revisa el historial de cambios, aprueba altas de funcionarios y consulta estadísticas por fecha, estado, tipo, prioridad y evolución mensual.
 
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/reportes_db?schema=public"
-PORT=3000
-NODE_ENV=development
-JWT_SECRET=dev_secret_change_me_in_production
-JWT_EXPIRES_IN=1h
-CORS_ORIGIN=http://localhost:5173
-```
-
-Para enviar confirmaciones por correo, configura también los datos de tu proveedor SMTP en `backend/.env`:
-
-```env
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=usuario-smtp
-SMTP_PASSWORD=contraseña-smtp
-SMTP_FROM="Denuncias Públicas <no-reply@example.com>"
-```
-
-`SMTP_HOST`, `SMTP_PORT` y `SMTP_FROM` son obligatorios en conjunto; `SMTP_USER` y `SMTP_PASSWORD` también deben configurarse juntos. El puerto 465 usa TLS implícito. Sin SMTP configurado, la denuncia se registra normalmente y la pantalla informa que no se pudo enviar el correo. Las sesiones anónimas no reciben correo.
-
-
-## Iniciar PostgreSQL
-
-Abre Docker Desktop y espera a que el motor esté listo. Si ya existe el contenedor,
-inícialo:
-
-```powershell
-docker start denuncias-postgres
-```
-
-En una instalación nueva, créalo:
-
-```powershell
-docker run --name denuncias-postgres `
-  -e POSTGRES_USER=postgres `
-  -e POSTGRES_PASSWORD=postgres `
-  -e POSTGRES_DB=reportes_db `
-  -p 5432:5432 `
-  -d postgres:16
-```
-
-También puedes usar Docker Compose; ese método publica PostgreSQL en el puerto
-5433, por lo que `DATABASE_URL` debe apuntar a `localhost:5433`:
-
-```powershell
-docker compose up -d
-```
-
-Para comprobarlo:
-
-```powershell
-docker ps --filter "name=denuncias-postgres"
-```
-
-Para detener PostgreSQL:
-
-```powershell
-docker stop denuncias-postgres
-```
-
-## Base de datos y usuarios demo
-
-Ejecuta estos comandos desde la raíz `Denuncias-publicas`:
-
-```powershell
-pnpm --dir backend exec prisma migrate deploy
-pnpm --dir backend db:seed
-```
-
-El seed crea estas cuentas:
-
-| Rol | Correo | Contraseña |
-|---|---|---|
-| Superadministrador | `admin@denuncias.local` | `Admin123!` |
-| Administrador de ente | `ente@denuncias.local` | `Ente123!` |
-| Funcionario | `funcionario@denuncias.local` | `Funcionario123!` |
-
-No uses estas contraseñas en producción.
-
-## Ejecutar el proyecto
-
-Desde la raíz:
-
-```powershell
-pnpm dev
-```
-
-URLs locales:
-
-- Frontend: http://localhost:5173/
-- API: http://localhost:3000/api
-- Health check: http://localhost:3000/api/health
-
-También se pueden iniciar por separado:
-
-```powershell
-pnpm --dir backend start:dev
-pnpm --dir frontend dev
-```
-
-## Funciones disponibles
+## Perfiles de usuario
 
 ### Ciudadano o visitante
-
-- Registrarse e iniciar sesión desde `/login`.
-- Entrar como visitante mediante una sesión temporal.
-- Crear denuncias, recibir prioridad automática y derivación al organismo correspondiente.
-- Recibir el identificador de seguimiento en pantalla y confirmación por email cuando la cuenta tenga correo y SMTP esté configurado.
-- Consultar sus propias denuncias.
-- Llamar a emergencias, bomberos o asistencia médica desde los accesos directos.
+- Se registra o entra como visitante.
+- Crea denuncias con prioridad automática.
+- Consulta el estado de sus propios reportes.
+- Recibe el identificador de seguimiento y, si corresponde, confirmación por correo.
+- Tiene accesos directos a emergencias, bomberos y asistencia médica.
 
 ### Ente público
-
-- Iniciar sesión desde `/gestion/login` con una cuenta institucional.
-- Ver la bandeja de denuncias activas.
-- Filtrar por estado.
-- Tomar una denuncia o asignarla a un funcionario activo del mismo ente.
-- Marcarla como `EN_REVISION`, `RESUELTO` o `RECHAZADO`.
-- El administrador de ente puede solicitar altas de funcionarios desde su panel; el superadministrador debe aprobarlas antes de que las cuentas puedan iniciar sesión.
+- Accede con una cuenta institucional.
+- Ve la bandeja de denuncias activas y filtra por estado.
+- Toma denuncias o las asigna a funcionarios activos del mismo organismo.
+- Actualiza el estado de cada caso.
+- Su administrador puede solicitar el alta de nuevos funcionarios (sujeta a aprobación).
 
 ### Administrador
+- Inicia sesión en el panel de gestión.
+- Consulta estadísticas generales con distintos filtros.
+- Administra denuncias, estados y usuarios.
+- Revisa el historial de cambios.
+- Aprueba o rechaza solicitudes de creación de funcionarios.
 
-- Iniciar sesión desde `/gestion/login`.
-- Consultar estadísticas generales por fechas, estado, tipo, prioridad y evolución mensual.
-- Gestionar denuncias y estados.
-- Consultar los cambios registrados en el historial.
-- Revisar solicitudes de funcionarios y aprobar o rechazar su creación.
+## Un detalle sobre la derivación
 
-Las estadísticas generales están restringidas al superadministrador. Las denuncias se derivan a Municipalidad Demo (URBANO), bombero demo (BOMBEROS) o policia demo (POLICIAL) si existe una cuenta institucional activa para ese organismo; en caso contrario quedan sin asignar y disponibles para gestión institucional. El seed configura Municipalidad Demo; bombero demo y policia demo deben configurarse desde la administración de funcionarios. La prioridad se calcula según términos de riesgo del título y descripción; las denuncias anónimas reciben prioridad baja. Las operaciones de gestión de categorías y usuarios están restringidas a administradores. La asignación interna requiere cuentas activas del mismo organismo; el seed incluye un funcionario demo para probar ese flujo. La botonera telefónica usa los números uruguayos 911, 104 y 105.
+Las denuncias se envían automáticamente a los organismos configurados —por ejemplo, una municipalidad, bomberos o policía— siempre que exista una cuenta institucional activa para ese organismo. Si no la hay, la denuncia queda sin asignar y disponible para la gestión institucional. Del mismo modo, la prioridad se calcula a partir de términos de riesgo en el título y la descripción, y las denuncias anónimas reciben prioridad baja por defecto.
 
-## Solución de problemas
+## Estado actual
 
-### La API responde que PostgreSQL no está disponible
+La base del sistema ya está funcionando: autenticación, registro de denuncias, cálculo de prioridad, derivación por organismo y gestión de estados. Quedan como próximos pasos las evidencias adjuntas, los comentarios avanzados y la administración completa de categorías y usuarios.
 
-Comprueba que Docker Desktop esté abierto y ejecuta:
+## Sobre el proyecto
 
-```powershell
-docker start denuncias-postgres
-```
+Es un proyecto en desarrollo activo, construido como una aplicación web con frontend y backend separados, base de datos relacional y despliegue previsto en servicios gratuitos. La guía de publicación y las medidas de seguridad recomendadas están documentadas en el repositorio.
 
-Después comprueba el health check:
+---
 
-```powershell
-Invoke-WebRequest -UseBasicParsing http://localhost:3000/api/health
-```
-
-### La base de datos no existe o las tablas faltan
-
-Ejecuta nuevamente:
-
-```powershell
-pnpm --dir backend exec prisma migrate dev --name initial_schema
-pnpm --dir backend db:seed
-```
-
-### El backend usa otra base de datos
-
-Asegúrate de que `backend/.env` use `reportes_db` y reinicia el backend. La variable `DATABASE_URL` debe coincidir con la base creada en Docker.
-
-## Compilación
-
-```powershell
-pnpm build
-```
-
-## Publicar la página
-
-La guía para publicarla con planes gratuitos, dominio `pages.dev` y medidas de seguridad está en [DEPLOYMENT.md](./DEPLOYMENT.md). Antes de usar datos reales, configura la base de datos y el bucket privado de evidencias indicados allí.
-
-## Estado del proyecto
-
-La migración inicial está en `backend/prisma/migrations`. Los endpoints de autenticación, denuncias y gestión de estados están implementados. Evidencias, comentarios avanzados y administración completa de categorías/usuarios quedan como trabajo posterior.
+¿Querés que le agregue una sección de capturas de pantalla, un apartado de "Cómo contribuir" o una nota sobre la licencia?
