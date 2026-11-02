@@ -824,63 +824,63 @@ function ManagementDashboard({
             )
           ) : (
             <>
-             <div className="admin-page-layout">
-            <div className="admin-page-content">
-              <header className="admin-header">
-                <div className="admin-page-title">
-                  <span className="eyebrow">{isAdmin ? 'Administración' : 'Funcionarios'}</span>
-                  <h1>Bandeja de reportes</h1>
-                  <p>Organiza y sigue los reportes de la ciudad.</p>
-                </div>
+              <div className="admin-page-layout">
+                <div className="admin-page-content">
+                  <header className="admin-header">
+                    <div className="admin-page-title">
+                      <span className="eyebrow">{isAdmin ? 'Administración' : 'Funcionarios'}</span>
+                      <h1>Bandeja de reportes</h1>
+                      <p>Organiza y sigue los reportes de la ciudad.</p>
+                    </div>
 
-                <div className="admin-header-tools">
-                  <label className="admin-search">
-                    <span aria-hidden="true">⌕</span>
-                    <input
-                      type="search"
-                      placeholder="Buscar denuncias..."
-                      value={searchTerm}
-                      onChange={(event) => setSearchTerm(event.target.value)}
-                      aria-label="Buscar denuncias"
-                    />
-                  </label>
-                  {!isArchivedView && (
-                    <select
-                      className="admin-filter"
-                      value={filter}
-                      onChange={(event) => setFilter(event.target.value)}
-                      aria-label="Filtrar denuncias por estado"
-                    >
-                      <option value="active">Todas</option>
-                      <option value="PENDIENTE">Pendientes</option>
-                      <option value="EN_PROCESO">En proceso</option>
-                      <option value="RESUELTO">Resueltas</option>
-                    </select>
-                  )}
-                  <div className="admin-export-actions" aria-label="Exportar denuncias">
-                    <button type="button" onClick={() => exportReports('csv')}>CSV</button>
-                    <button type="button" onClick={() => exportReports('xlsx')}>Excel</button>
-                    <button type="button" onClick={() => exportReports('pdf')}>PDF</button>
-                  </div>
-                </div>
-              </header>
+                    <div className="admin-header-tools">
+                      <label className="admin-search">
+                        <span aria-hidden="true">⌕</span>
+                        <input
+                          type="search"
+                          placeholder="Buscar denuncias..."
+                          value={searchTerm}
+                          onChange={(event) => setSearchTerm(event.target.value)}
+                          aria-label="Buscar denuncias"
+                        />
+                      </label>
+                      {!isArchivedView && (
+                        <select
+                          className="admin-filter"
+                          value={filter}
+                          onChange={(event) => setFilter(event.target.value)}
+                          aria-label="Filtrar denuncias por estado"
+                        >
+                          <option value="active">Todas</option>
+                          <option value="PENDIENTE">Pendientes</option>
+                          <option value="EN_PROCESO">En proceso</option>
+                          <option value="RESUELTO">Resueltas</option>
+                        </select>
+                      )}
+                      <div className="admin-export-actions" aria-label="Exportar denuncias">
+                        <button type="button" onClick={() => exportReports('csv')}>CSV</button>
+                        <button type="button" onClick={() => exportReports('xlsx')}>Excel</button>
+                        <button type="button" onClick={() => exportReports('pdf')}>PDF</button>
+                      </div>
+                    </div>
+                  </header>
 
-              {error && <p className="error management-error">{error}</p>}
+                  {error && <p className="error management-error">{error}</p>}
 
-              <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
-                <article className="admin-summary-card admin-summary-blue">
-                  <span className="admin-summary-icon" aria-hidden="true">▤</span>
-                  <div><span>Casos en esta vista</span><strong>{reports.length}</strong></div>
-                </article>
-                <article className="admin-summary-card admin-summary-amber">
-                  <span className="admin-summary-icon" aria-hidden="true">◷</span>
-                  <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
-                </article>
-                <article className="admin-summary-card admin-summary-green">
-                  <span className="admin-summary-icon" aria-hidden="true">✓</span>
-                  <div><span>En proceso</span><strong>{inProgressCount}</strong></div>
-                </article>
-              </section>
+                  <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
+                    <article className="admin-summary-card admin-summary-blue">
+                      <span className="admin-summary-icon" aria-hidden="true">▤</span>
+                      <div><span>Casos en esta vista</span><strong>{reports.length}</strong></div>
+                    </article>
+                    <article className="admin-summary-card admin-summary-amber">
+                      <span className="admin-summary-icon" aria-hidden="true">◷</span>
+                      <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
+                    </article>
+                    <article className="admin-summary-card admin-summary-green">
+                      <span className="admin-summary-icon" aria-hidden="true">✓</span>
+                      <div><span>En proceso</span><strong>{inProgressCount}</strong></div>
+                    </article>
+                  </section>
 
                   <div className="admin-results">
                     <div className="admin-board-heading" id="admin-board">
@@ -1329,279 +1329,279 @@ function App() {
               <EmergencyShortcuts />
             </section>
           ) : (
-          <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
-            <a
-              className="auth-home-link"
-              href="/"
-              onClick={(event) => {
-                event.preventDefault();
-                navigateAuth('home');
-              }}
-            >
-              ← Volver al inicio
-            </a>
+            <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
+              <a
+                className="auth-home-link"
+                href="/"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('home');
+                }}
+              >
+                ← Volver al inicio
+              </a>
 
-            <nav
-              className={`auth-route-nav ${managementLogin ? 'auth-route-nav-management' : ''}`}
-              aria-label="Opciones de acceso"
-            >
-              {managementLogin ? (
-                <a
-                  href="/login"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    navigateAuth('login');
-                  }}
-                >
-                  Acceso ciudadano
-                </a>
-              ) : (
-                <>
+              <nav
+                className={`auth-route-nav ${managementLogin ? 'auth-route-nav-management' : ''}`}
+                aria-label="Opciones de acceso"
+              >
+                {managementLogin ? (
                   <a
                     href="/login"
-                    className={authRoute === 'login' ? 'active' : ''}
-                    aria-current={authRoute === 'login' ? 'page' : undefined}
                     onClick={(event) => {
                       event.preventDefault();
                       navigateAuth('login');
                     }}
                   >
-                    <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
-                      <path d="M10 17l5-5-5-5M15 12H4" />
-                    </svg>
-                    <span>Iniciar sesión</span>
+                    Acceso ciudadano
                   </a>
-                  <a
-                    href="/registro"
-                    className={authRoute === 'register' ? 'active' : ''}
-                    aria-current={authRoute === 'register' ? 'page' : undefined}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      navigateAuth('register');
-                    }}
-                  >
-                    <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M15 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-4A4.5 4.5 0 0 0 2 18.5V20" />
-                      <circle cx="8.5" cy="6.5" r="4" />
-                      <path d="M19 8v6M16 11h6" />
-                    </svg>
-                    <span>Crear cuenta</span>
-                  </a>
-                  <a
-                    href="/anonimo"
-                    className={authRoute === 'anonymous' ? 'active' : ''}
-                    aria-current={authRoute === 'anonymous' ? 'page' : undefined}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      navigateAuth('anonymous');
-                    }}
-                  >
-                    Entrar como anónimo
-                  </a>
-                </>
-              )}
-            </nav>
-
-            {!managementLogin && (
-              <a
-                className="institutional-access-link"
-                href="/gestion/login"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('management-login');
-                }}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-4h4v4" />
-                </svg>
-                <span>
-                  <strong>Acceso para funcionarios</strong>
-                  <small>Ingresar al portal del ente público</small>
-                </span>
-                <b aria-hidden="true">→</b>
-              </a>
-            )}
-            {authRoute === 'anonymous' ? (
-              <div className="auth-anonymous-content">
-                <h2>Ingresar como anónimo</h2>
-                <p>
-                  Podés continuar sin crear una cuenta. La sesión será temporal.
-                </p>
-                {error && <p className="error">{error}</p>}
-                <button
-                  type="button"
-                  className="auth-submit"
-                  onClick={handleAnonymousLogin}
-                >
-                  Continuar como anónimo
-                </button>
-                <small className="auth-helper-text">
-                  Para consultar tus reportes luego, te recomendamos crear una cuenta.
-                </small>
-              </div>
-            ) : (
-              <form className="auth-form auth-form-redesign" onSubmit={handleAuth}>
-                <span className="auth-section-label">
-                  {managementLogin
-                    ? 'PORTAL INSTITUCIONAL'
-                    : registering
-                      ? 'CUENTA CIUDADANA'
-                      : 'ACCESO CIUDADANO'}
-                </span>
-                <h2>
-                  {registering
-                    ? 'Crear cuenta'
-                    : managementLogin
-                      ? 'Acceso de ente público'
-                      : 'Bienvenido/a'}
-                </h2>
-                <p className="auth-form-intro">
-                  {managementLogin
-                    ? 'Ingresá con tu cuenta institucional para gestionar denuncias.'
-                    : registering
-                      ? ''
-                      : 'Ingresá para crear y seguir tus denuncias.'}
-                </p>
-
-                {registering && (
-                  <div className="auth-name-fields">
-                    <label>
-                      Nombre
-                      <input
-                        required
-                        autoComplete="given-name"
-                        placeholder="Tu nombre"
-                        value={credentials.firstName}
-                        onChange={(event) =>
-                          setCredentials({
-                            ...credentials,
-                            firstName: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      Apellido
-                      <input
-                        required
-                        autoComplete="family-name"
-                        placeholder="Tu apellido"
-                        value={credentials.lastName}
-                        onChange={(event) =>
-                          setCredentials({
-                            ...credentials,
-                            lastName: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-                )}
-
-                <label htmlFor="auth-email">
-                  <span className="auth-field-label">
-                    <svg className="auth-field-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <rect x="3" y="5" width="18" height="14" rx="2" />
-                      <path d="m3 7 9 6 9-6" />
-                    </svg>
-                    Correo electrónico
-                  </span>
-                  <input
-                    id="auth-email"
-                    required
-                    type="email"
-                    autoComplete="email"
-                    placeholder="nombre@correo.com"
-                    value={credentials.email}
-                    onChange={(event) =>
-                      setCredentials({
-                        ...credentials,
-                        email: event.target.value,
-                      })
-                    }
-                  />
-                </label>
-
-                <label htmlFor="auth-password">
-                  <span className="auth-field-label">
-                    <svg className="auth-field-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <rect x="3" y="10" width="18" height="11" rx="2" />
-                      <path d="M7 10V7a5 5 0 0 1 10 0v3" />
-                    </svg>
-                    Contraseña
-                  </span>
-                  <span className="password-input-wrap">
-                    <input
-                      id="auth-password"
-                      required
-                      minLength={6}
-                      type={showPassword ? 'text' : 'password'}
-                      autoComplete={registering ? 'new-password' : 'current-password'}
-                      placeholder="Ingresá tu contraseña"
-                      value={credentials.password}
-                      onChange={(event) =>
-                        setCredentials({
-                          ...credentials,
-                          password: event.target.value,
-                        })
-                      }
-                    />
-                    <button
-                      className="password-visibility-toggle"
-                      type="button"
-                      onClick={() => setShowPassword((visible) => !visible)}
-                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                      aria-pressed={showPassword}
+                ) : (
+                  <>
+                    <a
+                      href="/login"
+                      className={authRoute === 'login' ? 'active' : ''}
+                      aria-current={authRoute === 'login' ? 'page' : undefined}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        navigateAuth('login');
+                      }}
                     >
-                      {showPassword ? (
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-                          <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 6-.4.8-1.3 2-2.6 3.2M6.2 6.2C3.9 7.6 2.7 9.7 2.5 11c.5.9 3.9 7 9.5 7 1.1 0 2.1-.2 3-.6" />
-                        </svg>
-                      ) : (
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      )}
-                    </button>
-                  </span>
-                </label>
+                      <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
+                        <path d="M10 17l5-5-5-5M15 12H4" />
+                      </svg>
+                      <span>Iniciar sesión</span>
+                    </a>
+                    <a
+                      href="/registro"
+                      className={authRoute === 'register' ? 'active' : ''}
+                      aria-current={authRoute === 'register' ? 'page' : undefined}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        navigateAuth('register');
+                      }}
+                    >
+                      <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M15 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-4A4.5 4.5 0 0 0 2 18.5V20" />
+                        <circle cx="8.5" cy="6.5" r="4" />
+                        <path d="M19 8v6M16 11h6" />
+                      </svg>
+                      <span>Crear cuenta</span>
+                    </a>
+                    <a
+                      href="/anonimo"
+                      className={authRoute === 'anonymous' ? 'active' : ''}
+                      aria-current={authRoute === 'anonymous' ? 'page' : undefined}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        navigateAuth('anonymous');
+                      }}
+                    >
+                      Entrar como anónimo
+                    </a>
+                  </>
+                )}
+              </nav>
 
-                {registering && (
-                  <label htmlFor="auth-confirm-password">
-                    Confirmar contraseña
+              {!managementLogin && (
+                <a
+                  className="institutional-access-link"
+                  href="/gestion/login"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('management-login');
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-4h4v4" />
+                  </svg>
+                  <span>
+                    <strong>Acceso para funcionarios</strong>
+                    <small>Ingresar al portal del ente público</small>
+                  </span>
+                  <b aria-hidden="true">→</b>
+                </a>
+              )}
+              {authRoute === 'anonymous' ? (
+                <div className="auth-anonymous-content">
+                  <h2>Ingresar como anónimo</h2>
+                  <p>
+                    Podés continuar sin crear una cuenta. La sesión será temporal.
+                  </p>
+                  {error && <p className="error">{error}</p>}
+                  <button
+                    type="button"
+                    className="auth-submit"
+                    onClick={handleAnonymousLogin}
+                  >
+                    Continuar como anónimo
+                  </button>
+                  <small className="auth-helper-text">
+                    Para consultar tus reportes luego, te recomendamos crear una cuenta.
+                  </small>
+                </div>
+              ) : (
+                <form className="auth-form auth-form-redesign" onSubmit={handleAuth}>
+                  <span className="auth-section-label">
+                    {managementLogin
+                      ? 'PORTAL INSTITUCIONAL'
+                      : registering
+                        ? 'CUENTA CIUDADANA'
+                        : 'ACCESO CIUDADANO'}
+                  </span>
+                  <h2>
+                    {registering
+                      ? 'Crear cuenta'
+                      : managementLogin
+                        ? 'Acceso de ente público'
+                        : 'Bienvenido/a'}
+                  </h2>
+                  <p className="auth-form-intro">
+                    {managementLogin
+                      ? 'Ingresá con tu cuenta institucional para gestionar denuncias.'
+                      : registering
+                        ? ''
+                        : 'Ingresá para crear y seguir tus denuncias.'}
+                  </p>
+
+                  {registering && (
+                    <div className="auth-name-fields">
+                      <label>
+                        Nombre
+                        <input
+                          required
+                          autoComplete="given-name"
+                          placeholder="Tu nombre"
+                          value={credentials.firstName}
+                          onChange={(event) =>
+                            setCredentials({
+                              ...credentials,
+                              firstName: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Apellido
+                        <input
+                          required
+                          autoComplete="family-name"
+                          placeholder="Tu apellido"
+                          value={credentials.lastName}
+                          onChange={(event) =>
+                            setCredentials({
+                              ...credentials,
+                              lastName: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  <label htmlFor="auth-email">
+                    <span className="auth-field-label">
+                      <svg className="auth-field-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="3" y="5" width="18" height="14" rx="2" />
+                        <path d="m3 7 9 6 9-6" />
+                      </svg>
+                      Correo electrónico
+                    </span>
                     <input
-                      id="auth-confirm-password"
+                      id="auth-email"
                       required
-                      minLength={6}
-                      type="password"
-                      autoComplete="new-password"
-                      placeholder="Ingresá nuevamente tu contraseña"
-                      value={credentials.confirmPassword}
+                      type="email"
+                      autoComplete="email"
+                      placeholder="nombre@correo.com"
+                      value={credentials.email}
                       onChange={(event) =>
                         setCredentials({
                           ...credentials,
-                          confirmPassword: event.target.value,
+                          email: event.target.value,
                         })
                       }
                     />
                   </label>
-                )}
 
-                {error && <p className="error">{error}</p>}
+                  <label htmlFor="auth-password">
+                    <span className="auth-field-label">
+                      <svg className="auth-field-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="3" y="10" width="18" height="11" rx="2" />
+                        <path d="M7 10V7a5 5 0 0 1 10 0v3" />
+                      </svg>
+                      Contraseña
+                    </span>
+                    <span className="password-input-wrap">
+                      <input
+                        id="auth-password"
+                        required
+                        minLength={6}
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete={registering ? 'new-password' : 'current-password'}
+                        placeholder="Ingresá tu contraseña"
+                        value={credentials.password}
+                        onChange={(event) =>
+                          setCredentials({
+                            ...credentials,
+                            password: event.target.value,
+                          })
+                        }
+                      />
+                      <button
+                        className="password-visibility-toggle"
+                        type="button"
+                        onClick={() => setShowPassword((visible) => !visible)}
+                        aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? (
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                            <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 6-.4.8-1.3 2-2.6 3.2M6.2 6.2C3.9 7.6 2.7 9.7 2.5 11c.5.9 3.9 7 9.5 7 1.1 0 2.1-.2 3-.6" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
+                    </span>
+                  </label>
 
-                <button type="submit" className="auth-submit">
-                  {registering ? 'Crear mi cuenta' : 'Entrar'}
-                </button>
-              </form>
-            )}
+                  {registering && (
+                    <label htmlFor="auth-confirm-password">
+                      Confirmar contraseña
+                      <input
+                        id="auth-confirm-password"
+                        required
+                        minLength={6}
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="Ingresá nuevamente tu contraseña"
+                        value={credentials.confirmPassword}
+                        onChange={(event) =>
+                          setCredentials({
+                            ...credentials,
+                            confirmPassword: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                  )}
 
-            <p className="auth-panel-footer">
-              Reportá. Informá. Mejorá.
-            </p>
-          </section>
+                  {error && <p className="error">{error}</p>}
+
+                  <button type="submit" className="auth-submit">
+                    {registering ? 'Crear mi cuenta' : 'Entrar'}
+                  </button>
+                </form>
+              )}
+
+              <p className="auth-panel-footer">
+                Reportá. Informá. Mejorá.
+              </p>
+            </section>
           )}
         </div>
       </main>
@@ -1736,8 +1736,7 @@ function App() {
               </div>
 
               <div className="reports-actions">
-                <strong>{reports.length}</strong>
-                <button
+                <strong className="reports-count">{reports.length}</strong>                <button
                   type="button"
                   onClick={() => {
                     setActualizandoReportes(true);
@@ -1771,7 +1770,11 @@ function App() {
                     <p>{item.description}</p>
                   </div>
 
-                  <span>{item.status}</span>
+                  <span
+                    className={`report-status report-status-${item.status.toLowerCase().replace(/_/g, '-')}`}
+                  >
+                    {item.status.toLowerCase().replace(/_/g, ' ')}
+                  </span>
                 </article>
               ))
             )}

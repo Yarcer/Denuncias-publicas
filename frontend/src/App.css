@@ -336,14 +336,14 @@ textarea {
 .reports-panel {
   border-radius: 18px;
   padding: 26px;
-  background:
-    linear-gradient(180deg, #0f172a 0%, #172554 100%);
+  background: #fff;
+  border: 1px solid #e2e8f0;
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.18);
 }
 
 .reports-panel h2,
 .reports-panel .eyebrow {
-  color: #f8fafc;
+  color: #0f172a;
 }
 
 .panel-heading>strong {
@@ -352,24 +352,27 @@ textarea {
 }
 
 .report-item {
+  margin-top: 14px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.22);
-  color: #f8fafc;
+  padding: 18px;
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  color: #1e293b;
 }
 
 .report-item p,
 .empty-state {
   margin: 7px 0 0;
-  color: #cbd5e1;
+  color: #64748b;
 }
 
-.report-item>span {
-  color: #7dd3fc;
-  background: rgba(56, 189, 248, 0.10);
+.report-item>span:not(.report-status) {
+  color: #0369a1;
+  background: #e0f2fe;
   padding: 6px 10px;
   border-radius: 999px;
   font-size: 0.76rem;
@@ -2876,7 +2879,7 @@ textarea {
 }
 
 .report-item .report-identifier {
-  color: #bfdbfe;
+  color: #64748b;
 }
 
 @media (max-width: 900px) {
@@ -2927,6 +2930,10 @@ textarea {
 
 .app-shell.ciudadano-shell .dashboard {
   margin-top: 28px;
+}
+
+.app-shell.ciudadano-shell .dashboard:has(.reports-panel) {
+  width: min(1600px, calc(100% - 48px));
 }
 
 body {
@@ -3814,4 +3821,83 @@ body {
   .public-home-action {
     min-height: 64px;
   }
+}
+
+.reports-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reports-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.reports-actions > button {
+  width: auto;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
+}
+
+.report-item-actions {
+  display: flex;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.report-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.report-status-pendiente {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fde68a;
+}
+
+.report-status-resuelto {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #bbf7d0;
+}
+
+.report-status-rechazado {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.report-status-en-revision,
+.report-status-asignado,
+.report-status-en-proceso {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
+.report-status-cerrado {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
