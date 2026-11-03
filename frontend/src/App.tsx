@@ -909,9 +909,42 @@ function ManagementDashboard({
                         </select>
                       )}
                       <div className="admin-export-actions" aria-label="Exportar denuncias">
-                        <button type="button" onClick={() => exportReports('csv')}>CSV</button>
-                        <button type="button" onClick={() => exportReports('xlsx')}>Excel</button>
-                        <button type="button" onClick={() => exportReports('pdf')}>PDF</button>
+                        <button
+                          type="button"
+                          aria-label="Exportar reportes a CSV"
+                          title="Exportar a CSV"
+                          onClick={() => exportReports('csv')}
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 32 32" width="28" height="28">
+                            <path d="M8 3h11l6 6v20H8z" fill="white" stroke="#17834b" strokeWidth="1.8" />
+                            <path d="M19 3v7h6M12 15h9M12 19h9M12 23h9M17 14v10" fill="none" stroke="#17834b" strokeWidth="1.5" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Exportar reportes a Excel"
+                          title="Exportar a Excel"
+                          onClick={() => exportReports('xlsx')}
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 32 32" width="28" height="28">
+                            <rect x="8" y="3" width="18" height="26" rx="2" fill="white" stroke="#217346" strokeWidth="1.5" />
+                            <path d="M18 4v24M9 12h16M9 20h16" stroke="#217346" strokeWidth="1.3" />
+                            <rect x="4" y="10" width="13" height="13" rx="1.5" fill="#217346" />
+                            <path d="m7.5 13 6 7m0-7-6 7" stroke="white" strokeWidth="1.8" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Exportar reportes a PDF"
+                          title="Exportar a PDF"
+                          onClick={() => exportReports('pdf')}
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 32 32" width="28" height="28">
+                            <path d="M8 3h11l6 6v20H8z" fill="white" stroke="#c62828" strokeWidth="1.8" />
+                            <path d="M19 3v7h6" fill="none" stroke="#c62828" strokeWidth="1.5" />
+                            <text x="10" y="21" fill="#c62828" fontSize="7" fontWeight="700">PDF</text>
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   </header>

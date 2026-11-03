@@ -1222,9 +1222,9 @@ textarea {
 
 .admin-header {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
   margin: 0 0 24px;
 }
 
@@ -1251,7 +1251,38 @@ textarea {
 .admin-header-tools {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.admin-export-actions button {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid #d7e1ed;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(19, 37, 66, 0.08);
+}
+
+.admin-export-actions button:hover {
+  border-color: #8ab4e8;
+  background: #f8fbff;
+  box-shadow: 0 6px 14px rgba(19, 37, 66, 0.12);
+}
+
+.admin-export-actions svg {
+  width: 32px;
+  height: 32px;
 }
 
 .admin-search {
