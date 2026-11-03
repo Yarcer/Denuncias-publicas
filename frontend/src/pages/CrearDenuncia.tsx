@@ -503,7 +503,7 @@ function CrearDenuncia() {
           </label>
 
           <p className="mapa-ayuda">
-            Escribí una dirección de Melo o hacé clic en el mapa. La búsqueda
+            Escribí una dirección de Melo o haz clic en el mapa. La búsqueda
             de direcciones usa OpenStreetMap.
           </p>
 

@@ -56,7 +56,3 @@ La base del sistema ya está funcionando: autenticación, registro de denuncias,
 ## Sobre el proyecto
 
 Es un proyecto en desarrollo activo, construido como una aplicación web con frontend y backend separados, base de datos relacional y despliegue previsto en servicios gratuitos. La guía de publicación y las medidas de seguridad recomendadas están documentadas en el repositorio.
-
----
-
-¿Querés que le agregue una sección de capturas de pantalla, un apartado de "Cómo contribuir" o una nota sobre la licencia?
