@@ -35,6 +35,7 @@ describe('DenunciasService', () => {
         }),
         findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
       },
+      category: { findUnique: jest.fn().mockResolvedValue(null) },
       report: { create: reportCreate },
     };
     const service = new DenunciasService(prisma as unknown as PrismaService);
@@ -63,6 +64,7 @@ describe('DenunciasService', () => {
         }),
         findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
       },
+      category: { findUnique: jest.fn().mockResolvedValue(null) },
       report: { create: reportCreate },
     } as unknown as PrismaService);
 
@@ -89,6 +91,7 @@ describe('DenunciasService', () => {
         }),
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      category: { findUnique: jest.fn().mockResolvedValue(null) },
       report: { create: reportCreate },
     } as unknown as PrismaService);
 
@@ -102,6 +105,43 @@ describe('DenunciasService', () => {
     });
 
     expect(reportCreate.mock.calls[0]?.[0].data.entityName).toBeNull();
+  });
+
+  it('routes all Convivencia reports to Policía Municipal', async () => {
+    const reportCreate = createReportMock();
+    const findFirst = jest.fn().mockResolvedValue({ id: 'police-user' });
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          isAnonymous: true,
+          role: 'CIUDADANO',
+        }),
+        findFirst,
+      },
+      category: {
+        findUnique: jest.fn().mockResolvedValue({ name: 'Convivencia' }),
+      },
+      report: { create: reportCreate },
+    } as unknown as PrismaService);
+
+    await service.create('anonymous-id', {
+      title: 'Ruidos molestos',
+      description: 'Hay ruidos molestos en la calle.',
+      type: 'URBANO',
+      latitude: -32.37,
+      longitude: -54.17,
+      categoryId: 'convivencia',
+    });
+
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ entityName: 'Policía Municipal' }),
+      }),
+    );
+    expect(reportCreate.mock.calls[0]?.[0].data).toMatchObject({
+      type: 'URBANO',
+      entityName: 'Policía Municipal',
+    });
   });
 
   it('scopes management report lists to their organization and unassigned reports', async () => {
@@ -159,12 +199,122 @@ describe('DenunciasService', () => {
     },
   );
 
+  it('includes existing Convivencia reports in Policía Municipal queues', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ entityName: 'Policía Municipal' }),
+      },
+      report: { findMany },
+    } as unknown as PrismaService);
+
+    await service.managementQueue(
+      { sub: 'police-user', role: 'FUNCIONARIO' },
+      undefined,
+    );
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            {
+              entityName: 'Municipalidad Demo',
+              type: 'URBANO',
+              category: { is: { name: 'Convivencia' } },
+            },
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('includes Policía Municipal Convivencia reports in Municipalidad Demo queues', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ entityName: 'Municipalidad Demo' }),
+      },
+      report: { findMany },
+    } as unknown as PrismaService);
+
+    await service.managementQueue(
+      { sub: 'municipal-user', role: 'FUNCIONARIO' },
+      undefined,
+    );
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            {
+              entityName: 'Policía Municipal',
+              type: 'URBANO',
+              category: { is: { name: 'Convivencia' } },
+            },
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('allows Policía Municipal to open existing Convivencia reports', async () => {
+    const report = {
+      id: reportId,
+      reporterId: 'citizen-id',
+      entityName: 'Municipalidad Demo',
+      type: 'URBANO',
+      title: 'Ruidos molestos',
+      category: { name: 'Convivencia' },
+    };
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ entityName: 'Policía Municipal' }),
+      },
+      report: { findUnique: jest.fn().mockResolvedValue(report) },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.findOne(reportId, { sub: 'police-user', role: 'FUNCIONARIO' }),
+    ).resolves.toMatchObject({ id: reportId });
+  });
+
+  it('allows Municipalidad Demo to open Convivencia reports routed to Policía Municipal', async () => {
+    const report = {
+      id: reportId,
+      reporterId: 'citizen-id',
+      entityName: 'Policía Municipal',
+      type: 'URBANO',
+      title: 'Ruidos molestos',
+      category: { name: 'Convivencia' },
+    };
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ entityName: 'Municipalidad Demo' }),
+      },
+      report: { findUnique: jest.fn().mockResolvedValue(report) },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.findOne(reportId, { sub: 'municipal-user', role: 'FUNCIONARIO' }),
+    ).resolves.toMatchObject({ id: reportId });
+  });
+
   it('allows an Intendencia user to open an urban report routed to Municipalidad Demo', async () => {
     const report = {
       id: reportId,
       reporterId: 'citizen-id',
       entityName: 'Municipalidad Demo',
       type: 'URBANO',
+      title: 'Luminaria apagada',
+      category: { name: 'Infraestructura' },
       priority: 'MEDIA',
     };
     const service = new DenunciasService({
@@ -190,6 +340,8 @@ describe('DenunciasService', () => {
           reporterId: 'citizen-id',
           entityName: 'policia demo',
           priority: 'MEDIA',
+          title: 'Incendio',
+          type: 'BOMBEROS',
         }),
       },
     } as unknown as PrismaService);
