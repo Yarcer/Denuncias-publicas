@@ -296,7 +296,13 @@ function GestionUsuarios({
                         <span>{user.email}</span>
                       </td>
                       <td>
-                        <strong>{user.role === 'SUPERADMINISTRADOR' ? 'SUPERADMINISTRADOR' : 'Ente público'}</strong>
+                        <strong>
+                          {user.role === 'FUNCIONARIO'
+                            ? 'Funcionario'
+                            : user.role === 'FUNCIONARIO_ADMINISTRADOR'
+                              ? 'Administrador de ente público'
+                              : 'Superadministrador'}
+                        </strong>
                         <span>{user.entityName || user.jurisdiction || 'Sin organismo asignado'}</span>
                       </td>
                       <td>

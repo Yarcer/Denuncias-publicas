@@ -88,8 +88,10 @@ function SolicitudesFuncionarios({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         email: form.email.trim(),
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
+        entityName: targetEntityName,
       })
       setForm({ email: '', password: '', firstName: '', lastName: '' })
+      setTargetEntityName('')
       setNotice('La solicitud fue enviada al superadministrador para su aprobación.')
       await loadRequests()
     } catch (saveError: unknown) {

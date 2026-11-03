@@ -426,6 +426,9 @@ function ManagementDashboard({
   currentUserId: string;
   onLogout: () => void;
 }) {
+  const signedInUser = useAuthStore((state) => state.user);
+  const signedInCsrfToken = useAuthStore((state) => state.csrfToken);
+  const updateSession = useAuthStore((state) => state.setSession);
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [managementView, setManagementView] = useState<
@@ -440,6 +443,52 @@ function ManagementDashboard({
   const [isKanbanView, setIsKanbanView] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [accountError, setAccountError] = useState('');
+  const accountName = [signedInUser?.firstName, signedInUser?.lastName]
+    .filter(Boolean)
+    .join(' ') || signedInUser?.email || 'Cuenta activa';
+  const accountInitials = accountName
+    .split(/[\s@._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toLocaleUpperCase('es-UY'))
+    .join('');
+  const accountRole = isAdmin
+    ? 'Gestión de superadministrador'
+    : isEntityAdmin
+      ? 'Gestión de administrador de ente público'
+      : 'Gestión de funcionario';
+  const accountEntity = isAdmin
+    ? 'Ámbito global'
+    : `Ente público: ${signedInUser?.entityName || 'No informado'}`;
+
+  useEffect(() => {
+    let active = true;
+
+    async function refreshManagementUser() {
+      try {
+        const response = await api.get('/auth/me');
+        if (active) {
+          updateSession(
+            response.data.data.user,
+            response.data.data.csrfToken ?? signedInCsrfToken ?? '',
+          );
+          setAccountError('');
+        }
+      } catch (accountLoadError: unknown) {
+        if (active) {
+          setAccountError(
+            getApiErrorMessage(accountLoadError, 'No se pudo actualizar la información de la cuenta.'),
+          );
+        }
+      }
+    }
+
+    void refreshManagementUser();
+    return () => {
+      active = false;
+    };
+  }, [signedInCsrfToken, updateSession]);
 
   async function fetchManagementReports(
     selectedStatus: string,
@@ -701,13 +750,37 @@ function ManagementDashboard({
 
   return (
     <main className={`app-shell admin-app-shell ${isAdmin ? 'superadmin-shell' : 'entity-shell'}`}>
+      <header className="admin-account-header">
+        <div className="admin-brand" aria-label="PuntoReporte">
+          <span>Punto</span>Reporte
+          <small>Gestión urbana</small>
+        </div>
+        <div className="admin-account-heading">
+          <strong>{accountRole}</strong>
+          <span>{accountEntity}</span>
+        </div>
+        <details className="admin-account-menu">
+          <summary aria-label="Mostrar información de la cuenta">
+            <span className="admin-account-avatar" aria-hidden="true">
+              {accountInitials || 'U'}
+            </span>
+            <span className="admin-account-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div className="admin-account-popover">
+            <strong>{accountName}</strong>
+            <span>{accountRole}</span>
+            <span>{accountEntity}</span>
+            <span>{signedInUser?.email}</span>
+            {accountError && <span className="admin-account-error">{accountError}</span>}
+            <button type="button" onClick={onLogout}>
+              <span aria-hidden="true">↪</span>
+              Cerrar sesión
+            </button>
+          </div>
+        </details>
+      </header>
       <div className="admin-layout">
         <aside className="admin-sidebar">
-          <div className="admin-brand" aria-label="PuntoReporte">
-            <span>Punto</span>Reporte
-            <small>Gestión urbana</small>
-          </div>
-
           <nav className="admin-nav" aria-label="Navegación de administración">
             {!isAdmin && (
               <>
@@ -786,9 +859,6 @@ function ManagementDashboard({
             )}
           </nav>
 
-          <button type="button" className="admin-logout" onClick={onLogout}>
-            <span aria-hidden="true">↪</span> Cerrar sesión
-          </button>
         </aside>
 
         <section className="admin-main">

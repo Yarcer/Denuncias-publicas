@@ -9,6 +9,7 @@ type User = {
   status: string;
   firstName?: string | null;
   lastName?: string | null;
+  entityName?: string | null;
 };
 
 type AuthState = {
