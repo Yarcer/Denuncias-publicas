@@ -7,7 +7,13 @@ import {
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Prisma, ReportPriority, ReportStatus, Role } from '@prisma/client';
+import {
+  Prisma,
+  ReportPriority,
+  ReportStatus,
+  ReportType,
+  Role,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
@@ -25,6 +31,21 @@ const terminalStatuses: ReportStatus[] = [
   ReportStatus.RECHAZADO,
   ReportStatus.CERRADO,
 ];
+const sharedReportOrganizations: {
+  type: ReportType;
+  names: readonly string[];
+}[] = [
+  { type: ReportType.URBANO, names: ['Municipalidad Demo', 'Intendencia'] },
+  { type: ReportType.POLICIAL, names: ['policia demo', 'Policía Municipal'] },
+];
+
+function normalizeOrganizationName(name: string) {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLocaleLowerCase('es-UY');
+}
 
 @Injectable()
 export class DenunciasService {
@@ -40,11 +61,18 @@ export class DenunciasService {
     const actor = managementRoles.includes(user.role)
       ? await this.getManagementEntity(user)
       : null;
+    const sharedOrganizationWhere = actor
+      ? this.sharedOrganizationFilters(actor.entityName)
+      : [];
     const where: Prisma.ReportWhereInput = {
       ...(user.role === 'CIUDADANO' ? { reporterId: user.sub } : {}),
       ...(actor
         ? {
-            OR: [{ entityName: actor.entityName }, { entityName: null }],
+            OR: [
+              { entityName: actor.entityName },
+              { entityName: null },
+              ...sharedOrganizationWhere,
+            ],
           }
         : {}),
       ...(status ? { status: status as never } : {}),
@@ -109,7 +137,11 @@ export class DenunciasService {
             };
     const where: Prisma.ReportWhereInput = {
       ...statusWhere,
-      OR: [{ entityName: actor.entityName }, { entityName: null }],
+      OR: [
+        { entityName: actor.entityName },
+        { entityName: null },
+        ...this.sharedOrganizationFilters(actor.entityName),
+      ],
     };
 
     const items = await this.prisma.report.findMany({
@@ -302,7 +334,7 @@ export class DenunciasService {
       throw new NotFoundException('Denuncia no encontrada');
     }
     const actor = await this.getManagementEntity(user);
-    this.assertReportOrganization(report.entityName, actor.entityName);
+    this.assertReportOrganization(report.entityName, report.type, actor.entityName);
 
     if (report.status !== ReportStatus.RECHAZADO) {
       throw new BadRequestException(
@@ -327,7 +359,7 @@ export class DenunciasService {
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
     const actor = await this.getManagementEntity(user);
-    this.assertReportOrganization(report.entityName, actor.entityName);
+    this.assertReportOrganization(report.entityName, report.type, actor.entityName);
     if (
       managementRoles.includes(user.role) &&
       report.assigneeId &&
@@ -374,7 +406,7 @@ export class DenunciasService {
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
     const actor = await this.getManagementEntity(user);
-    this.assertReportOrganization(report.entityName, actor.entityName);
+    this.assertReportOrganization(report.entityName, report.type, actor.entityName);
     if (terminalStatuses.includes(report.status)) {
       throw new ForbiddenException('Esta denuncia ya está cerrada');
     }
@@ -435,7 +467,7 @@ export class DenunciasService {
     const report = await this.prisma.report.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
     const actor = await this.getManagementEntity(user);
-    this.assertReportOrganization(report.entityName, actor.entityName);
+    this.assertReportOrganization(report.entityName, report.type, actor.entityName);
     if (managementRoles.includes(user.role) && report.assigneeId !== user.sub) {
       throw new ForbiddenException('Primero debes tomar esta denuncia');
     }
@@ -587,7 +619,11 @@ export class DenunciasService {
   }
 
   private async assertCanAccess(
-    report: { reporterId: string; entityName: string | null } | null,
+    report: {
+      reporterId: string;
+      entityName: string | null;
+      type: ReportType;
+    } | null,
     user: AuthenticatedUser,
   ) {
     if (!report) {
@@ -605,7 +641,11 @@ export class DenunciasService {
     }
     if (managementRoles.includes(user.role)) {
       const actor = await this.getManagementEntity(user);
-      this.assertReportOrganization(report.entityName, actor.entityName);
+      this.assertReportOrganization(
+        report.entityName,
+        report.type,
+        actor.entityName,
+      );
     }
   }
 
@@ -634,13 +674,50 @@ export class DenunciasService {
 
   private assertReportOrganization(
     reportEntityName: string | null,
+    reportType: ReportType,
     actorEntityName: string,
   ) {
-    if (reportEntityName && reportEntityName !== actorEntityName) {
+    if (
+      !reportEntityName ||
+      normalizeOrganizationName(reportEntityName) ===
+        normalizeOrganizationName(actorEntityName)
+    ) {
+      return;
+    }
+
+    const sharedRoute = sharedReportOrganizations.find(
+      ({ type, names }) =>
+        type === reportType &&
+        names.some(
+          (name) =>
+            normalizeOrganizationName(name) ===
+            normalizeOrganizationName(reportEntityName),
+        ) &&
+        names.some(
+          (name) =>
+            normalizeOrganizationName(name) ===
+            normalizeOrganizationName(actorEntityName),
+        ),
+    );
+
+    if (!sharedRoute) {
       throw new ForbiddenException(
         'Esta denuncia está asignada a otro organismo',
       );
     }
+  }
+
+  private sharedOrganizationFilters(actorEntityName: string) {
+    const normalizedActor = normalizeOrganizationName(actorEntityName);
+    return sharedReportOrganizations.flatMap(({ type, names }) => {
+      if (!names.some((name) => normalizeOrganizationName(name) === normalizedActor)) {
+        return [];
+      }
+
+      return names
+        .filter((name) => normalizeOrganizationName(name) !== normalizedActor)
+        .map((entityName) => ({ entityName, type }));
+    });
   }
 
   private parseDate(value: string, field: string) {

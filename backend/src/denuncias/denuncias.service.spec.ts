@@ -130,6 +130,55 @@ describe('DenunciasService', () => {
     expect(result.items[0]?.priority).toBe('URGENTE');
   });
 
+  it.each([
+    ['Intendencia', 'Municipalidad Demo', 'URBANO'],
+    ['Policía Municipal', 'policia demo', 'POLICIAL'],
+  ])(
+    'includes %s in the shared %s report queue',
+    async (entityName, sharedEntityName, type) => {
+      const findMany = jest.fn().mockResolvedValue([]);
+      const service = new DenunciasService({
+        user: { findUnique: jest.fn().mockResolvedValue({ entityName }) },
+        report: { findMany },
+      } as unknown as PrismaService);
+
+      await service.managementQueue(
+        { sub: 'staff-id', role: 'FUNCIONARIO' },
+        undefined,
+      );
+
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([
+              { entityName: sharedEntityName, type },
+            ]),
+          }),
+        }),
+      );
+    },
+  );
+
+  it('allows an Intendencia user to open an urban report routed to Municipalidad Demo', async () => {
+    const report = {
+      id: reportId,
+      reporterId: 'citizen-id',
+      entityName: 'Municipalidad Demo',
+      type: 'URBANO',
+      priority: 'MEDIA',
+    };
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ entityName: 'Intendencia' }),
+      },
+      report: { findUnique: jest.fn().mockResolvedValue(report) },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.findOne(reportId, { sub: 'staff-id', role: 'FUNCIONARIO' }),
+    ).resolves.toMatchObject({ id: reportId });
+  });
+
   it('does not expose reports routed to another organization by identifier', async () => {
     const service = new DenunciasService({
       user: {
