@@ -4,6 +4,7 @@ import { getApiErrorMessage } from '../lib/api-error'
 import './GestionUsuarios.css'
 
 type RequestStatus = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA'
+type RequestedRole = 'FUNCIONARIO' | 'FUNCIONARIO_ADMINISTRADOR'
 
 type StaffRequest = {
   id: string
@@ -31,6 +32,8 @@ function SolicitudesFuncionarios({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     firstName: '',
     lastName: '',
   })
+  const [requestedRole, setRequestedRole] = useState<RequestedRole>('FUNCIONARIO')
+  const [targetEntityName, setTargetEntityName] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [reviewingId, setReviewingId] = useState<string | null>(null)
@@ -137,6 +140,34 @@ function SolicitudesFuncionarios({ isSuperAdmin }: { isSuperAdmin: boolean }) {
               </div>
             </div>
             <div className="admin-user-fields">
+              <label className="admin-user-field-wide">
+                Tipo de cuenta
+                <select
+                  value={requestedRole}
+                  onChange={(event) =>
+                    setRequestedRole(event.target.value as RequestedRole)
+                  }
+                >
+                  <option value="FUNCIONARIO">Funcionario</option>
+                  <option value="FUNCIONARIO_ADMINISTRADOR">
+                    Funcionario administrador
+                  </option>
+                </select>
+              </label>
+              <label className="admin-user-field-wide">
+                Organismo de destino
+                <select
+                  required
+                  value={targetEntityName}
+                  onChange={(event) => setTargetEntityName(event.target.value)}
+                >
+                  <option value="">Seleccioná un organismo</option>
+                  <option value="OSE">OSE</option>
+                  <option value="Intendencia">Intendencia</option>
+                  <option value="Policía Municipal">Policía Municipal</option>
+                </select>
+              </label>
+
               <label>
                 Nombre
                 <input
