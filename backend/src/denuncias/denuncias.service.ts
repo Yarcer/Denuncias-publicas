@@ -439,7 +439,11 @@ export class DenunciasService {
     if (managementRoles.includes(user.role) && report.assigneeId !== user.sub) {
       throw new ForbiddenException('Primero debes tomar esta denuncia');
     }
-    if (terminalStatuses.includes(report.status)) {
+    const canReopenResolved =
+      report.status === ReportStatus.RESUELTO &&
+      (dto.status === ReportStatus.PENDIENTE ||
+        dto.status === ReportStatus.EN_PROCESO);
+    if (terminalStatuses.includes(report.status) && !canReopenResolved) {
       throw new ForbiddenException('Esta denuncia ya está cerrada');
     }
 

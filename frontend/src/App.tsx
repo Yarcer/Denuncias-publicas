@@ -437,17 +437,33 @@ function ManagementDashboard({
   const [categoryFilter, setCategoryFilter] = useState('');
   const [modalityFilter, setModalityFilter] = useState('');
   const [filter, setFilter] = useState('active');
+  const [isKanbanView, setIsKanbanView] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+
+  async function fetchManagementReports(
+    selectedStatus: string,
+    includeResolved: boolean,
+  ): Promise<ManagedReport[]> {
+    const responses = await Promise.all([
+      api.get(
+        '/denuncias/gestion/bandeja',
+        selectedStatus === 'active' ? {} : { params: { status: selectedStatus } },
+      ),
+      ...(includeResolved
+        ? [api.get('/denuncias/gestion/bandeja', { params: { status: 'RESUELTO' } })]
+        : []),
+    ]);
+    return responses.flatMap((response) => response.data.data.items as ManagedReport[]);
+  }
 
   async function loadReports(selectedStatus = filter) {
     if (isAdmin) return;
     try {
-      const response = await api.get(
-        '/denuncias/gestion/bandeja',
-        selectedStatus === 'active' ? {} : { params: { status: selectedStatus } },
-      );
-      setReports(response.data.data.items);
+      setReports(await fetchManagementReports(
+        selectedStatus,
+        isKanbanView && selectedStatus === 'active',
+      ));
       setError('');
     } catch (loadError: unknown) {
       setError(getApiErrorMessage(loadError, 'No se pudo cargar la bandeja.'));
@@ -460,12 +476,12 @@ function ManagementDashboard({
 
     async function fetchReports() {
       try {
-        const response = await api.get(
-          '/denuncias/gestion/bandeja',
-          filter === 'active' ? {} : { params: { status: filter } },
+        const items = await fetchManagementReports(
+          filter,
+          isKanbanView && filter === 'active',
         );
         if (active) {
-          setReports(response.data.data.items);
+          setReports(items);
           setError('');
         }
       } catch (loadError: unknown) {
@@ -479,7 +495,7 @@ function ManagementDashboard({
     return () => {
       active = false;
     };
-  }, [filter, isAdmin]);
+  }, [filter, isAdmin, isKanbanView]);
 
   function exportReports(format: 'csv' | 'xlsx' | 'pdf') {
     if (!visibleReports.length) {
@@ -582,6 +598,24 @@ function ManagementDashboard({
     }
   }
 
+  async function moveReportToStatus(id: string, status: string) {
+    const report = reports.find((item) => item.id === id);
+    if (!report || report.status === status) return;
+    if (report.assignee && report.assignee.id !== currentUserId) return;
+
+    try {
+      if (!report.assignee) {
+        await api.post(`/denuncias/${id}/tomar`);
+      }
+      await api.patch(`/denuncias/${id}/estado`, { status });
+      await loadReports();
+      setError('');
+    } catch (statusError: unknown) {
+      setError(getApiErrorMessage(statusError, 'No se pudo actualizar el estado.'));
+      await loadReports();
+    }
+  }
+
   const filterLabels: Record<string, string> = {
     active: 'Todos los reportes',
     PENDIENTE: 'Pendientes',
@@ -593,7 +627,19 @@ function ManagementDashboard({
     archived: 'Archivadas',
   };
 
-  const columns = [{ title: filterLabels[filter] ?? 'Reportes', status: '' }];
+  function changeReportFilter(selectedFilter: string) {
+    setFilter(selectedFilter);
+    if (selectedFilter !== 'active') setIsKanbanView(false);
+  }
+
+  const kanbanColumns = [
+    { title: 'Pendiente', status: 'PENDIENTE', statuses: ['PENDIENTE', 'ASIGNADO', 'EN_REVISION'] },
+    { title: 'En proceso', status: 'EN_PROCESO', statuses: ['EN_PROCESO'] },
+    { title: 'Realizada', status: 'RESUELTO', statuses: ['RESUELTO'] },
+  ];
+  const columns = isKanbanView && filter === 'active'
+    ? kanbanColumns
+    : [{ title: filterLabels[filter] ?? 'Reportes', status: '', statuses: [] as string[] }];
 
   const search = searchTerm.trim().toLowerCase();
   const categories = reports.reduce<NonNullable<ManagedReport['category']>[]>(
@@ -686,7 +732,11 @@ function ManagementDashboard({
                 <button
                   type="button"
                   className={managementView === 'reports' && isArchivedView ? 'admin-nav-active' : ''}
-                  onClick={() => { setManagementView('reports'); setFilter('archived'); }}
+                  onClick={() => {
+                    setManagementView('reports');
+                    setFilter('archived');
+                    setIsKanbanView(false);
+                  }}
                 >
                   <span aria-hidden="true">▣</span> Archivadas
                 </button>
@@ -793,6 +843,7 @@ function ManagementDashboard({
                       onClick={() => {
                         setFilter('archived');
                         setManagementView('reports');
+                        setIsKanbanView(false);
                       }}
                     >
                       <span aria-hidden="true">▣</span>
@@ -848,7 +899,7 @@ function ManagementDashboard({
                         <select
                           className="admin-filter"
                           value={filter}
-                          onChange={(event) => setFilter(event.target.value)}
+                          onChange={(event) => changeReportFilter(event.target.value)}
                           aria-label="Filtrar denuncias por estado"
                         >
                           <option value="active">Todas</option>
@@ -888,12 +939,25 @@ function ManagementDashboard({
                         <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
                         <p>{visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}</p>
                       </div>
+                      {!isArchivedView && (
+                        <button
+                          className="admin-view-toggle"
+                          type="button"
+                          aria-pressed={isKanbanView}
+                          onClick={() => {
+                            if (!isKanbanView) setFilter('active');
+                            setIsKanbanView(!isKanbanView);
+                          }}
+                        >
+                          {isKanbanView ? 'Cambiar a vista lista' : 'Cambiar a vista kanban'}
+                        </button>
+                      )}
                     </div>
 
-                    <section className={`admin-board ${filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}>
+                    <section className={`admin-board ${isKanbanView && filter === 'active' ? 'admin-board-kanban' : filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}>
                       {columns.map((column) => {
                         const columnReports = column.status
-                          ? visibleReports.filter((item) => item.status === column.status)
+                          ? visibleReports.filter((item) => column.statuses.includes(item.status))
                           : visibleReports;
 
                         return (
@@ -903,13 +967,45 @@ function ManagementDashboard({
                               <span>{columnReports.length}</span>
                             </header>
 
-                            <div className="admin-column-cards">
+                            <div
+                              className="admin-column-cards"
+                              onDragOver={(event) => {
+                                if (isKanbanView) event.preventDefault();
+                              }}
+                              onDrop={(event) => {
+                                if (!isKanbanView || !column.status) return;
+                                event.preventDefault();
+                                const reportId = event.dataTransfer.getData('text/plain');
+                                if (reportId) void moveReportToStatus(reportId, column.status);
+                              }}
+                            >
                               {columnReports.length === 0 ? (
                                 <p className="admin-column-empty">
                                   {search ? 'No hay coincidencias.' : 'No hay denuncias aquí.'}
                                 </p>
                               ) : columnReports.map((item) => (
-                                <article className="admin-report-card" key={item.id}>
+                                <article
+                                  className={`admin-report-card${isKanbanView ? ' admin-report-card-draggable' : ''}`}
+                                  key={item.id}
+                                  draggable={
+                                    isKanbanView &&
+                                    (!item.assignee || item.assignee.id === currentUserId) &&
+                                    !(item.status === 'RESUELTO' && !item.assignee)
+                                  }
+                                  title={
+                                    isKanbanView
+                                      ? item.assignee && item.assignee.id !== currentUserId
+                                        ? 'Solo puedes mover denuncias asignadas a tu usuario'
+                                        : item.status === 'RESUELTO' && !item.assignee
+                                          ? 'Esta denuncia no tiene un funcionario asignado para reabrirla'
+                                          : undefined
+                                      : undefined
+                                  }
+                                  onDragStart={(event) => {
+                                    event.dataTransfer.setData('text/plain', item.id);
+                                    event.dataTransfer.effectAllowed = 'move';
+                                  }}
+                                >
                                   <div className="admin-report-copy">
                                     <div className="admin-report-chips">
                                       <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
@@ -1025,7 +1121,7 @@ function ManagementDashboard({
                       {!isArchivedView && (
                         <label className="admin-filter-control">
                           <span>Estado</span>
-                          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+                          <select value={filter} onChange={(event) => changeReportFilter(event.target.value)}>
                             <option value="active">Todas</option>
                             <option value="PENDIENTE">Pendientes</option>
                             <option value="EN_PROCESO">En proceso</option>

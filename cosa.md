@@ -135,6 +135,7 @@ pnpm --dir frontend dev
 - Iniciar sesión desde `/gestion/login` con una cuenta institucional.
 - Ver la bandeja de denuncias activas.
 - Filtrar por estado.
+- Alternar el flujo de trabajo entre lista y tablero Kanban con columnas de pendientes, en proceso y realizadas; arrastrar una denuncia permite cambiar su estado.
 - Tomar una denuncia o asignarla a un funcionario activo del mismo ente.
 - Marcarla como `EN_REVISION`, `RESUELTO` o `RECHAZADO`.
 - El administrador de ente puede solicitar altas de funcionarios desde su panel; el superadministrador debe aprobarlas antes de que las cuentas puedan iniciar sesión.

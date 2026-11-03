@@ -1381,6 +1381,16 @@ textarea {
   font-size: 0.88rem;
 }
 
+.admin-view-toggle {
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid #cbd9ea;
+  border-radius: 12px;
+  background: #fff;
+  color: #1556b5;
+  white-space: nowrap;
+}
+
 .admin-board {
   display: grid;
   gap: 14px;
@@ -1390,6 +1400,10 @@ textarea {
 
 .admin-board-active {
   grid-template-columns: repeat(4, minmax(235px, 1fr));
+}
+
+.admin-board-kanban {
+  grid-template-columns: repeat(3, minmax(235px, 1fr));
 }
 
 .admin-board-single {
@@ -1421,6 +1435,21 @@ textarea {
 }
 
 .admin-board-active .admin-column:nth-child(4) {
+  background: #effbf5;
+  border-color: #d7f3e4;
+}
+
+.admin-board-kanban .admin-column:nth-child(1) {
+  background: #fff9ed;
+  border-color: #f6e8c8;
+}
+
+.admin-board-kanban .admin-column:nth-child(2) {
+  background: #f1f7ff;
+  border-color: #dceaff;
+}
+
+.admin-board-kanban .admin-column:nth-child(3) {
   background: #effbf5;
   border-color: #d7f3e4;
 }
@@ -1475,6 +1504,14 @@ textarea {
   border-radius: 13px;
   background: #fff;
   box-shadow: 0 4px 12px rgba(19, 37, 66, 0.045);
+}
+
+.admin-report-card-draggable[draggable="true"] {
+  cursor: grab;
+}
+
+.admin-report-card-draggable[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .admin-status-chip {
@@ -1726,6 +1763,7 @@ textarea {
   }
 
   .admin-board-active,
+  .admin-board-kanban,
   .admin-board-single {
     grid-template-columns: minmax(260px, 1fr);
   }
@@ -3133,7 +3171,8 @@ body {
 }
 
 @media (max-width: 1450px) {
-  .admin-board-active {
+  .admin-board-active,
+  .admin-board-kanban {
     grid-template-columns: repeat(2, minmax(235px, 1fr));
   }
 }
