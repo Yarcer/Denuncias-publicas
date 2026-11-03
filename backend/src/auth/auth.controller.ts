@@ -48,7 +48,7 @@ export class AuthController {
   }
 
   @Post('anonymous')
-  @Throttle({ default: { limit: 3, ttl: 60 * 60 * 1000 } })
+  @Throttle({ default: { limit: 20, ttl: 60 * 60 * 1000 } })
   async anonymousLogin(@Res({ passthrough: true }) response: Response) {
     return this.createSession(
       await this.authService.anonymousLogin(),
