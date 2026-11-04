@@ -20,6 +20,11 @@ const administrativeRoles: Role[] = [
   Role.FUNCIONARIO,
   Role.FUNCIONARIO_ADMINISTRADOR,
 ];
+const administrativeOrganizations = [
+  'Intendencia',
+  'OSE',
+  'Policía Municipal',
+];
 const administrativeUserSelection = {
   id: true,
   email: true,
@@ -55,6 +60,7 @@ export class UsuariosService {
     this.assertAdministrator(actor);
     this.assertAdministrativeRole(dto.role);
     this.assertOrganization(dto.role, dto.entityName);
+    this.assertAvailableOrganization(dto.entityName);
 
     try {
       return await this.prisma.user.create({
@@ -88,6 +94,9 @@ export class UsuariosService {
 
     this.assertAdministrativeRole(role);
     this.assertOrganization(role, entityName ?? undefined);
+    if (dto.entityName !== undefined) {
+      this.assertAvailableOrganization(dto.entityName);
+    }
 
     if (id === actor.sub && role !== Role.SUPERADMINISTRADOR) {
       throw new BadRequestException(
@@ -180,6 +189,19 @@ export class UsuariosService {
     if (administrativeRoles.includes(role) && !entityName?.trim()) {
       throw new BadRequestException(
         'El organismo es obligatorio para usuarios administrativos',
+      );
+    }
+  }
+
+  private assertAvailableOrganization(entityName?: string | null) {
+    if (
+      !entityName ||
+      !administrativeOrganizations.some(
+        (organization) => organization === entityName.trim(),
+      )
+    ) {
+      throw new BadRequestException(
+        'El organismo debe ser Intendencia, OSE o Policía Municipal',
       );
     }
   }

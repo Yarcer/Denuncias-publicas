@@ -62,4 +62,42 @@ describe('UsuariosService', () => {
       }),
     );
   });
+
+  it('rejects organizations outside the available options when creating accounts', async () => {
+    const create = jest.fn();
+    const service = new UsuariosService({
+      user: { create },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.createAdministrativeUser(actor, {
+        email: 'funcionario@example.com',
+        password: 'password-segura',
+        role: Role.FUNCIONARIO,
+        entityName: 'Municipalidad Demo',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('rejects organizations outside the available options when editing accounts', async () => {
+    const update = jest.fn();
+    const service = new UsuariosService({
+      user: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'employee-id',
+          role: Role.FUNCIONARIO,
+          entityName: 'Intendencia',
+        }),
+        update,
+      },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.updateAdministrativeUser(actor, 'employee-id', {
+        entityName: 'Municipalidad Demo',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(update).not.toHaveBeenCalled();
+  });
 });

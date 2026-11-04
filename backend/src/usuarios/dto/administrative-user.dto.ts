@@ -12,6 +12,11 @@ const administrativeStaffRoles = [
   Role.FUNCIONARIO,
   Role.FUNCIONARIO_ADMINISTRADOR,
 ];
+const administrativeOrganizations = [
+  'Intendencia',
+  'OSE',
+  'Policía Municipal',
+];
 
 export class CreateAdministrativeUserDto {
   @IsEmail()
@@ -33,6 +38,7 @@ export class CreateAdministrativeUserDto {
   lastName?: string;
 
   @IsOptional()
+  @IsIn(administrativeOrganizations)
   @IsString()
   entityName?: string;
 
@@ -64,6 +70,7 @@ export class UpdateAdministrativeUserDto {
   lastName?: string;
 
   @IsOptional()
+  @IsIn(administrativeOrganizations)
   @IsString()
   entityName?: string;
 
