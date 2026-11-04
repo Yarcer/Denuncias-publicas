@@ -31,6 +31,7 @@ const terminalStatuses: ReportStatus[] = [
   ReportStatus.RECHAZADO,
   ReportStatus.CERRADO,
 ];
+const archivedReportRetentionMs = 90 * 24 * 60 * 60 * 1000;
 const sharedReportOrganizations: {
   type: ReportType;
   names: readonly string[];
@@ -143,7 +144,12 @@ export class DenunciasService {
 
     const statusWhere: Prisma.ReportWhereInput =
       status === 'archived'
-        ? { archivedAt: { not: null } }
+        ? {
+            archivedAt: {
+              not: null,
+              gte: new Date(Date.now() - archivedReportRetentionMs),
+            },
+          }
         : status
           ? { status: status as ReportStatus, archivedAt: null }
           : {
@@ -589,6 +595,11 @@ export class DenunciasService {
         data: {
           status: dto.status,
           resolvedAt: dto.status === ReportStatus.RESUELTO ? new Date() : null,
+          archivedAt:
+            dto.status === ReportStatus.RESUELTO ||
+            dto.status === ReportStatus.RECHAZADO
+              ? (report.archivedAt ?? new Date())
+              : null,
         },
         include: {
           category: true,
@@ -822,7 +833,11 @@ export class DenunciasService {
   private sharedOrganizationFilters(actorEntityName: string) {
     const normalizedActor = normalizeOrganizationName(actorEntityName);
     return sharedReportOrganizations.flatMap(({ type, names }) => {
-      if (!names.some((name) => normalizeOrganizationName(name) === normalizedActor)) {
+      if (
+        !names.some(
+          (name) => normalizeOrganizationName(name) === normalizedActor,
+        )
+      ) {
         return [];
       }
 
@@ -835,11 +850,10 @@ export class DenunciasService {
   private reportOrganizationFilters(actorEntityName: string) {
     const normalizedActor = normalizeOrganizationName(actorEntityName);
     return reportOrganizationOverrides
-      .filter(
-        (route) =>
-          [route.organizationName, ...route.sharedOrganizationNames].some(
-            (name) => normalizeOrganizationName(name) === normalizedActor,
-          ),
+      .filter((route) =>
+        [route.organizationName, ...route.sharedOrganizationNames].some(
+          (name) => normalizeOrganizationName(name) === normalizedActor,
+        ),
       )
       .flatMap((route) =>
         [route.organizationName, ...route.sharedOrganizationNames]
@@ -872,11 +886,13 @@ export class DenunciasService {
     ];
     return (
       organizations.some(
-        (name) => normalizeOrganizationName(name) ===
+        (name) =>
+          normalizeOrganizationName(name) ===
           normalizeOrganizationName(actorEntityName),
       ) &&
       organizations.some(
-        (name) => normalizeOrganizationName(name) ===
+        (name) =>
+          normalizeOrganizationName(name) ===
           normalizeOrganizationName(report.entityName ?? ''),
       )
     );

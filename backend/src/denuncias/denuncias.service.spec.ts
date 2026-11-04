@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import { ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DenunciasService } from './denuncias.service';
 
@@ -14,6 +15,23 @@ describe('DenunciasService', () => {
     };
     include: { category: true };
   };
+  type ManagementQueueQuery = {
+    where: {
+      OR: Record<string, unknown>[];
+      archivedAt?: { not: null; gte: Date };
+    };
+  };
+  type StatusUpdateInput = {
+    where: { id: string };
+    data: {
+      status: ReportStatus;
+      resolvedAt: Date | null;
+      archivedAt: Date | null;
+    };
+    include: Record<string, unknown>;
+  };
+  const createManagementQueueMock = () =>
+    jest.fn<Promise<unknown[]>, [ManagementQueueQuery]>().mockResolvedValue([]);
   const createReportMock = () =>
     jest
       .fn<Promise<Record<string, unknown>>, [ReportCreateInput]>()
@@ -109,7 +127,9 @@ describe('DenunciasService', () => {
 
   it('routes all Convivencia reports to Policía Municipal', async () => {
     const reportCreate = createReportMock();
-    const findFirst = jest.fn().mockResolvedValue({ id: 'police-user' });
+    const findFirst = jest
+      .fn<Promise<{ id: string }>, [{ where: { entityName: string } }]>()
+      .mockResolvedValue({ id: 'police-user' });
     const service = new DenunciasService({
       user: {
         findUnique: jest.fn().mockResolvedValue({
@@ -133,11 +153,9 @@ describe('DenunciasService', () => {
       categoryId: 'convivencia',
     });
 
-    expect(findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ entityName: 'Policía Municipal' }),
-      }),
-    );
+    expect(findFirst.mock.calls[0]?.[0]).toMatchObject({
+      where: { entityName: 'Policía Municipal' },
+    });
     expect(reportCreate.mock.calls[0]?.[0].data).toMatchObject({
       type: 'URBANO',
       entityName: 'Policía Municipal',
@@ -167,7 +185,130 @@ describe('DenunciasService', () => {
         },
       }),
     );
-    expect(result.items[0]?.priority).toBe('URGENTE');
+    expect(result.items[0]).toMatchObject({ priority: 'URGENTE' });
+  });
+
+  it('only returns archived reports from the last 90 days', async () => {
+    const findMany = createManagementQueueMock();
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ entityName: 'Municipalidad Demo' }),
+      },
+      report: { findMany },
+    } as unknown as PrismaService);
+    const requestStartedAt = Date.now();
+
+    await service.managementQueue(
+      { sub: 'staff-id', role: 'FUNCIONARIO' },
+      'archived',
+    );
+
+    const archivedAt = findMany.mock.calls[0]?.[0].where.archivedAt;
+    expect(archivedAt?.not).toBeNull();
+    expect(archivedAt?.gte.getTime()).toBeGreaterThanOrEqual(
+      requestStartedAt - 90 * 24 * 60 * 60 * 1000,
+    );
+    expect(archivedAt?.gte.getTime()).toBeLessThanOrEqual(
+      Date.now() - 90 * 24 * 60 * 60 * 1000,
+    );
+  });
+
+  it.each([ReportStatus.RESUELTO, ReportStatus.RECHAZADO])(
+    'automatically archives reports when their status changes to %s',
+    async (status) => {
+      const report = {
+        id: reportId,
+        reporterId: 'citizen-id',
+        entityName: 'Municipalidad Demo',
+        type: 'URBANO',
+        title: 'Luminaria apagada',
+        status: ReportStatus.EN_PROCESO,
+        archivedAt: null,
+        assigneeId: 'staff-id',
+        category: { name: 'Infraestructura' },
+      };
+      const transaction = {
+        report: {
+          update: jest
+            .fn<Promise<Record<string, unknown>>, [StatusUpdateInput]>()
+            .mockImplementation(({ data }) =>
+              Promise.resolve({ ...report, ...data }),
+            ),
+        },
+        reportHistory: { create: jest.fn().mockResolvedValue({}) },
+      };
+      const service = new DenunciasService({
+        user: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ entityName: 'Municipalidad Demo' }),
+        },
+        report: { findUnique: jest.fn().mockResolvedValue(report) },
+        $transaction: jest.fn(
+          (callback: (tx: typeof transaction) => Promise<unknown>) =>
+            callback(transaction),
+        ),
+      } as unknown as PrismaService);
+
+      await service.changeStatus(
+        reportId,
+        { sub: 'staff-id', role: 'FUNCIONARIO' },
+        { status },
+      );
+
+      expect(
+        transaction.report.update.mock.calls[0]?.[0].data.archivedAt,
+      ).toBeInstanceOf(Date);
+      expect(transaction.reportHistory.create).toHaveBeenCalled();
+    },
+  );
+
+  it('removes the archive date when a resolved report is reopened', async () => {
+    const report = {
+      id: reportId,
+      reporterId: 'citizen-id',
+      entityName: 'Municipalidad Demo',
+      type: 'URBANO',
+      title: 'Luminaria apagada',
+      status: ReportStatus.RESUELTO,
+      archivedAt: new Date('2026-10-01T10:00:00.000Z'),
+      assigneeId: 'staff-id',
+      category: { name: 'Infraestructura' },
+    };
+    const transaction = {
+      report: {
+        update: jest
+          .fn<Promise<Record<string, unknown>>, [StatusUpdateInput]>()
+          .mockImplementation(({ data }) =>
+            Promise.resolve({ ...report, ...data }),
+          ),
+      },
+      reportHistory: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ entityName: 'Municipalidad Demo' }),
+      },
+      report: { findUnique: jest.fn().mockResolvedValue(report) },
+      $transaction: jest.fn(
+        (callback: (tx: typeof transaction) => Promise<unknown>) =>
+          callback(transaction),
+      ),
+    } as unknown as PrismaService);
+
+    await service.changeStatus(
+      reportId,
+      { sub: 'staff-id', role: 'FUNCIONARIO' },
+      { status: ReportStatus.EN_PROCESO },
+    );
+
+    expect(
+      transaction.report.update.mock.calls[0]?.[0].data.archivedAt,
+    ).toBeNull();
   });
 
   it('returns status history with responsible users, scoped to the current organization', async () => {
@@ -274,7 +415,7 @@ describe('DenunciasService', () => {
   ])(
     'includes %s in the shared %s report queue',
     async (entityName, sharedEntityName, type) => {
-      const findMany = jest.fn().mockResolvedValue([]);
+      const findMany = createManagementQueueMock();
       const service = new DenunciasService({
         user: { findUnique: jest.fn().mockResolvedValue({ entityName }) },
         report: { findMany },
@@ -285,20 +426,15 @@ describe('DenunciasService', () => {
         undefined,
       );
 
-      expect(findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            OR: expect.arrayContaining([
-              { entityName: sharedEntityName, type },
-            ]),
-          }),
-        }),
-      );
+      expect(findMany.mock.calls[0]?.[0].where.OR).toContainEqual({
+        entityName: sharedEntityName,
+        type,
+      });
     },
   );
 
   it('includes existing Convivencia reports in Policía Municipal queues', async () => {
-    const findMany = jest.fn().mockResolvedValue([]);
+    const findMany = createManagementQueueMock();
     const service = new DenunciasService({
       user: {
         findUnique: jest
@@ -313,23 +449,15 @@ describe('DenunciasService', () => {
       undefined,
     );
 
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          OR: expect.arrayContaining([
-            {
-              entityName: 'Municipalidad Demo',
-              type: 'URBANO',
-              category: { is: { name: 'Convivencia' } },
-            },
-          ]),
-        }),
-      }),
-    );
+    expect(findMany.mock.calls[0]?.[0].where.OR).toContainEqual({
+      entityName: 'Municipalidad Demo',
+      type: 'URBANO',
+      category: { is: { name: 'Convivencia' } },
+    });
   });
 
   it('includes Policía Municipal Convivencia reports in Municipalidad Demo queues', async () => {
-    const findMany = jest.fn().mockResolvedValue([]);
+    const findMany = createManagementQueueMock();
     const service = new DenunciasService({
       user: {
         findUnique: jest
@@ -344,19 +472,11 @@ describe('DenunciasService', () => {
       undefined,
     );
 
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          OR: expect.arrayContaining([
-            {
-              entityName: 'Policía Municipal',
-              type: 'URBANO',
-              category: { is: { name: 'Convivencia' } },
-            },
-          ]),
-        }),
-      }),
-    );
+    expect(findMany.mock.calls[0]?.[0].where.OR).toContainEqual({
+      entityName: 'Policía Municipal',
+      type: 'URBANO',
+      category: { is: { name: 'Convivencia' } },
+    });
   });
 
   it('allows Policía Municipal to open existing Convivencia reports', async () => {

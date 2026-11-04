@@ -754,15 +754,6 @@ function ManagementDashboard({
     void loadAssignableUsers();
   }, [isAdmin]);
 
-  async function archiveReport(id: string) {
-    try {
-      await api.patch(`/denuncias/${id}/archivar`);
-      await loadReports();
-    } catch (archiveError: unknown) {
-      setError(getApiErrorMessage(archiveError, 'No se pudo archivar la denuncia.'));
-    }
-  }
-
   async function takeReport(id: string) {
     try {
       await api.post(`/denuncias/${id}/tomar`);
@@ -1301,7 +1292,10 @@ function ManagementDashboard({
                     <div className="admin-board-heading" id="admin-board">
                       <div>
                         <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
-                        <p>{visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}</p>
+                        <p>
+                          {visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}
+                          {isArchivedView && ' · Los reportes se ocultan luego de 90 días archivados.'}
+                        </p>
                       </div>
                       {!isArchivedView && (
                         <button
@@ -1318,7 +1312,7 @@ function ManagementDashboard({
                       )}
                     </div>
 
-                    <section className={`admin-board ${isKanbanView && filter === 'active' ? 'admin-board-kanban' : filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}>
+                    <section className={`admin-board ${isKanbanView && filter === 'active' ? 'admin-board-kanban' : filter === 'active' ? 'admin-board-list' : 'admin-board-single'}`}>
                       {columns.map((column) => {
                         const columnReports = column.status
                           ? visibleReports.filter((item) => column.statuses.includes(item.status))
@@ -1415,52 +1409,49 @@ function ManagementDashboard({
                                     ))}
                                   </div>
 
-                                  <div className="admin-report-actions">
-                                    <label className="report-assignment">
-                                      <span>Asignar a</span>
-                                      <select
-                                        value={item.assignee?.id ?? ''}
-                                        onChange={(event) => {
-                                          if (event.target.value) {
-                                            void assignReport(item.id, event.target.value);
-                                          }
-                                        }}
-                                      >
-                                        <option value="">Seleccionar funcionario</option>
-                                        {assignableUsers.map((assignableUser) => (
-                                          <option key={assignableUser.id} value={assignableUser.id}>
-                                            {[assignableUser.firstName, assignableUser.lastName]
-                                              .filter(Boolean)
-                                              .join(' ') || assignableUser.email}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </label>
-                                    {!item.assignee && (
-                                      <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
-                                    )}
-                                    {item.assignee && (
-                                      <>
-                                        <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
-                                          En revisión
-                                        </button>
-                                        <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
-                                          Iniciar trabajo
-                                        </button>
-                                        <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
-                                          Marcar resuelta
-                                        </button>
-                                        <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
-                                          Denegar
-                                        </button>
-                                      </>
-                                    )}
-                                    {item.status === 'RECHAZADO' && filter !== 'archived' && (
-                                      <button className="secondary" onClick={() => archiveReport(item.id)}>
-                                        Archivar
-                                      </button>
-                                    )}
-                                  </div>
+                                  {!isArchivedView && (
+                                    <div className="admin-report-actions">
+                                      <label className="report-assignment">
+                                        <span>Asignar a</span>
+                                        <select
+                                          value={item.assignee?.id ?? ''}
+                                          onChange={(event) => {
+                                            if (event.target.value) {
+                                              void assignReport(item.id, event.target.value);
+                                            }
+                                          }}
+                                        >
+                                          <option value="">Seleccionar funcionario</option>
+                                          {assignableUsers.map((assignableUser) => (
+                                            <option key={assignableUser.id} value={assignableUser.id}>
+                                              {[assignableUser.firstName, assignableUser.lastName]
+                                                .filter(Boolean)
+                                                .join(' ') || assignableUser.email}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                      {!item.assignee && (
+                                        <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
+                                      )}
+                                      {item.assignee && (
+                                        <>
+                                          <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
+                                            En revisión
+                                          </button>
+                                          <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
+                                            Iniciar trabajo
+                                          </button>
+                                          <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
+                                            Marcar resuelta
+                                          </button>
+                                          <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
+                                            Denegar
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
                                 </article>
                               ))}
                             </div>
