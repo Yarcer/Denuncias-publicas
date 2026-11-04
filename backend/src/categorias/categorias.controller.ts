@@ -13,7 +13,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CategoriasService } from './categorias.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
-
+ 
 @Controller('categorias')
 export class CategoriasController {
   constructor(private readonly categoriasService: CategoriasService) {}
