@@ -71,6 +71,7 @@ async function seedCategories() {
     { name: 'Infraestructura', type: ReportType.URBANO },
     { name: 'Limpieza', type: ReportType.URBANO },
     { name: 'Convivencia', type: ReportType.URBANO },
+    { name: 'Saneamiento', type: ReportType.URBANO },
   ];
 
   for (const category of categories) {
@@ -81,7 +82,7 @@ async function seedCategories() {
 
     await prisma.category.upsert({
       where: { id: slug },
-      update: { type: category.type },
+      update: { name: category.name, type: category.type, active: true },
       create: {
         id: slug,
         name: category.name,
@@ -92,7 +93,8 @@ async function seedCategories() {
 }
 
 async function main() {
-  if (process.env.NODE_ENV !== 'production') {
+  const categoriesOnly = process.argv.includes('--categories-only');
+  if (!categoriesOnly && process.env.NODE_ENV !== 'production') {
     await seedDemoUsers();
   }
   await seedCategories();

@@ -45,6 +45,12 @@ const reportOrganizationOverrides = [
     organizationName: 'Policía Municipal',
     sharedOrganizationNames: ['Municipalidad Demo'],
   },
+  {
+    type: ReportType.URBANO,
+    categoryName: 'Saneamiento',
+    organizationName: 'OSE',
+    sharedOrganizationNames: [],
+  },
 ];
 
 function normalizeOrganizationName(name: string) {

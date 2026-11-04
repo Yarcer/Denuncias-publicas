@@ -53,6 +53,12 @@ const subcategorias = {
     'Ruidos molestos',
     'Obstrucción de la vía pública',
   ],
+
+  saneamiento: [
+    'Pérdidas de agua en vía pública',
+    'Falta de agua o baja presión',
+    'Problemas con la calidad del agua',
+  ],
 }
 
 const limitesMelo = {
@@ -164,6 +170,10 @@ function CrearDenuncia() {
 
     if (nombreNormalizado.includes('convivencia')) {
       return 'convivencia'
+    }
+
+    if (nombreNormalizado.includes('saneamiento')) {
+      return 'saneamiento'
     }
 
     return ''

@@ -88,6 +88,14 @@ pnpm --dir backend exec prisma migrate deploy
 pnpm --dir backend db:seed
 ```
 
+Para actualizar únicamente el catálogo de categorías sin modificar las cuentas demo:
+
+```powershell
+pnpm --dir backend db:seed:categories
+```
+
+Después, vuelve a cargar la página de creación de reportes. La lista se consulta desde la API y esta la obtiene de la base de datos.
+
 El seed crea estas cuentas:
 
 | Rol | Correo | Contraseña |
