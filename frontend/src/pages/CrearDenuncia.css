@@ -96,6 +96,13 @@
   resize: vertical;
 }
 
+.descripcion-character-count {
+  margin: 6px 2px 0;
+  color: #64748b;
+  font-size: 0.82rem;
+  text-align: right;
+}
+
 .denuncia-form input:focus,
 .denuncia-form select:focus,
 .denuncia-form textarea:focus {

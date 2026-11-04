@@ -30,6 +30,8 @@ type CreateReportResponse = {
   }
 }
 
+const MAX_DESCRIPTION_LENGTH = 500
+
 const subcategorias = {
   infraestructura: [
     'Baches o calles en mal estado',
@@ -462,8 +464,12 @@ function CrearDenuncia() {
             placeholder="Describí el problema..."
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
+            maxLength={MAX_DESCRIPTION_LENGTH}
             required
           />
+          <p className="descripcion-character-count" aria-live="polite">
+            {MAX_DESCRIPTION_LENGTH - descripcion.length} caracteres disponibles
+          </p>
         </div>
 
         <div>
