@@ -3,8 +3,9 @@ import { api } from '../lib/api'
 import { getApiErrorMessage } from '../lib/api-error'
 import './GestionUsuarios.css'
 
-type AdministrativeRole = 'FUNCIONARIO' | 'FUNCIONARIO_ADMINISTRADOR' | 'SUPERADMINISTRADOR'
+type AdministrativeRole = 'FUNCIONARIO' | 'FUNCIONARIO_ADMINISTRADOR'
 type UserStatus = 'ACTIVO' | 'INACTIVO' | 'BANEADO'
+const organizationOptions = ['Intendencia', 'OSE', 'Policía Municipal'] as const
 
 type AdministrativeUser = {
   id: string
@@ -101,7 +102,10 @@ function GestionUsuarios({
       role: user.role,
       firstName: user.firstName ?? '',
       lastName: user.lastName ?? '',
-      entityName: user.entityName ?? '',
+      entityName:
+        organizationOptions.find(
+          (organization) => organization === user.entityName,
+        ) ?? '',
       jurisdiction: user.jurisdiction ?? '',
     })
     onViewChange('create-user')
@@ -232,18 +236,24 @@ function GestionUsuarios({
                 disabled={editingId === currentUserId}
                 onChange={(event) => setForm({ ...form, role: event.target.value as AdministrativeRole })}
               >
-                <option value="FUNCIONARIO">Ente público</option>
-                <option value="SUPERADMINISTRADOR">SUPERADMINISTRADOR</option>
+                <option value="FUNCIONARIO">Funcionario</option>
+                <option value="FUNCIONARIO_ADMINISTRADOR">Funcionario Administrador</option>
               </select>
             </label>
             <label>
               Organismo
-              <input
-                required={form.role === 'FUNCIONARIO'}
+              <select
+                required
                 value={form.entityName}
                 onChange={(event) => setForm({ ...form, entityName: event.target.value })}
-                placeholder="Ej. Dirección de Tránsito"
-              />
+              >
+                <option value="" disabled>Seleccioná un organismo</option>
+                {organizationOptions.map((organization) => (
+                  <option key={organization} value={organization}>
+                    {organization}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="admin-user-field-wide">
               Jurisdicción
@@ -296,7 +306,11 @@ function GestionUsuarios({
                         <span>{user.email}</span>
                       </td>
                       <td>
-                        <strong>{user.role === 'SUPERADMINISTRADOR' ? 'SUPERADMINISTRADOR' : 'Ente público'}</strong>
+                        <strong>
+                          {user.role === 'FUNCIONARIO'
+                            ? 'Funcionario'
+                            : 'Funcionario Administrador'}
+                        </strong>
                         <span>{user.entityName || user.jurisdiction || 'Sin organismo asignado'}</span>
                       </td>
                       <td>

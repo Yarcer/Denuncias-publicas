@@ -19,7 +19,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "db:seed": "ts-node --transpile-only prisma/seed.ts"
+    "db:seed": "ts-node --transpile-only prisma/seed.ts",
+    "db:seed:categories": "ts-node --transpile-only prisma/seed.ts --categories-only"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1154.0",

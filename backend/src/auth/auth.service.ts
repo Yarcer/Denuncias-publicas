@@ -133,6 +133,7 @@ export class AuthService {
     status: string;
     firstName: string | null;
     lastName: string | null;
+    entityName: string | null;
     phone: string | null;
     createdAt: Date;
     updatedAt: Date;
@@ -145,6 +146,7 @@ export class AuthService {
       status: user.status,
       firstName: user.firstName,
       lastName: user.lastName,
+      entityName: user.entityName,
       phone: user.phone,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,

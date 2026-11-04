@@ -7,7 +7,13 @@ import {
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Prisma, ReportPriority, ReportStatus, Role } from '@prisma/client';
+import {
+  Prisma,
+  ReportPriority,
+  ReportStatus,
+  ReportType,
+  Role,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
@@ -25,6 +31,36 @@ const terminalStatuses: ReportStatus[] = [
   ReportStatus.RECHAZADO,
   ReportStatus.CERRADO,
 ];
+const archivedReportRetentionMs = 90 * 24 * 60 * 60 * 1000;
+const sharedReportOrganizations: {
+  type: ReportType;
+  names: readonly string[];
+}[] = [
+  { type: ReportType.URBANO, names: ['Municipalidad Demo', 'Intendencia'] },
+  { type: ReportType.POLICIAL, names: ['policia demo', 'Policía Municipal'] },
+];
+const reportOrganizationOverrides = [
+  {
+    type: ReportType.URBANO,
+    categoryName: 'Convivencia',
+    organizationName: 'Policía Municipal',
+    sharedOrganizationNames: ['Municipalidad Demo'],
+  },
+  {
+    type: ReportType.URBANO,
+    categoryName: 'Saneamiento',
+    organizationName: 'OSE',
+    sharedOrganizationNames: [],
+  },
+];
+
+function normalizeOrganizationName(name: string) {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLocaleLowerCase('es-UY');
+}
 
 @Injectable()
 export class DenunciasService {
@@ -40,11 +76,19 @@ export class DenunciasService {
     const actor = managementRoles.includes(user.role)
       ? await this.getManagementEntity(user)
       : null;
+    const sharedOrganizationWhere = actor
+      ? this.sharedOrganizationFilters(actor.entityName)
+      : [];
     const where: Prisma.ReportWhereInput = {
       ...(user.role === 'CIUDADANO' ? { reporterId: user.sub } : {}),
       ...(actor
         ? {
-            OR: [{ entityName: actor.entityName }, { entityName: null }],
+            OR: [
+              { entityName: actor.entityName },
+              { entityName: null },
+              ...sharedOrganizationWhere,
+              ...this.reportOrganizationFilters(actor.entityName),
+            ],
           }
         : {}),
       ...(status ? { status: status as never } : {}),
@@ -100,7 +144,12 @@ export class DenunciasService {
 
     const statusWhere: Prisma.ReportWhereInput =
       status === 'archived'
-        ? { archivedAt: { not: null } }
+        ? {
+            archivedAt: {
+              not: null,
+              gte: new Date(Date.now() - archivedReportRetentionMs),
+            },
+          }
         : status
           ? { status: status as ReportStatus, archivedAt: null }
           : {
@@ -109,7 +158,12 @@ export class DenunciasService {
             };
     const where: Prisma.ReportWhereInput = {
       ...statusWhere,
-      OR: [{ entityName: actor.entityName }, { entityName: null }],
+      OR: [
+        { entityName: actor.entityName },
+        { entityName: null },
+        ...this.sharedOrganizationFilters(actor.entityName),
+        ...this.reportOrganizationFilters(actor.entityName),
+      ],
     };
 
     const items = await this.prisma.report.findMany({
@@ -136,6 +190,58 @@ export class DenunciasService {
       items,
       count: items.length,
       filters: { status: status ?? 'active' },
+    };
+  }
+
+  async managementHistory(user: AuthenticatedUser) {
+    this.assertManagementRole(user);
+    const actor = await this.getManagementEntity(user);
+    const reportVisibilityFilters = [
+      { entityName: actor.entityName },
+      { entityName: null },
+      ...this.sharedOrganizationFilters(actor.entityName),
+      ...this.reportOrganizationFilters(actor.entityName),
+    ];
+    const items = await this.prisma.reportHistory.findMany({
+      where: {
+        report: {
+          is: { OR: reportVisibilityFilters },
+        },
+      },
+      select: {
+        id: true,
+        fromStatus: true,
+        toStatus: true,
+        changedBy: true,
+        createdAt: true,
+        report: { select: { id: true, title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const responsibleIds = [...new Set(items.map((item) => item.changedBy))];
+    const responsibleUsers = responsibleIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: responsibleIds } },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            entityName: true,
+          },
+        })
+      : [];
+    const usersById = new Map(
+      responsibleUsers.map((responsible) => [responsible.id, responsible]),
+    );
+
+    return {
+      items: items.map(({ changedBy, ...item }) => ({
+        ...item,
+        responsible: usersById.get(changedBy) ?? null,
+      })),
+      count: items.length,
     };
   }
 
@@ -180,7 +286,18 @@ export class DenunciasService {
       where: { id: reporterId },
       select: { isAnonymous: true, role: true },
     });
-    const entityName = this.organizations[dto.type];
+    const category = await this.prisma.category.findUnique({
+      where: { id: dto.categoryId },
+      select: { name: true },
+    });
+    const organizationOverride = reportOrganizationOverrides.find(
+      (route) =>
+        route.type === dto.type &&
+        normalizeOrganizationName(route.categoryName) ===
+          normalizeOrganizationName(category?.name ?? ''),
+    );
+    const entityName =
+      organizationOverride?.organizationName ?? this.organizations[dto.type];
     const configuredOrganization = await this.prisma.user.findFirst({
       where: {
         entityName,
@@ -224,7 +341,10 @@ export class DenunciasService {
     user: AuthenticatedUser,
     file?: UploadedImage,
   ) {
-    const report = await this.prisma.report.findUnique({ where: { id } });
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true },
+    });
     await this.assertCanAccess(report, user);
 
     if (
@@ -296,13 +416,14 @@ export class DenunciasService {
 
     const report = await this.prisma.report.findUnique({
       where: { id },
+      include: { category: true },
     });
 
     if (!report) {
       throw new NotFoundException('Denuncia no encontrada');
     }
     const actor = await this.getManagementEntity(user);
-    this.assertReportOrganization(report.entityName, actor.entityName);
+    this.assertReportOrganization(report, actor.entityName);
 
     if (report.status !== ReportStatus.RECHAZADO) {
       throw new BadRequestException(
@@ -324,10 +445,13 @@ export class DenunciasService {
 
   async take(id: string, user: AuthenticatedUser) {
     this.assertManagementRole(user);
-    const report = await this.prisma.report.findUnique({ where: { id } });
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true },
+    });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
     const actor = await this.getManagementEntity(user);
-    this.assertReportOrganization(report.entityName, actor.entityName);
+    this.assertReportOrganization(report, actor.entityName);
     if (
       managementRoles.includes(user.role) &&
       report.assigneeId &&
@@ -344,7 +468,11 @@ export class DenunciasService {
         where: { id },
         data: {
           assigneeId: user.sub,
-          entityName: report.entityName ?? actor.entityName,
+          entityName: this.isOrganizationOverride(report, actor.entityName)
+            ? (this.getOrganizationOverride(report)?.organizationName ??
+              report.entityName ??
+              actor.entityName)
+            : (report.entityName ?? actor.entityName),
           status: ReportStatus.ASIGNADO,
         },
         include: {
@@ -357,24 +485,29 @@ export class DenunciasService {
           },
         },
       });
-      await transaction.reportHistory.create({
-        data: {
-          reportId: id,
-          fromStatus: report.status,
-          toStatus: ReportStatus.ASIGNADO,
-          changedBy: user.sub,
-        },
-      });
+      if (report.status !== ReportStatus.ASIGNADO) {
+        await transaction.reportHistory.create({
+          data: {
+            reportId: id,
+            fromStatus: report.status,
+            toStatus: ReportStatus.ASIGNADO,
+            changedBy: user.sub,
+          },
+        });
+      }
       return updated;
     });
   }
 
   async assign(id: string, user: AuthenticatedUser, dto: AssignReportDto) {
     this.assertManagementRole(user);
-    const report = await this.prisma.report.findUnique({ where: { id } });
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true },
+    });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
     const actor = await this.getManagementEntity(user);
-    this.assertReportOrganization(report.entityName, actor.entityName);
+    this.assertReportOrganization(report, actor.entityName);
     if (terminalStatuses.includes(report.status)) {
       throw new ForbiddenException('Esta denuncia ya está cerrada');
     }
@@ -403,7 +536,11 @@ export class DenunciasService {
         where: { id },
         data: {
           assigneeId: assignee.id,
-          entityName: report.entityName ?? actor.entityName,
+          entityName: this.isOrganizationOverride(report, actor.entityName)
+            ? (this.getOrganizationOverride(report)?.organizationName ??
+              report.entityName ??
+              actor.entityName)
+            : (report.entityName ?? actor.entityName),
           status: nextStatus,
         },
         include: {
@@ -413,15 +550,17 @@ export class DenunciasService {
           },
         },
       });
-      await transaction.reportHistory.create({
-        data: {
-          reportId: id,
-          fromStatus: report.status,
-          toStatus: nextStatus,
-          changedBy: user.sub,
-          comment: `Asignada internamente a ${assignee.firstName || assignee.email}`,
-        },
-      });
+      if (report.status !== nextStatus) {
+        await transaction.reportHistory.create({
+          data: {
+            reportId: id,
+            fromStatus: report.status,
+            toStatus: nextStatus,
+            changedBy: user.sub,
+            comment: `Asignada internamente a ${assignee.firstName || assignee.email}`,
+          },
+        });
+      }
       return updated;
     });
   }
@@ -432,14 +571,21 @@ export class DenunciasService {
     dto: ManageReportDto,
   ) {
     this.assertManagementRole(user);
-    const report = await this.prisma.report.findUnique({ where: { id } });
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true },
+    });
     if (!report) throw new NotFoundException('Denuncia no encontrada');
     const actor = await this.getManagementEntity(user);
-    this.assertReportOrganization(report.entityName, actor.entityName);
+    this.assertReportOrganization(report, actor.entityName);
     if (managementRoles.includes(user.role) && report.assigneeId !== user.sub) {
       throw new ForbiddenException('Primero debes tomar esta denuncia');
     }
-    if (terminalStatuses.includes(report.status)) {
+    const canReopenResolved =
+      report.status === ReportStatus.RESUELTO &&
+      (dto.status === ReportStatus.PENDIENTE ||
+        dto.status === ReportStatus.EN_PROCESO);
+    if (terminalStatuses.includes(report.status) && !canReopenResolved) {
       throw new ForbiddenException('Esta denuncia ya está cerrada');
     }
 
@@ -449,6 +595,11 @@ export class DenunciasService {
         data: {
           status: dto.status,
           resolvedAt: dto.status === ReportStatus.RESUELTO ? new Date() : null,
+          archivedAt:
+            dto.status === ReportStatus.RESUELTO ||
+            dto.status === ReportStatus.RECHAZADO
+              ? (report.archivedAt ?? new Date())
+              : null,
         },
         include: {
           category: true,
@@ -460,14 +611,16 @@ export class DenunciasService {
           },
         },
       });
-      await transaction.reportHistory.create({
-        data: {
-          reportId: id,
-          fromStatus: report.status,
-          toStatus: dto.status,
-          changedBy: user.sub,
-        },
-      });
+      if (report.status !== dto.status) {
+        await transaction.reportHistory.create({
+          data: {
+            reportId: id,
+            fromStatus: report.status,
+            toStatus: dto.status,
+            changedBy: user.sub,
+          },
+        });
+      }
       return updated;
     });
   }
@@ -583,7 +736,13 @@ export class DenunciasService {
   }
 
   private async assertCanAccess(
-    report: { reporterId: string; entityName: string | null } | null,
+    report: {
+      reporterId: string;
+      entityName: string | null;
+      type: ReportType;
+      title: string;
+      category?: { name: string };
+    } | null,
     user: AuthenticatedUser,
   ) {
     if (!report) {
@@ -601,7 +760,7 @@ export class DenunciasService {
     }
     if (managementRoles.includes(user.role)) {
       const actor = await this.getManagementEntity(user);
-      this.assertReportOrganization(report.entityName, actor.entityName);
+      this.assertReportOrganization(report, actor.entityName);
     }
   }
 
@@ -629,14 +788,126 @@ export class DenunciasService {
   }
 
   private assertReportOrganization(
-    reportEntityName: string | null,
+    report: {
+      entityName: string | null;
+      type: ReportType;
+      title: string;
+      category?: { name: string };
+    },
     actorEntityName: string,
   ) {
-    if (reportEntityName && reportEntityName !== actorEntityName) {
+    if (
+      !report.entityName ||
+      normalizeOrganizationName(report.entityName) ===
+        normalizeOrganizationName(actorEntityName)
+    ) {
+      return;
+    }
+
+    if (this.isOrganizationOverride(report, actorEntityName)) {
+      return;
+    }
+
+    const sharedRoute = sharedReportOrganizations.find(
+      ({ type, names }) =>
+        type === report.type &&
+        names.some(
+          (name) =>
+            normalizeOrganizationName(name) ===
+            normalizeOrganizationName(report.entityName ?? ''),
+        ) &&
+        names.some(
+          (name) =>
+            normalizeOrganizationName(name) ===
+            normalizeOrganizationName(actorEntityName),
+        ),
+    );
+
+    if (!sharedRoute) {
       throw new ForbiddenException(
         'Esta denuncia está asignada a otro organismo',
       );
     }
+  }
+
+  private sharedOrganizationFilters(actorEntityName: string) {
+    const normalizedActor = normalizeOrganizationName(actorEntityName);
+    return sharedReportOrganizations.flatMap(({ type, names }) => {
+      if (
+        !names.some(
+          (name) => normalizeOrganizationName(name) === normalizedActor,
+        )
+      ) {
+        return [];
+      }
+
+      return names
+        .filter((name) => normalizeOrganizationName(name) !== normalizedActor)
+        .map((entityName) => ({ entityName, type }));
+    });
+  }
+
+  private reportOrganizationFilters(actorEntityName: string) {
+    const normalizedActor = normalizeOrganizationName(actorEntityName);
+    return reportOrganizationOverrides
+      .filter((route) =>
+        [route.organizationName, ...route.sharedOrganizationNames].some(
+          (name) => normalizeOrganizationName(name) === normalizedActor,
+        ),
+      )
+      .flatMap((route) =>
+        [route.organizationName, ...route.sharedOrganizationNames]
+          .filter((name) => normalizeOrganizationName(name) !== normalizedActor)
+          .map((entityName) => ({
+            entityName,
+            type: route.type,
+            category: { is: { name: route.categoryName } },
+          })),
+      );
+  }
+
+  private isOrganizationOverride(
+    report: {
+      entityName: string | null;
+      type: ReportType;
+      title: string;
+      category?: { name: string };
+    },
+    actorEntityName: string,
+  ) {
+    const route = this.getOrganizationOverride(report);
+    if (!route) {
+      return false;
+    }
+
+    const organizations = [
+      route.organizationName,
+      ...route.sharedOrganizationNames,
+    ];
+    return (
+      organizations.some(
+        (name) =>
+          normalizeOrganizationName(name) ===
+          normalizeOrganizationName(actorEntityName),
+      ) &&
+      organizations.some(
+        (name) =>
+          normalizeOrganizationName(name) ===
+          normalizeOrganizationName(report.entityName ?? ''),
+      )
+    );
+  }
+
+  private getOrganizationOverride(report: {
+    type: ReportType;
+    category?: { name: string };
+  }) {
+    return reportOrganizationOverrides.find(
+      (route) =>
+        route.type === report.type &&
+        normalizeOrganizationName(route.categoryName) ===
+          normalizeOrganizationName(report.category?.name ?? ''),
+    );
   }
 
   private parseDate(value: string, field: string) {

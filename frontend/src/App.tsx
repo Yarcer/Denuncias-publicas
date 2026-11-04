@@ -13,9 +13,10 @@ import SolicitudesFuncionarios from './pages/SolicitudesFuncionarios';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
-type AuthRoute = 'login' | 'register' | 'anonymous' | 'management-login';
+type AuthRoute = 'home' | 'login' | 'register' | 'anonymous' | 'management-login';
 
 function getAuthRoute(pathname = window.location.pathname): AuthRoute {
+  if (pathname === '/') return 'home';
   if (pathname === '/gestion/login') return 'management-login';
   if (pathname === '/registro') return 'register';
   if (pathname === '/anonimo') return 'anonymous';
@@ -23,6 +24,20 @@ function getAuthRoute(pathname = window.location.pathname): AuthRoute {
 }
 
 type Report = { id: string; title: string; description: string; status: string; priority?: string };
+type ReportHistoryEntry = {
+  id: string;
+  fromStatus: string;
+  toStatus: string;
+  createdAt: string;
+  report: { id: string; title: string };
+  responsible: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    email: string;
+    entityName?: string | null;
+  } | null;
+};
 type ManagedReport = Report & {
   type?: string;
   entityName?: string | null;
@@ -171,28 +186,28 @@ function GeneralStatistics() {
 
   const sections = statistics
     ? [
-        {
-          title: 'Por estado',
-          items: statistics.byStatus.map((item) => ({
-            label: item.status?.replace(/_/g, ' ') ?? '',
-            count: item.count,
-          })),
-        },
-        {
-          title: 'Por tipo',
-          items: statistics.byType.map((item) => ({
-            label: item.type ?? '',
-            count: item.count,
-          })),
-        },
-        {
-          title: 'Por prioridad',
-          items: statistics.byPriority.map((item) => ({
-            label: item.priority ?? '',
-            count: item.count,
-          })),
-        },
-      ]
+      {
+        title: 'Por estado',
+        items: statistics.byStatus.map((item) => ({
+          label: item.status?.replace(/_/g, ' ') ?? '',
+          count: item.count,
+        })),
+      },
+      {
+        title: 'Por tipo',
+        items: statistics.byType.map((item) => ({
+          label: item.type ?? '',
+          count: item.count,
+        })),
+      },
+      {
+        title: 'Por prioridad',
+        items: statistics.byPriority.map((item) => ({
+          label: item.priority ?? '',
+          count: item.count,
+        })),
+      },
+    ]
     : [];
   const maximumMonthlyCount = Math.max(
     1,
@@ -203,7 +218,6 @@ function GeneralStatistics() {
     <section className="statistics-page">
       <header className="statistics-header">
         <div>
-          <span className="statistics-eyebrow">Administración</span>
           <h1>Estadísticas generales</h1>
           <p>Resumen de denuncias registradas en el sistema.</p>
         </div>
@@ -275,6 +289,124 @@ function GeneralStatistics() {
             </article>
           </div>
         </>
+      )}
+    </section>
+  );
+}
+
+function ManagementHistory() {
+  const [historyItems, setHistoryItems] = useState<ReportHistoryEntry[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadHistory() {
+      try {
+        const response = await api.get('/denuncias/gestion/historial');
+        if (active) {
+          setHistoryItems(response.data.data.items as ReportHistoryEntry[]);
+          setError('');
+        }
+      } catch (loadError: unknown) {
+        if (active) {
+          setError(
+            getApiErrorMessage(loadError, 'No se pudo cargar el historial.'),
+          );
+        }
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    }
+
+    void loadHistory();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const search = searchTerm.trim().toLocaleLowerCase('es-UY');
+  const visibleHistory = historyItems.filter((item) => {
+    const responsible = item.responsible;
+    const responsibleText = responsible
+      ? `${responsible.firstName ?? ''} ${responsible.lastName ?? ''} ${responsible.email} ${responsible.entityName ?? ''}`
+      : 'usuario no disponible';
+    return `${item.report.title} ${item.fromStatus} ${item.toStatus} ${responsibleText}`
+      .toLocaleLowerCase('es-UY')
+      .includes(search);
+  });
+
+  return (
+    <section className="management-history">
+      <header className="management-history-header">
+        <div>
+          <span className="eyebrow">Gestión de reportes</span>
+          <h1>Historial de cambios</h1>
+          <p>Consulta cuándo cambió el estado de cada reporte y quién realizó el cambio.</p>
+        </div>
+        <label className="admin-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            type="search"
+            placeholder="Buscar en el historial..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            aria-label="Buscar en el historial"
+          />
+        </label>
+      </header>
+
+      {error && <p className="error management-error">{error}</p>}
+      <div className="admin-board-heading">
+        <div>
+          <h2>Actividad registrada</h2>
+          <p>{visibleHistory.length} {visibleHistory.length === 1 ? 'cambio' : 'cambios'}</p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <p className="admin-column-empty">Cargando historial...</p>
+      ) : visibleHistory.length === 0 ? (
+        <p className="admin-column-empty">
+          {search ? 'No hay cambios que coincidan con la búsqueda.' : 'Todavía no hay cambios de estado registrados.'}
+        </p>
+      ) : (
+        <div className="admin-history-list">
+          {visibleHistory.map((item) => {
+            const fullName = `${item.responsible?.firstName ?? ''} ${item.responsible?.lastName ?? ''}`.trim();
+            const responsibleName =
+              fullName || item.responsible?.email || 'Usuario no disponible';
+
+            return (
+              <article className="admin-history-card" key={item.id}>
+                <div className="admin-history-change">
+                  <span className={`admin-status-chip admin-status-${item.fromStatus.toLowerCase()}`}>
+                    {item.fromStatus.replace(/_/g, ' ')}
+                  </span>
+                  <span aria-hidden="true">→</span>
+                  <span className={`admin-status-chip admin-status-${item.toStatus.toLowerCase()}`}>
+                    {item.toStatus.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <h3>{item.report.title}</h3>
+                <p>
+                  Modificado por <strong>{responsibleName}</strong>
+                  {fullName && item.responsible?.email && (
+                    <span className="admin-history-email"> · {item.responsible.email}</span>
+                  )}
+                </p>
+                <time dateTime={item.createdAt}>
+                  {new Intl.DateTimeFormat('es-UY', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  }).format(new Date(item.createdAt))}
+                </time>
+              </article>
+            );
+          })}
+        </div>
       )}
     </section>
   );
@@ -426,28 +558,93 @@ function ManagementDashboard({
   currentUserId: string;
   onLogout: () => void;
 }) {
+  const signedInUser = useAuthStore((state) => state.user);
+  const signedInCsrfToken = useAuthStore((state) => state.csrfToken);
+  const updateSession = useAuthStore((state) => state.setSession);
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [managementView, setManagementView] = useState<
-    'reports' | 'users' | 'create-user' | 'statistics' | 'requests'
-  >(isAdmin ? 'users' : 'reports');
+    'home' | 'reports' | 'history' | 'users' | 'create-user' | 'statistics' | 'requests'
+  >('home');
   const [dateOrder, setDateOrder] = useState<'newest' | 'oldest'>('newest');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [modalityFilter, setModalityFilter] = useState('');
   const [filter, setFilter] = useState('active');
+  const [isKanbanView, setIsKanbanView] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [accountError, setAccountError] = useState('');
+  const accountName = [signedInUser?.firstName, signedInUser?.lastName]
+    .filter(Boolean)
+    .join(' ') || signedInUser?.email || 'Cuenta activa';
+  const accountInitials = accountName
+    .split(/[\s@._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toLocaleUpperCase('es-UY'))
+    .join('');
+  const accountRole = isAdmin
+    ? 'Gestión de superadministrador'
+    : isEntityAdmin
+      ? 'Gestión de administrador de ente público'
+      : 'Gestión de funcionario';
+  const accountEntity = isAdmin
+    ? 'Ámbito global'
+    : `Ente público: ${signedInUser?.entityName || 'No informado'}`;
+
+  useEffect(() => {
+    let active = true;
+
+    async function refreshManagementUser() {
+      try {
+        const response = await api.get('/auth/me');
+        if (active) {
+          updateSession(
+            response.data.data.user,
+            response.data.data.csrfToken ?? signedInCsrfToken ?? '',
+          );
+          setAccountError('');
+        }
+      } catch (accountLoadError: unknown) {
+        if (active) {
+          setAccountError(
+            getApiErrorMessage(accountLoadError, 'No se pudo actualizar la información de la cuenta.'),
+          );
+        }
+      }
+    }
+
+    void refreshManagementUser();
+    return () => {
+      active = false;
+    };
+  }, [signedInCsrfToken, updateSession]);
+
+  async function fetchManagementReports(
+    selectedStatus: string,
+    includeResolved: boolean,
+  ): Promise<ManagedReport[]> {
+    const responses = await Promise.all([
+      api.get(
+        '/denuncias/gestion/bandeja',
+        selectedStatus === 'active' ? {} : { params: { status: selectedStatus } },
+      ),
+      ...(includeResolved
+        ? [api.get('/denuncias/gestion/bandeja', { params: { status: 'RESUELTO' } })]
+        : []),
+    ]);
+    return responses.flatMap((response) => response.data.data.items as ManagedReport[]);
+  }
 
   async function loadReports(selectedStatus = filter) {
     if (isAdmin) return;
     try {
-      const response = await api.get(
-        '/denuncias/gestion/bandeja',
-        selectedStatus === 'active' ? {} : { params: { status: selectedStatus } },
-      );
-      setReports(response.data.data.items);
+      setReports(await fetchManagementReports(
+        selectedStatus,
+        isKanbanView && selectedStatus === 'active',
+      ));
       setError('');
     } catch (loadError: unknown) {
       setError(getApiErrorMessage(loadError, 'No se pudo cargar la bandeja.'));
@@ -460,12 +657,12 @@ function ManagementDashboard({
 
     async function fetchReports() {
       try {
-        const response = await api.get(
-          '/denuncias/gestion/bandeja',
-          filter === 'active' ? {} : { params: { status: filter } },
+        const items = await fetchManagementReports(
+          filter,
+          isKanbanView && filter === 'active',
         );
         if (active) {
-          setReports(response.data.data.items);
+          setReports(items);
           setError('');
         }
       } catch (loadError: unknown) {
@@ -479,7 +676,7 @@ function ManagementDashboard({
     return () => {
       active = false;
     };
-  }, [filter, isAdmin]);
+  }, [filter, isAdmin, isKanbanView]);
 
   function exportReports(format: 'csv' | 'xlsx' | 'pdf') {
     if (!visibleReports.length) {
@@ -489,7 +686,7 @@ function ManagementDashboard({
 
     const rows = buildExportRows(visibleReports);
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-    const baseName = `denuncias-${filter === 'active' ? 'activa' : filter}-${timestamp}`;
+    const baseName = `denuncias-${filter === 'active' ? 'todas' : filter}-${timestamp}`;
 
     if (format === 'csv') {
       const headers = Object.keys(rows[0]);
@@ -510,7 +707,7 @@ function ManagementDashboard({
       return;
     }
 
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     const headers = Object.keys(rows[0]);
     const tableRows = rows.map((row) => headers.map((header) => row[header as keyof typeof row] ?? ''));
 
@@ -523,8 +720,19 @@ function ManagementDashboard({
       head: [headers],
       body: tableRows,
       startY: 84,
-      margin: { left: 40, right: 40 },
-      styles: { fontSize: 7, cellPadding: 4 },
+      margin: { left: 32, right: 32 },
+      styles: { fontSize: 7, cellPadding: 4, minCellWidth: 48 },
+      columnStyles: {
+        1: { minCellWidth: 70 },
+        2: { minCellWidth: 100 },
+        5: { minCellWidth: 80 },
+        6: { minCellWidth: 85 },
+        7: { minCellWidth: 75 },
+        8: { minCellWidth: 90 },
+        11: { minCellWidth: 85 },
+      },
+      horizontalPageBreak: true,
+      horizontalPageBreakRepeat: 0,
       headStyles: { fillColor: [21, 86, 181], textColor: 255 },
       alternateRowStyles: { fillColor: [247, 250, 255] },
     });
@@ -545,15 +753,6 @@ function ManagementDashboard({
 
     void loadAssignableUsers();
   }, [isAdmin]);
-
-  async function archiveReport(id: string) {
-    try {
-      await api.patch(`/denuncias/${id}/archivar`);
-      await loadReports();
-    } catch (archiveError: unknown) {
-      setError(getApiErrorMessage(archiveError, 'No se pudo archivar la denuncia.'));
-    }
-  }
 
   async function takeReport(id: string) {
     try {
@@ -582,14 +781,26 @@ function ManagementDashboard({
     }
   }
 
-  const activeColumns = [
-    { title: 'Pendientes', status: 'PENDIENTE' },
-    { title: 'En revisión', status: 'EN_REVISION' },
-    { title: 'Asignadas', status: 'ASIGNADO' },
-    { title: 'En proceso', status: 'EN_PROCESO' },
-  ];
+  async function moveReportToStatus(id: string, status: string) {
+    const report = reports.find((item) => item.id === id);
+    if (!report || report.status === status) return;
+    if (report.assignee && report.assignee.id !== currentUserId) return;
+
+    try {
+      if (!report.assignee) {
+        await api.post(`/denuncias/${id}/tomar`);
+      }
+      await api.patch(`/denuncias/${id}/estado`, { status });
+      await loadReports();
+      setError('');
+    } catch (statusError: unknown) {
+      setError(getApiErrorMessage(statusError, 'No se pudo actualizar el estado.'));
+      await loadReports();
+    }
+  }
 
   const filterLabels: Record<string, string> = {
+    active: 'Todos los reportes',
     PENDIENTE: 'Pendientes',
     ASIGNADO: 'Asignadas',
     EN_REVISION: 'En revisión',
@@ -599,31 +810,51 @@ function ManagementDashboard({
     archived: 'Archivadas',
   };
 
-  const columns = filter === 'active'
-    ? activeColumns
-    : [{ title: filterLabels[filter] ?? 'Reportes', status: '' }];
+  function changeReportFilter(selectedFilter: string) {
+    setFilter(selectedFilter);
+    if (selectedFilter !== 'active') setIsKanbanView(false);
+  }
+
+  function clearReportFilters() {
+    setFilter(filter === 'archived' ? 'archived' : 'active');
+    setDateOrder('newest');
+    setDateFrom('');
+    setDateTo('');
+    setCategoryFilter('');
+    setModalityFilter('');
+    setSearchTerm('');
+  }
+
+  const kanbanColumns = [
+    { title: 'Pendiente', status: 'PENDIENTE', statuses: ['PENDIENTE', 'ASIGNADO', 'EN_REVISION'] },
+    { title: 'En proceso', status: 'EN_PROCESO', statuses: ['EN_PROCESO'] },
+    { title: 'Realizada', status: 'RESUELTO', statuses: ['RESUELTO'] },
+  ];
+  const columns = isKanbanView && filter === 'active'
+    ? kanbanColumns
+    : [{ title: filterLabels[filter] ?? 'Reportes', status: '', statuses: [] as string[] }];
 
   const search = searchTerm.trim().toLowerCase();
- const categories = reports.reduce<NonNullable<ManagedReport['category']>[]>(
-  (unique, report) => {
-    const category = report.category;
+  const categories = reports.reduce<NonNullable<ManagedReport['category']>[]>(
+    (unique, report) => {
+      const category = report.category;
 
-    if (category && !unique.some((item) => item.id === category.id)) {
-      unique.push(category);
-    }
+      if (category && !unique.some((item) => item.id === category.id)) {
+        unique.push(category);
+      }
 
-    return unique;
-  },
-  [],
-).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+      return unique;
+    },
+    [],
+  ).sort((a, b) => a.name.localeCompare(b.name, 'es'));
 
   const startOfRange = dateFrom
-  ? new Date(`${dateFrom}T00:00:00`).getTime()
-  : null;
+    ? new Date(`${dateFrom}T00:00:00`).getTime()
+    : null;
 
   const endOfRange = dateTo
-  ? new Date(`${dateTo}T23:59:59.999`).getTime()
-  : null;
+    ? new Date(`${dateTo}T23:59:59.999`).getTime()
+    : null;
 
   const visibleReports = reports
     .filter((item) => {
@@ -665,18 +896,50 @@ function ManagementDashboard({
   }
 
   return (
-    <main className={`app-shell admin-app-shell ${isAdmin ? 'superadmin-shell' : 'entity-shell'}`}>
+    <main
+      className={`app-shell admin-app-shell ${
+        isAdmin ? 'superadmin-shell' : isEntityAdmin ? 'entity-shell' : 'staff-shell'
+      }`}
+    >
+      <header className="admin-account-header">
+        <div className="admin-brand" aria-label="PuntoReporte">
+          <span>Punto</span>Reporte
+          <small>Gestión urbana</small>
+        </div>
+        <div className="admin-account-heading">
+          <strong>{accountRole}</strong>
+          <span>{accountEntity}</span>
+        </div>
+        <details className="admin-account-menu">
+          <summary aria-label="Mostrar información de la cuenta">
+            <span className="admin-account-avatar" aria-hidden="true">
+              {accountInitials || 'U'}
+            </span>
+            <span className="admin-account-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div className="admin-account-popover">
+            <strong>{accountName}</strong>
+            <span>{accountRole}</span>
+            <span>{accountEntity}</span>
+            <span>{signedInUser?.email}</span>
+            {accountError && <span className="admin-account-error">{accountError}</span>}
+            <button type="button" onClick={onLogout}>
+              <span aria-hidden="true">↪</span>
+              Cerrar sesión
+            </button>
+          </div>
+        </details>
+      </header>
       <div className="admin-layout">
         <aside className="admin-sidebar">
-          <div className="admin-brand" aria-label="PuntoReporte">
-            <span>Punto</span>Reporte
-            <small>Gestión urbana</small>
-          </div>
-
           <nav className="admin-nav" aria-label="Navegación de administración">
             {!isAdmin && (
               <>
-                <button type="button" onClick={() => scrollToSection('admin-summary')}>
+                <button
+                  type="button"
+                  className={managementView === 'home' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('home')}
+                >
                   <span aria-hidden="true">⌂</span> Inicio
                 </button>
                 <button
@@ -685,7 +948,7 @@ function ManagementDashboard({
                   onClick={() => {
                     setManagementView('reports');
                     setFilter('active');
-                    scrollToSection('admin-board');
+                    requestAnimationFrame(() => scrollToSection('admin-board'));
                   }}
                 >
                   <span aria-hidden="true">▤</span> Bandeja de reportes
@@ -693,14 +956,32 @@ function ManagementDashboard({
                 <button
                   type="button"
                   className={managementView === 'reports' && isArchivedView ? 'admin-nav-active' : ''}
-                  onClick={() => { setManagementView('reports'); setFilter('archived'); }}
+                  onClick={() => {
+                    setManagementView('reports');
+                    setFilter('archived');
+                    setIsKanbanView(false);
+                  }}
                 >
                   <span aria-hidden="true">▣</span> Archivadas
+                </button>
+                <button
+                  type="button"
+                  className={managementView === 'history' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('history')}
+                >
+                  <span aria-hidden="true">◷</span> Historial de cambios
                 </button>
               </>
             )}
             {isAdmin && (
               <>
+                <button
+                  type="button"
+                  className={managementView === 'home' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('home')}
+                >
+                  <span aria-hidden="true">⌂</span> Inicio
+                </button>
                 <button
                   type="button"
                   className={managementView === 'statistics' ? 'admin-nav-active' : ''}
@@ -736,13 +1017,92 @@ function ManagementDashboard({
             )}
           </nav>
 
-          <button type="button" className="admin-logout" onClick={onLogout}>
-            <span aria-hidden="true">↪</span> Cerrar sesión
-          </button>
         </aside>
 
         <section className="admin-main">
-          {managementView === 'requests' ? (
+          {managementView === 'home' ? (
+            <section className="management-home">
+              <header className="management-home-header">
+                <span className="eyebrow">
+                  {isAdmin ? 'Administración general' : 'Gestión de reportes'}
+                </span>
+                <h1>
+                  {isAdmin
+                    ? 'Inicio del superadministrador'
+                    : isEntityAdmin
+                      ? 'Inicio de administrador de ente público'
+                      : 'Inicio del funcionario'}
+                </h1>
+                <p>
+                  {isAdmin
+                    ? 'Administra las cuentas, solicitudes y estadísticas de la plataforma.'
+                    : 'Consulta y gestiona los reportes asignados a tu organismo.'}
+                </p>
+              </header>
+
+              <div className="management-home-cards">
+                {isAdmin ? (
+                  <>
+                    <button type="button" onClick={() => setManagementView('users')}>
+                      <span aria-hidden="true">◉</span>
+                      <strong>Cuentas de funcionarios</strong>
+                      <small>Crear y administrar accesos.</small>
+                    </button>
+                    <button type="button" onClick={() => setManagementView('requests')}>
+                      <span aria-hidden="true">＋</span>
+                      <strong>Solicitudes</strong>
+                      <small>Revisar solicitudes de funcionarios.</small>
+                    </button>
+                    <button type="button" onClick={() => setManagementView('statistics')}>
+                      <span aria-hidden="true">▥</span>
+                      <strong>Estadísticas</strong>
+                      <small>Ver el resumen general de reportes.</small>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilter('active');
+                        setManagementView('reports');
+                      }}
+                    >
+                      <span aria-hidden="true">▤</span>
+                      <strong>Bandeja de reportes</strong>
+                      <small>Consultar y gestionar reportes activos.</small>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilter('archived');
+                        setManagementView('reports');
+                        setIsKanbanView(false);
+                      }}
+                    >
+                      <span aria-hidden="true">▣</span>
+                      <strong>Reportes archivados</strong>
+                      <small>Consultar reportes ya archivados.</small>
+                    </button>
+                    <button type="button" onClick={() => setManagementView('history')}>
+                      <span aria-hidden="true">◷</span>
+                      <strong>Historial de cambios</strong>
+                      <small>Consultar los cambios de estado y sus responsables.</small>
+                    </button>
+                    {isEntityAdmin && (
+                      <button type="button" onClick={() => setManagementView('requests')}>
+                        <span aria-hidden="true">＋</span>
+                        <strong>Solicitar funcionario</strong>
+                        <small>Enviar una solicitud de acceso.</small>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
+          ) : managementView === 'history' ? (
+            <ManagementHistory />
+          ) : managementView === 'requests' ? (
             <SolicitudesFuncionarios isSuperAdmin={isAdmin} />
           ) : isAdmin ? (
             managementView === 'statistics' ? (
@@ -756,277 +1116,359 @@ function ManagementDashboard({
             )
           ) : (
             <>
-             <div className="admin-page-layout">
-            <div className="admin-page-content">
-              <header className="admin-header">
-                <div className="admin-page-title">
-                  <span className="eyebrow">{isAdmin ? 'Administración' : 'Ente público'}</span>
-                  <h1>Bandeja de denuncias</h1>
-                  <p>Organiza y sigue los reportes de la ciudad.</p>
-                </div>
+              <div className="admin-page-layout">
+                <div className="admin-page-content">
+                  <header className="admin-header">
+                    <div className="admin-page-title">
+                      <span className="eyebrow">
+                        {isAdmin ? 'Administración' : isEntityAdmin ? 'Administradores' : 'Funcionarios'}
+                      </span>
+                      <h1>Bandeja de reportes</h1>
+                      <p>Organiza y sigue los reportes de la ciudad.</p>
+                    </div>
 
-                <div className="admin-header-tools">
-                  <label className="admin-search">
-                    <span aria-hidden="true">⌕</span>
-                    <input
-                      type="search"
-                      placeholder="Buscar denuncias..."
-                      value={searchTerm}
-                      onChange={(event) => setSearchTerm(event.target.value)}
-                      aria-label="Buscar denuncias"
-                    />
-                  </label>
-                  <div className="admin-export-actions" aria-label="Exportar denuncias">
-                    <button type="button" onClick={() => exportReports('csv')}>CSV</button>
-                    <button type="button" onClick={() => exportReports('xlsx')}>Excel</button>
-                    <button type="button" onClick={() => exportReports('pdf')}>PDF</button>
-                  </div>
-                </div>
-              </header>
-
-              {error && <p className="error management-error">{error}</p>}
-
-              <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
-                <article className="admin-summary-card admin-summary-blue">
-                  <span className="admin-summary-icon" aria-hidden="true">▤</span>
-                  <div><span>Casos en esta vista</span><strong>{reports.length}</strong></div>
-                </article>
-                <article className="admin-summary-card admin-summary-amber">
-                  <span className="admin-summary-icon" aria-hidden="true">◷</span>
-                  <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
-                </article>
-                <article className="admin-summary-card admin-summary-green">
-                  <span className="admin-summary-icon" aria-hidden="true">✓</span>
-                  <div><span>En proceso</span><strong>{inProgressCount}</strong></div>
-                </article>
-              </section>
-
-              <aside className="admin-filter-panel" aria-label="Filtros de denuncias">
-                <details>
-                  <summary className="admin-filter-heading">
-                    <span aria-hidden="true">☷</span>
-                    <span className="admin-filter-title">
-                      <strong>Filtros</strong>
-                      <small>Estado, fecha, tipo y modalidad</small>
-                    </span>
-                    <span className="admin-filter-chevron" aria-hidden="true">⌄</span>
-                  </summary>
-
-                  <div className="admin-filter-fields">
-                    <label className="admin-filter-control">
-                      <span>Estado</span>
-                      <select value={filter} onChange={(event) => setFilter(event.target.value)}>
-                        <option value="active">Activas · tablero</option>
-                        <option value="PENDIENTE">Pendientes</option>
-                        <option value="ASIGNADO">Asignadas</option>
-                        <option value="EN_REVISION">En revisión</option>
-                        <option value="EN_PROCESO">En proceso</option>
-                        <option value="RESUELTO">Resueltas</option>
-                        <option value="RECHAZADO">Denegadas</option>
-                        <option value="archived">Archivadas</option>
-                      </select>
-                    </label>
-
-                    <label className="admin-filter-control">
-                      <span>Tipo de denuncia</span>
-                      <select
-                        value={categoryFilter}
-                        onChange={(event) => setCategoryFilter(event.target.value)}
-                      >
-                        <option value="">Todos los tipos</option>
-                        {categories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="admin-filter-control">
-                      <span>Modalidad</span>
-                      <select
-                        value={modalityFilter}
-                        onChange={(event) => setModalityFilter(event.target.value)}
-                      >
-                        <option value="">Todas</option>
-                        <option value="identified">Identificadas</option>
-                        <option value="anonymous">Anónimas</option>
-                      </select>
-                    </label>
-
-                    <fieldset className="admin-filter-group">
-                      <legend>Fecha de reporte</legend>
-
-                      <label className="admin-filter-control">
-                        <span>Desde</span>
+                    <div className="admin-header-tools">
+                      <label className="admin-search">
+                        <span aria-hidden="true">⌕</span>
                         <input
-                          type="date"
-                          value={dateFrom}
-                          max={dateTo || undefined}
-                          onChange={(event) => setDateFrom(event.target.value)}
+                          type="search"
+                          placeholder="Buscar denuncias..."
+                          value={searchTerm}
+                          onChange={(event) => setSearchTerm(event.target.value)}
+                          aria-label="Buscar denuncias"
                         />
                       </label>
+                      <div className="admin-filter-panel" aria-label="Filtros de denuncias">
+                        <details>
+                          <summary className="admin-filter-heading">
+                            <span aria-hidden="true">☷</span>
+                            <span className="admin-filter-title">
+                              <strong>Filtros</strong>
+                            </span>
+                            <span className="admin-filter-chevron" aria-hidden="true">⌄</span>
+                          </summary>
 
-                      <label className="admin-filter-control">
-                        <span>Hasta</span>
-                        <input
-                          type="date"
-                          value={dateTo}
-                          min={dateFrom || undefined}
-                          onChange={(event) => setDateTo(event.target.value)}
-                        />
-                      </label>
+                          <div className="admin-filter-fields">
+                            {!isArchivedView && (
+                              <label className="admin-filter-control">
+                                <span>Estado</span>
+                                <select value={filter} onChange={(event) => changeReportFilter(event.target.value)}>
+                                  <option value="active">Todas</option>
+                                  <option value="PENDIENTE">Pendientes</option>
+                                  <option value="ASIGNADO">Asignadas</option>
+                                  <option value="EN_REVISION">En revisión</option>
+                                  <option value="EN_PROCESO">En proceso</option>
+                                  <option value="RESUELTO">Resueltas</option>
+                                  <option value="RECHAZADO">Denegadas</option>
+                                </select>
+                              </label>
+                            )}
 
-                      <label className="admin-filter-control">
-                        <span>Ordenar por fecha</span>
-                        <select
-                          value={dateOrder}
-                          onChange={(event) =>
-                            setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'newest')
-                          }
-                        >
-                          <option value="newest">Más recientes</option>
-                          <option value="oldest">Más antiguas</option>
-                        </select>
-                      </label>
-                    </fieldset>
-                  </div>
-                </details>
-              </aside>
+                            <fieldset className="admin-filter-group">
+                              <legend>Fecha de reporte</legend>
 
-              <div className="admin-results">
-                <div className="admin-board-heading" id="admin-board">
-                  <div>
-                    <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
-                    <p>{visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}</p>
-                  </div>
-                </div>
+                              <label className="admin-filter-control">
+                                <span>Desde</span>
+                                <input
+                                  type="date"
+                                  value={dateFrom}
+                                  max={dateTo || undefined}
+                                  onChange={(event) => setDateFrom(event.target.value)}
+                                />
+                              </label>
 
-                <section
-                  className={`admin-board ${filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}
-                  aria-label={filter === 'active' ? 'Etapas del flujo de trabajo. Deslizá horizontalmente para recorrerlas.' : 'Denuncias archivadas'}
-                  tabIndex={filter === 'active' ? 0 : undefined}
-                >
-                  {columns.map((column) => {
-                    const columnReports = column.status
-                      ? visibleReports.filter((item) => item.status === column.status)
-                      : visibleReports;
+                              <label className="admin-filter-control">
+                                <span>Hasta</span>
+                                <input
+                                  type="date"
+                                  value={dateTo}
+                                  min={dateFrom || undefined}
+                                  onChange={(event) => setDateTo(event.target.value)}
+                                />
+                              </label>
 
-                    return (
-                      <div className="admin-column" key={column.title}>
-                        <header className="admin-column-header">
-                          <h3>{column.title}</h3>
-                          <span>{columnReports.length}</span>
-                        </header>
+                              <label className="admin-filter-control">
+                                <span>Ordenar por fecha</span>
+                                <select
+                                  value={dateOrder}
+                                  onChange={(event) =>
+                                    setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'newest')
+                                  }
+                                >
+                                  <option value="newest">Más recientes</option>
+                                  <option value="oldest">Más antiguas</option>
+                                </select>
+                              </label>
+                            </fieldset>
 
-                        <div className="admin-column-cards">
-                          {columnReports.length === 0 ? (
-                            <p className="admin-column-empty">
-                              {search ? 'No hay coincidencias.' : 'No hay denuncias aquí.'}
-                            </p>
-                          ) : columnReports.map((item) => (
-                            <article className="admin-report-card" key={item.id}>
-                              <div className="admin-report-copy">
-                                <div className="admin-report-chips">
-                                  <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
-                                    {item.status.replace(/_/g, ' ')}
-                                  </span>
-                                  {item.priority && (
-                                    <span className={`admin-priority-chip admin-priority-${item.priority.toLowerCase()}`}>
-                                      Prioridad {item.priority.toLowerCase()}
-                                    </span>
-                                  )}
-                                </div>
-                                <h4>{item.title}</h4>
-                                <p>{item.description}</p>
-                                <div className="admin-report-meta">
-                                  <span><b aria-hidden="true">▣</b>{item.entityName || 'Organismo sin asignar'}</span>
-                                  <span><b aria-hidden="true">⌖</b>{item.address || 'Ubicación sin dirección'}</span>
-                                  <span><b aria-hidden="true">♙</b>{item.reporter?.firstName || item.reporter?.email || 'Ciudadano'}</span>
-                                  <span>
-                                    Enviado: {new Intl.DateTimeFormat('es-UY', {
-                                      dateStyle: 'short',
-                                      timeStyle: 'short',
-                                    }).format(new Date(item.createdAt))}
-                                    </span>
-                                </div>
-
-                                {item.latitude != null && item.longitude != null && (
-                                  <a
-                                    className="admin-map-link"
-                                    href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <span aria-hidden="true">⌖</span> Ver mapa
-                                  </a>
-                                )}
-
-                                {item.evidence?.map((photo) => (
-                                  <ReportImage
-                                    key={photo.id}
-                                    reportId={item.id}
-                                    evidenceId={photo.id}
-                                  />
+                            <label className="admin-filter-control">
+                              <span>Tipo de denuncia</span>
+                              <select
+                                value={categoryFilter}
+                                onChange={(event) => setCategoryFilter(event.target.value)}
+                              >
+                                <option value="">Todos los tipos</option>
+                                {categories.map((category) => (
+                                  <option key={category.id} value={category.id}>
+                                    {category.name}
+                                  </option>
                                 ))}
-                              </div>
-
-                              <div className="admin-report-actions">
-                                <label className="report-assignment">
-                                  <span>Asignar a</span>
-                                  <select
-                                    value={item.assignee?.id ?? ''}
-                                    onChange={(event) => {
-                                      if (event.target.value) {
-                                        void assignReport(item.id, event.target.value);
-                                      }
-                                    }}
-                                  >
-                                    <option value="">Seleccionar funcionario</option>
-                                    {assignableUsers.map((assignableUser) => (
-                                      <option key={assignableUser.id} value={assignableUser.id}>
-                                        {[assignableUser.firstName, assignableUser.lastName]
-                                          .filter(Boolean)
-                                          .join(' ') || assignableUser.email}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                {!item.assignee && (
-                                  <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
-                                )}
-                                {item.assignee && (
-                                  <>
-                                    <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
-                                      En revisión
-                                    </button>
-                                    <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
-                                      Iniciar trabajo
-                                    </button>
-                                    <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
-                                      Marcar resuelta
-                                    </button>
-                                    <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
-                                      Denegar
-                                    </button>
-                                  </>
-                                )}
-                                {item.status === 'RECHAZADO' && filter !== 'archived' && (
-                                  <button className="secondary" onClick={() => archiveReport(item.id)}>
-                                    Archivar
-                                  </button>
-                                )}
-                              </div>
-                            </article>
-                          ))}
-                        </div>
+                              </select>
+                            </label>
+                            <label className="admin-filter-control">
+                              <span>Modalidad</span>
+                              <select
+                                value={modalityFilter}
+                                onChange={(event) => setModalityFilter(event.target.value)}
+                              >
+                                <option value="">Todas</option>
+                                <option value="identified">Identificadas</option>
+                                <option value="anonymous">Anónimas</option>
+                              </select>
+                            </label>
+                            <button
+                              className="admin-clear-filters"
+                              type="button"
+                              onClick={clearReportFilters}
+                            >
+                              Limpiar filtros
+                            </button>
+                          </div>
+                        </details>
                       </div>
-                    );
-                  })}
-                </section>
-              </div>
-            </div>
+                      <div className="admin-export-actions" aria-label="Exportar denuncias">
+                        <button
+                          type="button"
+                          aria-label="Exportar reportes a CSV"
+                          title="Exportar a CSV"
+                          onClick={() => exportReports('csv')}
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 32 32" width="28" height="28">
+                            <path d="M8 3h11l6 6v20H8z" fill="white" stroke="#17834b" strokeWidth="1.8" />
+                            <path d="M19 3v7h6M12 15h9M12 19h9M12 23h9M17 14v10" fill="none" stroke="#17834b" strokeWidth="1.5" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Exportar reportes a Excel"
+                          title="Exportar a Excel"
+                          onClick={() => exportReports('xlsx')}
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 32 32" width="28" height="28">
+                            <rect x="8" y="3" width="18" height="26" rx="2" fill="white" stroke="#217346" strokeWidth="1.5" />
+                            <path d="M18 4v24M9 12h16M9 20h16" stroke="#217346" strokeWidth="1.3" />
+                            <rect x="4" y="10" width="13" height="13" rx="1.5" fill="#217346" />
+                            <path d="m7.5 13 6 7m0-7-6 7" stroke="white" strokeWidth="1.8" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Exportar reportes a PDF"
+                          title="Exportar a PDF"
+                          onClick={() => exportReports('pdf')}
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 32 32" width="28" height="28">
+                            <path d="M8 3h11l6 6v20H8z" fill="white" stroke="#c62828" strokeWidth="1.8" />
+                            <path d="M19 3v7h6" fill="none" stroke="#c62828" strokeWidth="1.5" />
+                            <text x="10" y="21" fill="#c62828" fontSize="7" fontWeight="700">PDF</text>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </header>
 
-          </div>
+                  {error && <p className="error management-error">{error}</p>}
+
+                  <section className="admin-summary" id="admin-summary" aria-label="Resumen de la vista">
+                    <article className="admin-summary-card admin-summary-blue">
+                      <span className="admin-summary-icon" aria-hidden="true">▤</span>
+                      <div><span>Casos en esta vista</span><strong>{reports.length}</strong></div>
+                    </article>
+                    <article className="admin-summary-card admin-summary-amber">
+                      <span className="admin-summary-icon" aria-hidden="true">◷</span>
+                      <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
+                    </article>
+                    <article className="admin-summary-card admin-summary-green">
+                      <span className="admin-summary-icon" aria-hidden="true">✓</span>
+                      <div><span>En proceso</span><strong>{inProgressCount}</strong></div>
+                    </article>
+                  </section>
+
+                  <div className="admin-results">
+                    <div className="admin-board-heading" id="admin-board">
+                      <div>
+                        <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
+                        <p>
+                          {visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}
+                          {isArchivedView && ' · Los reportes se ocultan luego de 90 días archivados.'}
+                        </p>
+                      </div>
+                      {!isArchivedView && (
+                        <button
+                          className="admin-view-toggle"
+                          type="button"
+                          aria-pressed={isKanbanView}
+                          onClick={() => {
+                            if (!isKanbanView) setFilter('active');
+                            setIsKanbanView(!isKanbanView);
+                          }}
+                        >
+                          {isKanbanView ? 'Cambiar a vista lista' : 'Cambiar a vista kanban'}
+                        </button>
+                      )}
+                    </div>
+
+                    <section className={`admin-board ${isKanbanView && filter === 'active' ? 'admin-board-kanban' : filter === 'active' ? 'admin-board-list' : 'admin-board-single'}`}>
+                      {columns.map((column) => {
+                        const columnReports = column.status
+                          ? visibleReports.filter((item) => column.statuses.includes(item.status))
+                          : visibleReports;
+
+                        return (
+                          <div className="admin-column" key={column.title}>
+                            <header className="admin-column-header">
+                              <h3>{column.title}</h3>
+                              <span>{columnReports.length}</span>
+                            </header>
+
+                            <div
+                              className="admin-column-cards"
+                              onDragOver={(event) => {
+                                if (isKanbanView) event.preventDefault();
+                              }}
+                              onDrop={(event) => {
+                                if (!isKanbanView || !column.status) return;
+                                event.preventDefault();
+                                const reportId = event.dataTransfer.getData('text/plain');
+                                if (reportId) void moveReportToStatus(reportId, column.status);
+                              }}
+                            >
+                              {columnReports.length === 0 ? (
+                                <p className="admin-column-empty">
+                                  {search ? 'No hay coincidencias.' : 'No hay denuncias aquí.'}
+                                </p>
+                              ) : columnReports.map((item) => (
+                                <article
+                                  className={`admin-report-card${isKanbanView ? ' admin-report-card-draggable' : ''}`}
+                                  key={item.id}
+                                  draggable={
+                                    isKanbanView &&
+                                    (!item.assignee || item.assignee.id === currentUserId) &&
+                                    !(item.status === 'RESUELTO' && !item.assignee)
+                                  }
+                                  title={
+                                    isKanbanView
+                                      ? item.assignee && item.assignee.id !== currentUserId
+                                        ? 'Solo puedes mover denuncias asignadas a tu usuario'
+                                        : item.status === 'RESUELTO' && !item.assignee
+                                          ? 'Esta denuncia no tiene un funcionario asignado para reabrirla'
+                                          : undefined
+                                      : undefined
+                                  }
+                                  onDragStart={(event) => {
+                                    event.dataTransfer.setData('text/plain', item.id);
+                                    event.dataTransfer.effectAllowed = 'move';
+                                  }}
+                                >
+                                  <div className="admin-report-copy">
+                                    <div className="admin-report-chips">
+                                      <span className={`admin-status-chip admin-status-${item.status.toLowerCase()}`}>
+                                        {item.status.replace(/_/g, ' ')}
+                                      </span>
+                                      {item.priority && (
+                                        <span className={`admin-priority-chip admin-priority-${item.priority.toLowerCase()}`}>
+                                          Prioridad {item.priority.toLowerCase()}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <h4>{item.title}</h4>
+                                    <p>{item.description}</p>
+                                    <div className="admin-report-meta">
+                                      <span><b aria-hidden="true">▣</b>{item.entityName || 'Organismo sin asignar'}</span>
+                                      <span><b aria-hidden="true">⌖</b>{item.address || 'Ubicación sin dirección'}</span>
+                                      <span><b aria-hidden="true">♙</b>{item.reporter?.firstName || item.reporter?.email || 'Ciudadano'}</span>
+                                      <span>
+                                        Enviado: {new Intl.DateTimeFormat('es-UY', {
+                                          dateStyle: 'short',
+                                          timeStyle: 'short',
+                                        }).format(new Date(item.createdAt))}
+                                      </span>
+                                    </div>
+
+                                    {item.latitude != null && item.longitude != null && (
+                                      <a
+                                        className="admin-map-link"
+                                        href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=17/${item.latitude}/${item.longitude}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        <span aria-hidden="true">⌖</span> Ver mapa
+                                      </a>
+                                    )}
+
+                                    {item.evidence?.map((photo) => (
+                                      <ReportImage
+                                        key={photo.id}
+                                        reportId={item.id}
+                                        evidenceId={photo.id}
+                                      />
+                                    ))}
+                                  </div>
+
+                                  {!isArchivedView && (
+                                    <div className="admin-report-actions">
+                                      <label className="report-assignment">
+                                        <span>Asignar a</span>
+                                        <select
+                                          value={item.assignee?.id ?? ''}
+                                          onChange={(event) => {
+                                            if (event.target.value) {
+                                              void assignReport(item.id, event.target.value);
+                                            }
+                                          }}
+                                        >
+                                          <option value="">Seleccionar funcionario</option>
+                                          {assignableUsers.map((assignableUser) => (
+                                            <option key={assignableUser.id} value={assignableUser.id}>
+                                              {[assignableUser.firstName, assignableUser.lastName]
+                                                .filter(Boolean)
+                                                .join(' ') || assignableUser.email}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                      {!item.assignee && (
+                                        <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
+                                      )}
+                                      {item.assignee && (
+                                        <>
+                                          <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
+                                            En revisión
+                                          </button>
+                                          <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
+                                            Iniciar trabajo
+                                          </button>
+                                          <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
+                                            Marcar resuelta
+                                          </button>
+                                          <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
+                                            Denegar
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </article>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </section>
+                  </div>
+                </div>
+
+              </div>
             </>
           )}
         </section>
@@ -1074,6 +1516,7 @@ function App() {
 
   function navigateAuth(route: AuthRoute) {
     const routePaths: Record<AuthRoute, string> = {
+      home: '/',
       login: '/login',
       register: '/registro',
       anonymous: '/anonimo',
@@ -1196,257 +1639,339 @@ function App() {
             className="auth-brand-logo"
           />
 
-          <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
+          {authRoute === 'home' ? (
+            <section className="public-home" aria-labelledby="public-home-title">
+              <span className="public-home-kicker">PuntoReporte · Melo</span>
+              <h1 id="public-home-title">Tu ciudad, un lugar mejor</h1>
+              <p>
+                Reportá problemas de tu entorno y ayudá a mejorar los espacios
+                y servicios de la comunidad.
+              </p>
 
-            <nav
-              className={`auth-route-nav ${managementLogin ? 'auth-route-nav-management' : ''}`}
-              aria-label="Opciones de acceso"
-            >
-              {managementLogin ? (
+              <div className="public-home-actions">
                 <a
+                  className="public-home-action public-home-action-primary"
+                  href="/anonimo"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('anonymous');
+                  }}
+                >
+                  Crear reporte
+                  <small>Podés continuar sin una cuenta</small>
+                </a>
+                <a
+                  className="public-home-action"
                   href="/login"
                   onClick={(event) => {
                     event.preventDefault();
                     navigateAuth('login');
                   }}
                 >
-                  Acceso ciudadano
+                  Iniciar sesión
+                  <small>Seguí tus reportes</small>
                 </a>
-              ) : (
-                <>
-                  <a
-                    href="/login"
-                    className={authRoute === 'login' ? 'active' : ''}
-                    aria-current={authRoute === 'login' ? 'page' : undefined}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      navigateAuth('login');
-                    }}
-                  >
-                    <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
-                      <path d="M10 17l5-5-5-5M15 12H4" />
-                    </svg>
-                    <span>Iniciar sesión</span>
-                  </a>
-                  <a
-                    href="/registro"
-                    className={authRoute === 'register' ? 'active' : ''}
-                    aria-current={authRoute === 'register' ? 'page' : undefined}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      navigateAuth('register');
-                    }}
-                  >
-                    <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M15 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-4A4.5 4.5 0 0 0 2 18.5V20" />
-                      <circle cx="8.5" cy="6.5" r="4" />
-                      <path d="M19 8v6M16 11h6" />
-                    </svg>
-                    <span>Crear cuenta</span>
-                  </a>
-                  <a
-                    href="/anonimo"
-                    className={authRoute === 'anonymous' ? 'active' : ''}
-                    aria-current={authRoute === 'anonymous' ? 'page' : undefined}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      navigateAuth('anonymous');
-                    }}
-                  >
-                    Entrar como anónimo
-                  </a>
-                </>
-              )}
-            </nav>
+                <a
+                  className="public-home-action"
+                  href="/registro"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('register');
+                  }}
+                >
+                  Crear cuenta
+                  <small>Registrate como ciudadano</small>
+                </a>
+              </div>
 
-            {!managementLogin && (
               <a
-                className="institutional-access-link"
+                className="public-home-staff-link"
                 href="/gestion/login"
                 onClick={(event) => {
                   event.preventDefault();
                   navigateAuth('management-login');
                 }}
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-4h4v4" />
-                </svg>
-                <span>
-                  <strong>Acceso para funcionarios</strong>
-                  <small>Ingresar al portal del ente público</small>
-                </span>
-                <b aria-hidden="true">→</b>
+                Acceso para funcionarios
               </a>
-            )}
-            {authRoute === 'anonymous' ? (
-              <div className="auth-anonymous-content">
-                <h2>Ingresar como anónimo</h2>
-                <p>
-                  Podés continuar sin crear una cuenta. La sesión será temporal.
-                </p>
-                {error && <p className="error">{error}</p>}
-                <button
-                  type="button"
-                  className="auth-submit"
-                  onClick={handleAnonymousLogin}
-                >
-                  Continuar como anónimo
-                </button>
-                <small className="auth-helper-text">
-                  Para consultar tus reportes luego, te recomendamos crear una cuenta.
-                </small>
-              </div>
-            ) : (
-              <form className="auth-form auth-form-redesign" onSubmit={handleAuth}>
-                <span className="auth-section-label">
-                  {managementLogin
-                    ? 'PORTAL INSTITUCIONAL'
-                    : registering
-                      ? 'CUENTA CIUDADANA'
-                      : 'ACCESO CIUDADANO'}
-                </span>
-                <h2>
-                  {registering
-                    ? 'Crear cuenta'
-                    : managementLogin
-                      ? 'Acceso de ente público'
-                      : 'Bienvenido/a'}
-                </h2>
-                <p className="auth-form-intro">
-                  {managementLogin
-                    ? 'Ingresá con tu cuenta institucional para gestionar denuncias.'
-                    : registering
-                      ? ''
-                      : 'Ingresá para crear y seguir tus denuncias.'}
-                </p>
 
-                {registering && (
-                  <div className="auth-name-fields">
-                    <label>
-                      Nombre
-                      <input
-                        required
-                        autoComplete="given-name"
-                        placeholder="Tu nombre"
-                        value={credentials.firstName}
-                        onChange={(event) =>
-                          setCredentials({
-                            ...credentials,
-                            firstName: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      Apellido
-                      <input
-                        required
-                        autoComplete="family-name"
-                        placeholder="Tu apellido"
-                        value={credentials.lastName}
-                        onChange={(event) =>
-                          setCredentials({
-                            ...credentials,
-                            lastName: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-                )}
+              <EmergencyShortcuts />
+            </section>
+          ) : (
+            <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
+              <a
+                className="auth-home-link"
+                href="/"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('home');
+                }}
+              >
+                ← Volver al inicio
+              </a>
 
-                <label htmlFor="auth-email">
-                  Correo electrónico
-                  <input
-                    id="auth-email"
-                    required
-                    type="email"
-                    autoComplete="email"
-                    placeholder="nombre@correo.com"
-                    value={credentials.email}
-                    onChange={(event) =>
-                      setCredentials({
-                        ...credentials,
-                        email: event.target.value,
-                      })
-                    }
-                  />
-                </label>
-
-                <label htmlFor="auth-password">
-                  Contraseña
-                  <span className="password-input-wrap">
-                    <input
-                      id="auth-password"
-                      required
-                      minLength={6}
-                      type={showPassword ? 'text' : 'password'}
-                      autoComplete={registering ? 'new-password' : 'current-password'}
-                      placeholder="Ingresá tu contraseña"
-                      value={credentials.password}
-                      onChange={(event) =>
-                        setCredentials({
-                          ...credentials,
-                          password: event.target.value,
-                        })
-                      }
-                    />
-                    <button
-                      className="password-visibility-toggle"
-                      type="button"
-                      onClick={() => setShowPassword((visible) => !visible)}
-                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                      aria-pressed={showPassword}
+              <nav
+                className={`auth-route-nav ${managementLogin ? 'auth-route-nav-management' : ''}`}
+                aria-label="Opciones de acceso"
+              >
+                {managementLogin ? (
+                  <a
+                    href="/login"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateAuth('login');
+                    }}
+                  >
+                    Acceso ciudadano
+                  </a>
+                ) : (
+                  <>
+                    <a
+                      href="/login"
+                      className={authRoute === 'login' ? 'active' : ''}
+                      aria-current={authRoute === 'login' ? 'page' : undefined}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        navigateAuth('login');
+                      }}
                     >
-                      {showPassword ? (
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-                          <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 6-.4.8-1.3 2-2.6 3.2M6.2 6.2C3.9 7.6 2.7 9.7 2.5 11c.5.9 3.9 7 9.5 7 1.1 0 2.1-.2 3-.6" />
-                        </svg>
-                      ) : (
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      )}
-                    </button>
-                  </span>
-                </label>
+                      <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5" />
+                        <path d="M10 17l5-5-5-5M15 12H4" />
+                      </svg>
+                      <span>Iniciar sesión</span>
+                    </a>
+                    <a
+                      href="/registro"
+                      className={authRoute === 'register' ? 'active' : ''}
+                      aria-current={authRoute === 'register' ? 'page' : undefined}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        navigateAuth('register');
+                      }}
+                    >
+                      <svg className="auth-route-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M15 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-4A4.5 4.5 0 0 0 2 18.5V20" />
+                        <circle cx="8.5" cy="6.5" r="4" />
+                        <path d="M19 8v6M16 11h6" />
+                      </svg>
+                      <span>Crear cuenta</span>
+                    </a>
+                    <a
+                      href="/anonimo"
+                      className={authRoute === 'anonymous' ? 'active' : ''}
+                      aria-current={authRoute === 'anonymous' ? 'page' : undefined}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        navigateAuth('anonymous');
+                      }}
+                    >
+                      Entrar como anónimo
+                    </a>
+                  </>
+                )}
+              </nav>
 
-                {registering && (
-                  <label htmlFor="auth-confirm-password">
-                    Confirmar contraseña
+              {!managementLogin && (
+                <a
+                  className="institutional-access-link"
+                  href="/gestion/login"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('management-login');
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-4h4v4" />
+                  </svg>
+                  <span>
+                    <strong>Acceso para funcionarios</strong>
+                    <small>Ingresar al portal del ente público</small>
+                  </span>
+                  <b aria-hidden="true">→</b>
+                </a>
+              )}
+              {authRoute === 'anonymous' ? (
+                <div className="auth-anonymous-content">
+                  <h2>Ingresar como anónimo</h2>
+                  <p>
+                    Podés continuar sin crear una cuenta. La sesión será temporal.
+                  </p>
+                  {error && <p className="error">{error}</p>}
+                  <button
+                    type="button"
+                    className="auth-submit"
+                    onClick={handleAnonymousLogin}
+                  >
+                    Continuar como anónimo
+                  </button>
+                  <small className="auth-helper-text">
+                    Para consultar tus reportes luego, te recomendamos crear una cuenta.
+                  </small>
+                </div>
+              ) : (
+                <form className="auth-form auth-form-redesign" onSubmit={handleAuth}>
+                  <span className="auth-section-label">
+                    {managementLogin
+                      ? 'PORTAL INSTITUCIONAL'
+                      : registering
+                        ? 'CUENTA CIUDADANA'
+                        : 'ACCESO CIUDADANO'}
+                  </span>
+                  <h2>
+                    {registering
+                      ? 'Crear cuenta'
+                      : managementLogin
+                        ? 'Acceso de ente público'
+                        : 'Bienvenido/a'}
+                  </h2>
+                  <p className="auth-form-intro">
+                    {managementLogin
+                      ? 'Ingresá con tu cuenta institucional para gestionar denuncias.'
+                      : registering
+                        ? ''
+                        : 'Ingresá para crear y seguir tus denuncias.'}
+                  </p>
+
+                  {registering && (
+                    <div className="auth-name-fields">
+                      <label>
+                        Nombre
+                        <input
+                          required
+                          autoComplete="given-name"
+                          placeholder="Tu nombre"
+                          value={credentials.firstName}
+                          onChange={(event) =>
+                            setCredentials({
+                              ...credentials,
+                              firstName: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Apellido
+                        <input
+                          required
+                          autoComplete="family-name"
+                          placeholder="Tu apellido"
+                          value={credentials.lastName}
+                          onChange={(event) =>
+                            setCredentials({
+                              ...credentials,
+                              lastName: event.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  <label htmlFor="auth-email">
+                    <span className="auth-field-label">
+                      <svg className="auth-field-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="3" y="5" width="18" height="14" rx="2" />
+                        <path d="m3 7 9 6 9-6" />
+                      </svg>
+                      Correo electrónico
+                    </span>
                     <input
-                      id="auth-confirm-password"
+                      id="auth-email"
                       required
-                      minLength={6}
-                      type="password"
-                      autoComplete="new-password"
-                      placeholder="Ingresá nuevamente tu contraseña"
-                      value={credentials.confirmPassword}
+                      type="email"
+                      autoComplete="email"
+                      placeholder="nombre@correo.com"
+                      value={credentials.email}
                       onChange={(event) =>
                         setCredentials({
                           ...credentials,
-                          confirmPassword: event.target.value,
+                          email: event.target.value,
                         })
                       }
                     />
                   </label>
-                )}
 
-                {error && <p className="error">{error}</p>}
+                  <label htmlFor="auth-password">
+                    <span className="auth-field-label">
+                      <svg className="auth-field-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="3" y="10" width="18" height="11" rx="2" />
+                        <path d="M7 10V7a5 5 0 0 1 10 0v3" />
+                      </svg>
+                      Contraseña
+                    </span>
+                    <span className="password-input-wrap">
+                      <input
+                        id="auth-password"
+                        required
+                        minLength={6}
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete={registering ? 'new-password' : 'current-password'}
+                        placeholder="Ingresá tu contraseña"
+                        value={credentials.password}
+                        onChange={(event) =>
+                          setCredentials({
+                            ...credentials,
+                            password: event.target.value,
+                          })
+                        }
+                      />
+                      <button
+                        className="password-visibility-toggle"
+                        type="button"
+                        onClick={() => setShowPassword((visible) => !visible)}
+                        aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? (
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                            <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.2 9.5 6-.4.8-1.3 2-2.6 3.2M6.2 6.2C3.9 7.6 2.7 9.7 2.5 11c.5.9 3.9 7 9.5 7 1.1 0 2.1-.2 3-.6" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
+                    </span>
+                  </label>
 
-                <button type="submit" className="auth-submit">
-                  {registering ? 'Crear mi cuenta' : 'Entrar'}
-                </button>
-              </form>
-            )}
+                  {registering && (
+                    <label htmlFor="auth-confirm-password">
+                      Confirmar contraseña
+                      <input
+                        id="auth-confirm-password"
+                        required
+                        minLength={6}
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="Ingresá nuevamente tu contraseña"
+                        value={credentials.confirmPassword}
+                        onChange={(event) =>
+                          setCredentials({
+                            ...credentials,
+                            confirmPassword: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                  )}
 
-            <p className="auth-panel-footer">
-              Reportá. Informá. Mejorá.
-            </p>
-          </section>
+                  {error && <p className="error">{error}</p>}
+
+                  <button type="submit" className="auth-submit">
+                    {registering ? 'Crear mi cuenta' : 'Entrar'}
+                  </button>
+                </form>
+              )}
+
+              <p className="auth-panel-footer">
+                Reportá. Informá. Mejorá.
+              </p>
+            </section>
+          )}
         </div>
       </main>
     );
@@ -1559,14 +2084,11 @@ function App() {
       </nav>
 
       <section className="dashboard">
-
         <header className="dashboard-header">
-          <div>
-            <h1 className="saludo-ciudadano">
-              <span className="saludo-icono" aria-hidden="true">👋</span>
-              <span>Hola, {user.firstName || user.email}</span>
-            </h1>
-          </div>
+          <h1 className="saludo-ciudadano">
+            <span className="saludo-icono" aria-hidden="true">👋</span>
+            <span>Hola, {user.firstName || user.email}</span>
+          </h1>
         </header>
 
 
@@ -1582,8 +2104,7 @@ function App() {
               </div>
 
               <div className="reports-actions">
-                <strong>{reports.length}</strong>
-                <button
+                <strong className="reports-count">{reports.length}</strong>                <button
                   type="button"
                   onClick={() => {
                     setActualizandoReportes(true);
@@ -1598,7 +2119,7 @@ function App() {
             </div>
 
             {errorReportes && <p className="error">{errorReportes}</p>}
-            
+
             {reports.length === 0 ? (
               <p className="empty-state">
                 Todavía no tienes reportes registrados.
@@ -1617,14 +2138,18 @@ function App() {
                     <p>{item.description}</p>
                   </div>
 
-                  <span>{item.status}</span>
+                  <span
+                    className={`report-status report-status-${item.status.toLowerCase().replace(/_/g, '-')}`}
+                  >
+                    {item.status.toLowerCase().replace(/_/g, ' ')}
+                  </span>
                 </article>
               ))
             )}
           </section>
         )}
 
-        <EmergencyShortcuts />
+        {vistaCiudadano === 'crear' && <EmergencyShortcuts />}
 
       </section>
     </main>

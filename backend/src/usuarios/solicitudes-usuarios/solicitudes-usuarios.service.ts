@@ -59,10 +59,10 @@ export class SolicitudesUsuariosService {
     }
 
     // 3. Obtener el organismo de su cuenta.
-    const organismo = solicitante.entityName?.trim();
+    const organismo = dto.entityName.trim();
 
     if (!organismo) {
-      throw new BadRequestException('Tu cuenta no tiene un organismo asignado');
+      throw new BadRequestException('Debes seleccionar un organismo de destino');
     }
 
     // 4. Normalizar y validar los datos recibidos.

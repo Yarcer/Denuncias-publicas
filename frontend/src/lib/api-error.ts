@@ -2,7 +2,7 @@ import { isAxiosError } from 'axios';
 
 export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (!isAxiosError<{ message?: unknown }>(error)) {
-    return fallback;
+    return error instanceof Error ? `${fallback} (${error.message})` : fallback;
   }
 
   const message = error.response?.data?.message;
@@ -13,5 +13,8 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
     return message.join(', ');
   }
 
-  return fallback;
+  if (error.response) {
+    return `${fallback} (HTTP ${error.response.status}: ${error.message})`;
+  }
+  return `${fallback} (${error.message})`;
 }

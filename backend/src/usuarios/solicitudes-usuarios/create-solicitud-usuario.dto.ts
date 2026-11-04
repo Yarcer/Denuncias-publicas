@@ -27,6 +27,11 @@ export class CreateSolicitudUsuarioDto {
   @IsNotEmpty()
   @MaxLength(100)
   lastName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  entityName!: string;
 }
 
 export class ReviewSolicitudUsuarioDto {

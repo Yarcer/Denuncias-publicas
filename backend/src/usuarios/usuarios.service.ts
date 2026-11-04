@@ -16,7 +16,15 @@ import {
 
 type AuthenticatedUser = { sub: string; role: string };
 
-const administrativeRoles: Role[] = [Role.FUNCIONARIO, Role.SUPERADMINISTRADOR];
+const administrativeRoles: Role[] = [
+  Role.FUNCIONARIO,
+  Role.FUNCIONARIO_ADMINISTRADOR,
+];
+const administrativeOrganizations = [
+  'Intendencia',
+  'OSE',
+  'Policía Municipal',
+];
 const administrativeUserSelection = {
   id: true,
   email: true,
@@ -52,6 +60,7 @@ export class UsuariosService {
     this.assertAdministrator(actor);
     this.assertAdministrativeRole(dto.role);
     this.assertOrganization(dto.role, dto.entityName);
+    this.assertAvailableOrganization(dto.entityName);
 
     try {
       return await this.prisma.user.create({
@@ -85,6 +94,9 @@ export class UsuariosService {
 
     this.assertAdministrativeRole(role);
     this.assertOrganization(role, entityName ?? undefined);
+    if (dto.entityName !== undefined) {
+      this.assertAvailableOrganization(dto.entityName);
+    }
 
     if (id === actor.sub && role !== Role.SUPERADMINISTRADOR) {
       throw new BadRequestException(
@@ -160,7 +172,7 @@ export class UsuariosService {
   private assertAdministrator(actor: AuthenticatedUser) {
     if (actor.role !== Role.SUPERADMINISTRADOR) {
       throw new ForbiddenException(
-        'Solo un superSUPERADMINISTRADOR puede gestionar usuarios',
+        'Solo un SUPERADMINISTRADOR puede gestionar usuarios',
       );
     }
   }
@@ -168,15 +180,28 @@ export class UsuariosService {
   private assertAdministrativeRole(role: Role) {
     if (!administrativeRoles.includes(role)) {
       throw new BadRequestException(
-        'El rol debe ser Ente público o SUPERADMINISTRADOR',
+        'El rol debe ser FUNCIONARIO o FUNCIONARIO_ADMINISTRADOR',
       );
     }
   }
 
   private assertOrganization(role: Role, entityName?: string | null) {
-    if (role !== Role.SUPERADMINISTRADOR && !entityName?.trim()) {
+    if (administrativeRoles.includes(role) && !entityName?.trim()) {
       throw new BadRequestException(
         'El organismo es obligatorio para usuarios administrativos',
+      );
+    }
+  }
+
+  private assertAvailableOrganization(entityName?: string | null) {
+    if (
+      !entityName ||
+      !administrativeOrganizations.some(
+        (organization) => organization === entityName.trim(),
+      )
+    ) {
+      throw new BadRequestException(
+        'El organismo debe ser Intendencia, OSE o Policía Municipal',
       );
     }
   }
@@ -189,7 +214,7 @@ export class UsuariosService {
       error.code === 'P2002'
     ) {
       throw new ConflictException(
-        'Ya existe un usuario con ese correo electrónico',
+        'Vuelva a intentarlo',
       );
     }
     throw error;

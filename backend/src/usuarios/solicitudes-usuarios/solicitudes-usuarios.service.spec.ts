@@ -3,6 +3,43 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SolicitudesUsuariosService } from './solicitudes-usuarios.service';
 
 describe('SolicitudesUsuariosService', () => {
+  it('stores the destination entity selected in the request', async () => {
+    const createRequest = jest.fn().mockResolvedValue({});
+    const service = new SolicitudesUsuariosService({
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'manager-id',
+          role: Role.FUNCIONARIO_ADMINISTRADOR,
+          status: 'ACTIVO',
+          entityName: 'Municipalidad Demo',
+          jurisdiction: 'Melo',
+        }),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      administrativeUserRequest: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: createRequest,
+      },
+    } as unknown as PrismaService);
+
+    await service.crearSolicitud('manager-id', {
+      email: 'staff@example.com',
+      password: 'secure-password',
+      firstName: 'Funcionario',
+      lastName: 'Demo',
+      entityName: 'OSE',
+    });
+
+    expect(createRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          entityName: 'OSE',
+          requestedById: 'manager-id',
+        }),
+      }),
+    );
+  });
+
   type RequestUpdateInput = {
     where: { id: string; status: AdministrativeRequestStatus };
     data: {
