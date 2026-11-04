@@ -575,7 +575,7 @@ function ManagementDashboard({
       return;
     }
 
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     const headers = Object.keys(rows[0]);
     const tableRows = rows.map((row) => headers.map((header) => row[header as keyof typeof row] ?? ''));
 
@@ -588,8 +588,19 @@ function ManagementDashboard({
       head: [headers],
       body: tableRows,
       startY: 84,
-      margin: { left: 40, right: 40 },
-      styles: { fontSize: 7, cellPadding: 4 },
+      margin: { left: 32, right: 32 },
+      styles: { fontSize: 7, cellPadding: 4, minCellWidth: 48 },
+      columnStyles: {
+        1: { minCellWidth: 70 },
+        2: { minCellWidth: 100 },
+        5: { minCellWidth: 80 },
+        6: { minCellWidth: 85 },
+        7: { minCellWidth: 75 },
+        8: { minCellWidth: 90 },
+        11: { minCellWidth: 85 },
+      },
+      horizontalPageBreak: true,
+      horizontalPageBreakRepeat: 0,
       headStyles: { fillColor: [21, 86, 181], textColor: 255 },
       alternateRowStyles: { fillColor: [247, 250, 255] },
     });
