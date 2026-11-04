@@ -770,7 +770,11 @@ function ManagementDashboard({
   }
 
   return (
-    <main className={`app-shell admin-app-shell ${isAdmin ? 'superadmin-shell' : 'entity-shell'}`}>
+    <main
+      className={`app-shell admin-app-shell ${
+        isAdmin ? 'superadmin-shell' : isEntityAdmin ? 'entity-shell' : 'staff-shell'
+      }`}
+    >
       <header className="admin-account-header">
         <div className="admin-brand" aria-label="PuntoReporte">
           <span>Punto</span>Reporte
@@ -889,7 +893,13 @@ function ManagementDashboard({
                 <span className="eyebrow">
                   {isAdmin ? 'Administración general' : 'Gestión de reportes'}
                 </span>
-                <h1>{isAdmin ? 'Inicio del superadministrador' : 'Inicio del funcionario'}</h1>
+                <h1>
+                  {isAdmin
+                    ? 'Inicio del superadministrador'
+                    : isEntityAdmin
+                      ? 'Inicio de administrador de ente público'
+                      : 'Inicio del funcionario'}
+                </h1>
                 <p>
                   {isAdmin
                     ? 'Administra las cuentas, solicitudes y estadísticas de la plataforma.'
@@ -970,7 +980,9 @@ function ManagementDashboard({
                 <div className="admin-page-content">
                   <header className="admin-header">
                     <div className="admin-page-title">
-                      <span className="eyebrow">{isAdmin ? 'Administración' : 'Funcionarios'}</span>
+                      <span className="eyebrow">
+                        {isAdmin ? 'Administración' : isEntityAdmin ? 'Administradores' : 'Funcionarios'}
+                      </span>
                       <h1>Bandeja de reportes</h1>
                       <p>Organiza y sigue los reportes de la ciudad.</p>
                     </div>

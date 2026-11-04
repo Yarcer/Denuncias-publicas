@@ -3142,6 +3142,19 @@ textarea {
   border-color: #d2c4f2;
 }
 
+.admin-app-shell.entity-shell .admin-sidebar,
+.admin-app-shell.entity-shell .admin-account-header {
+  background: linear-gradient(180deg, #17483f 0%, #103b35 100%);
+}
+
+.admin-app-shell.entity-shell .admin-brand span {
+  color: #83d6b7;
+}
+
+.admin-app-shell.entity-shell .admin-nav button.admin-nav-active {
+  background: #21866d;
+}
+
 .app-shell.ciudadano-shell {
   padding: 0 0 45px;
 }
