@@ -16,7 +16,10 @@ import {
 
 type AuthenticatedUser = { sub: string; role: string };
 
-const administrativeRoles: Role[] = [Role.FUNCIONARIO, Role.SUPERADMINISTRADOR];
+const administrativeRoles: Role[] = [
+  Role.FUNCIONARIO,
+  Role.FUNCIONARIO_ADMINISTRADOR,
+];
 const administrativeUserSelection = {
   id: true,
   email: true,
@@ -168,13 +171,13 @@ export class UsuariosService {
   private assertAdministrativeRole(role: Role) {
     if (!administrativeRoles.includes(role)) {
       throw new BadRequestException(
-        'El rol debe ser Ente público o SUPERADMINISTRADOR',
+        'El rol debe ser FUNCIONARIO o FUNCIONARIO_ADMINISTRADOR',
       );
     }
   }
 
   private assertOrganization(role: Role, entityName?: string | null) {
-    if (role !== Role.SUPERADMINISTRADOR && !entityName?.trim()) {
+    if (administrativeRoles.includes(role) && !entityName?.trim()) {
       throw new BadRequestException(
         'El organismo es obligatorio para usuarios administrativos',
       );

@@ -2,10 +2,16 @@ import { Role, UserStatus } from '@prisma/client';
 import {
   IsEmail,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
+
+const administrativeStaffRoles = [
+  Role.FUNCIONARIO,
+  Role.FUNCIONARIO_ADMINISTRADOR,
+];
 
 export class CreateAdministrativeUserDto {
   @IsEmail()
@@ -15,7 +21,7 @@ export class CreateAdministrativeUserDto {
   @MinLength(8)
   password!: string;
 
-  @IsEnum(Role)
+  @IsIn(administrativeStaffRoles)
   role!: Role;
 
   @IsOptional()
@@ -46,7 +52,7 @@ export class UpdateAdministrativeUserDto {
   password?: string;
 
   @IsOptional()
-  @IsEnum(Role)
+  @IsIn(administrativeStaffRoles)
   role?: Role;
 
   @IsOptional()

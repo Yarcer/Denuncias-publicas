@@ -3,7 +3,7 @@ import { api } from '../lib/api'
 import { getApiErrorMessage } from '../lib/api-error'
 import './GestionUsuarios.css'
 
-type AdministrativeRole = 'FUNCIONARIO' | 'FUNCIONARIO_ADMINISTRADOR' | 'SUPERADMINISTRADOR'
+type AdministrativeRole = 'FUNCIONARIO' | 'FUNCIONARIO_ADMINISTRADOR'
 type UserStatus = 'ACTIVO' | 'INACTIVO' | 'BANEADO'
 
 type AdministrativeUser = {
@@ -232,8 +232,8 @@ function GestionUsuarios({
                 disabled={editingId === currentUserId}
                 onChange={(event) => setForm({ ...form, role: event.target.value as AdministrativeRole })}
               >
-                <option value="FUNCIONARIO">Ente público</option>
-                <option value="SUPERADMINISTRADOR">SUPERADMINISTRADOR</option>
+                <option value="FUNCIONARIO">Funcionario</option>
+                <option value="FUNCIONARIO_ADMINISTRADOR">Funcionario Administrador</option>
               </select>
             </label>
             <label>
@@ -299,9 +299,7 @@ function GestionUsuarios({
                         <strong>
                           {user.role === 'FUNCIONARIO'
                             ? 'Funcionario'
-                            : user.role === 'FUNCIONARIO_ADMINISTRADOR'
-                              ? 'Administrador de ente público'
-                              : 'Superadministrador'}
+                            : 'Funcionario Administrador'}
                         </strong>
                         <span>{user.entityName || user.jurisdiction || 'Sin organismo asignado'}</span>
                       </td>
