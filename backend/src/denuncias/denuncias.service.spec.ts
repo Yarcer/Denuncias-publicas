@@ -170,6 +170,104 @@ describe('DenunciasService', () => {
     expect(result.items[0]?.priority).toBe('URGENTE');
   });
 
+  it('returns status history with responsible users, scoped to the current organization', async () => {
+    const history = [
+      {
+        id: 'history-id',
+        fromStatus: 'PENDIENTE',
+        toStatus: 'ASIGNADO',
+        changedBy: 'staff-id',
+        createdAt: new Date('2026-11-01T10:00:00.000Z'),
+        report: { id: reportId, title: 'Luminaria apagada' },
+      },
+    ];
+    const findHistory = jest.fn().mockResolvedValue(history);
+    const findUsers = jest.fn().mockResolvedValue([
+      {
+        id: 'staff-id',
+        firstName: 'Ana',
+        lastName: 'Pérez',
+        email: 'ana@example.com',
+        entityName: 'Municipalidad Demo',
+      },
+    ]);
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ entityName: 'Municipalidad Demo' }),
+        findMany: findUsers,
+      },
+      reportHistory: { findMany: findHistory },
+    } as unknown as PrismaService);
+
+    const result = await service.managementHistory({
+      sub: 'staff-id',
+      role: 'FUNCIONARIO',
+    });
+
+    expect(findHistory).toHaveBeenCalledWith({
+      where: {
+        report: {
+          is: {
+            OR: [
+              { entityName: 'Municipalidad Demo' },
+              { entityName: null },
+              { entityName: 'Intendencia', type: 'URBANO' },
+              {
+                entityName: 'Policía Municipal',
+                type: 'URBANO',
+                category: { is: { name: 'Convivencia' } },
+              },
+            ],
+          },
+        },
+      },
+      select: {
+        id: true,
+        fromStatus: true,
+        toStatus: true,
+        changedBy: true,
+        createdAt: true,
+        report: { select: { id: true, title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(findUsers).toHaveBeenCalledWith({
+      where: { id: { in: ['staff-id'] } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        entityName: true,
+      },
+    });
+    expect(result).toMatchObject({
+      count: 1,
+      items: [
+        {
+          id: 'history-id',
+          report: { id: reportId, title: 'Luminaria apagada' },
+          responsible: { id: 'staff-id', email: 'ana@example.com' },
+        },
+      ],
+    });
+    expect(result.items[0]).not.toHaveProperty('changedBy');
+  });
+
+  it('does not expose management history to citizens', async () => {
+    const findHistory = jest.fn();
+    const service = new DenunciasService({
+      reportHistory: { findMany: findHistory },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.managementHistory({ sub: 'citizen-id', role: 'CIUDADANO' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(findHistory).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['Intendencia', 'Municipalidad Demo', 'URBANO'],
     ['Policía Municipal', 'policia demo', 'POLICIAL'],

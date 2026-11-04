@@ -24,6 +24,20 @@ function getAuthRoute(pathname = window.location.pathname): AuthRoute {
 }
 
 type Report = { id: string; title: string; description: string; status: string; priority?: string };
+type ReportHistoryEntry = {
+  id: string;
+  fromStatus: string;
+  toStatus: string;
+  createdAt: string;
+  report: { id: string; title: string };
+  responsible: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    email: string;
+    entityName?: string | null;
+  } | null;
+};
 type ManagedReport = Report & {
   type?: string;
   entityName?: string | null;
@@ -280,6 +294,124 @@ function GeneralStatistics() {
   );
 }
 
+function ManagementHistory() {
+  const [historyItems, setHistoryItems] = useState<ReportHistoryEntry[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadHistory() {
+      try {
+        const response = await api.get('/denuncias/gestion/historial');
+        if (active) {
+          setHistoryItems(response.data.data.items as ReportHistoryEntry[]);
+          setError('');
+        }
+      } catch (loadError: unknown) {
+        if (active) {
+          setError(
+            getApiErrorMessage(loadError, 'No se pudo cargar el historial.'),
+          );
+        }
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    }
+
+    void loadHistory();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const search = searchTerm.trim().toLocaleLowerCase('es-UY');
+  const visibleHistory = historyItems.filter((item) => {
+    const responsible = item.responsible;
+    const responsibleText = responsible
+      ? `${responsible.firstName ?? ''} ${responsible.lastName ?? ''} ${responsible.email} ${responsible.entityName ?? ''}`
+      : 'usuario no disponible';
+    return `${item.report.title} ${item.fromStatus} ${item.toStatus} ${responsibleText}`
+      .toLocaleLowerCase('es-UY')
+      .includes(search);
+  });
+
+  return (
+    <section className="management-history">
+      <header className="management-history-header">
+        <div>
+          <span className="eyebrow">Gestión de reportes</span>
+          <h1>Historial de cambios</h1>
+          <p>Consulta cuándo cambió el estado de cada reporte y quién realizó el cambio.</p>
+        </div>
+        <label className="admin-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            type="search"
+            placeholder="Buscar en el historial..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            aria-label="Buscar en el historial"
+          />
+        </label>
+      </header>
+
+      {error && <p className="error management-error">{error}</p>}
+      <div className="admin-board-heading">
+        <div>
+          <h2>Actividad registrada</h2>
+          <p>{visibleHistory.length} {visibleHistory.length === 1 ? 'cambio' : 'cambios'}</p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <p className="admin-column-empty">Cargando historial...</p>
+      ) : visibleHistory.length === 0 ? (
+        <p className="admin-column-empty">
+          {search ? 'No hay cambios que coincidan con la búsqueda.' : 'Todavía no hay cambios de estado registrados.'}
+        </p>
+      ) : (
+        <div className="admin-history-list">
+          {visibleHistory.map((item) => {
+            const fullName = `${item.responsible?.firstName ?? ''} ${item.responsible?.lastName ?? ''}`.trim();
+            const responsibleName =
+              fullName || item.responsible?.email || 'Usuario no disponible';
+
+            return (
+              <article className="admin-history-card" key={item.id}>
+                <div className="admin-history-change">
+                  <span className={`admin-status-chip admin-status-${item.fromStatus.toLowerCase()}`}>
+                    {item.fromStatus.replace(/_/g, ' ')}
+                  </span>
+                  <span aria-hidden="true">→</span>
+                  <span className={`admin-status-chip admin-status-${item.toStatus.toLowerCase()}`}>
+                    {item.toStatus.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <h3>{item.report.title}</h3>
+                <p>
+                  Modificado por <strong>{responsibleName}</strong>
+                  {fullName && item.responsible?.email && (
+                    <span className="admin-history-email"> · {item.responsible.email}</span>
+                  )}
+                </p>
+                <time dateTime={item.createdAt}>
+                  {new Intl.DateTimeFormat('es-UY', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  }).format(new Date(item.createdAt))}
+                </time>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ReportImage({
   reportId,
   evidenceId,
@@ -432,7 +564,7 @@ function ManagementDashboard({
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [managementView, setManagementView] = useState<
-    'home' | 'reports' | 'users' | 'create-user' | 'statistics' | 'requests'
+    'home' | 'reports' | 'history' | 'users' | 'create-user' | 'statistics' | 'requests'
   >('home');
   const [dateOrder, setDateOrder] = useState<'newest' | 'oldest'>('newest');
   const [dateFrom, setDateFrom] = useState('');
@@ -838,6 +970,13 @@ function ManagementDashboard({
                 >
                   <span aria-hidden="true">▣</span> Archivadas
                 </button>
+                <button
+                  type="button"
+                  className={managementView === 'history' ? 'admin-nav-active' : ''}
+                  onClick={() => setManagementView('history')}
+                >
+                  <span aria-hidden="true">◷</span> Historial de cambios
+                </button>
               </>
             )}
             {isAdmin && (
@@ -951,6 +1090,11 @@ function ManagementDashboard({
                       <strong>Reportes archivados</strong>
                       <small>Consultar reportes ya archivados.</small>
                     </button>
+                    <button type="button" onClick={() => setManagementView('history')}>
+                      <span aria-hidden="true">◷</span>
+                      <strong>Historial de cambios</strong>
+                      <small>Consultar los cambios de estado y sus responsables.</small>
+                    </button>
                     {isEntityAdmin && (
                       <button type="button" onClick={() => setManagementView('requests')}>
                         <span aria-hidden="true">＋</span>
@@ -962,6 +1106,8 @@ function ManagementDashboard({
                 )}
               </div>
             </section>
+          ) : managementView === 'history' ? (
+            <ManagementHistory />
           ) : managementView === 'requests' ? (
             <SolicitudesFuncionarios isSuperAdmin={isAdmin} />
           ) : isAdmin ? (

@@ -49,6 +49,13 @@ export class DenunciasController {
     return this.denunciasService.managementQueue(req.user, status);
   }
 
+  @Get('gestion/historial')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('FUNCIONARIO', 'FUNCIONARIO_ADMINISTRADOR')
+  managementHistory(@Req() req: AuthenticatedRequest) {
+    return this.denunciasService.managementHistory(req.user);
+  }
+
   @Get('gestion/funcionarios')
   @UseGuards(AuthGuard('jwt'))
   assignableUsers(@Req() req: AuthenticatedRequest) {

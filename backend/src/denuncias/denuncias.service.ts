@@ -187,6 +187,58 @@ export class DenunciasService {
     };
   }
 
+  async managementHistory(user: AuthenticatedUser) {
+    this.assertManagementRole(user);
+    const actor = await this.getManagementEntity(user);
+    const reportVisibilityFilters = [
+      { entityName: actor.entityName },
+      { entityName: null },
+      ...this.sharedOrganizationFilters(actor.entityName),
+      ...this.reportOrganizationFilters(actor.entityName),
+    ];
+    const items = await this.prisma.reportHistory.findMany({
+      where: {
+        report: {
+          is: { OR: reportVisibilityFilters },
+        },
+      },
+      select: {
+        id: true,
+        fromStatus: true,
+        toStatus: true,
+        changedBy: true,
+        createdAt: true,
+        report: { select: { id: true, title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const responsibleIds = [...new Set(items.map((item) => item.changedBy))];
+    const responsibleUsers = responsibleIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: responsibleIds } },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            entityName: true,
+          },
+        })
+      : [];
+    const usersById = new Map(
+      responsibleUsers.map((responsible) => [responsible.id, responsible]),
+    );
+
+    return {
+      items: items.map(({ changedBy, ...item }) => ({
+        ...item,
+        responsible: usersById.get(changedBy) ?? null,
+      })),
+      count: items.length,
+    };
+  }
+
   async assignableUsers(user: AuthenticatedUser) {
     this.assertManagementRole(user);
     const actor = managementRoles.includes(user.role)
@@ -427,14 +479,16 @@ export class DenunciasService {
           },
         },
       });
-      await transaction.reportHistory.create({
-        data: {
-          reportId: id,
-          fromStatus: report.status,
-          toStatus: ReportStatus.ASIGNADO,
-          changedBy: user.sub,
-        },
-      });
+      if (report.status !== ReportStatus.ASIGNADO) {
+        await transaction.reportHistory.create({
+          data: {
+            reportId: id,
+            fromStatus: report.status,
+            toStatus: ReportStatus.ASIGNADO,
+            changedBy: user.sub,
+          },
+        });
+      }
       return updated;
     });
   }
@@ -490,15 +544,17 @@ export class DenunciasService {
           },
         },
       });
-      await transaction.reportHistory.create({
-        data: {
-          reportId: id,
-          fromStatus: report.status,
-          toStatus: nextStatus,
-          changedBy: user.sub,
-          comment: `Asignada internamente a ${assignee.firstName || assignee.email}`,
-        },
-      });
+      if (report.status !== nextStatus) {
+        await transaction.reportHistory.create({
+          data: {
+            reportId: id,
+            fromStatus: report.status,
+            toStatus: nextStatus,
+            changedBy: user.sub,
+            comment: `Asignada internamente a ${assignee.firstName || assignee.email}`,
+          },
+        });
+      }
       return updated;
     });
   }
@@ -544,14 +600,16 @@ export class DenunciasService {
           },
         },
       });
-      await transaction.reportHistory.create({
-        data: {
-          reportId: id,
-          fromStatus: report.status,
-          toStatus: dto.status,
-          changedBy: user.sub,
-        },
-      });
+      if (report.status !== dto.status) {
+        await transaction.reportHistory.create({
+          data: {
+            reportId: id,
+            fromStatus: report.status,
+            toStatus: dto.status,
+            changedBy: user.sub,
+          },
+        });
+      }
       return updated;
     });
   }
