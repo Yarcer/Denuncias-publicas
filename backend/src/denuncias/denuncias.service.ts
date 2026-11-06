@@ -31,6 +31,32 @@ const terminalStatuses: ReportStatus[] = [
   ReportStatus.RECHAZADO,
   ReportStatus.CERRADO,
 ];
+const publicMapCategoryNames = ['Infraestructura', 'Limpieza', 'Saneamiento'];
+const publicMapSubcategories = [
+  'Baches o calles en mal estado',
+  'Semáforos dañados o fuera de funcionamiento',
+  'Señalización dañada o faltante',
+  'Luminarias públicas dañadas',
+  'Alcantarillas tapadas o dañadas',
+  'Acumulación excesiva de basura',
+  'Contenedores llenos o dañados',
+  'Contenedores faltantes',
+  'Presencia de escombros',
+  'Pérdidas de agua en vía pública',
+  'Falta de agua o baja presión',
+  'Problemas con la calidad del agua',
+];
+const publicMapGridSizeDegrees = 0.02;
+const maxPublicMapZones = 300;
+
+function isPublicMapCategory(name?: string | null) {
+  return publicMapCategoryNames.includes(name?.trim() ?? '');
+}
+
+function publicMapGridCenter(cell: number) {
+  return Number(((cell + 0.5) * publicMapGridSizeDegrees).toFixed(2));
+}
+
 const archivedReportRetentionMs = 90 * 24 * 60 * 60 * 1000;
 const sharedReportOrganizations: {
   type: ReportType;
@@ -108,6 +134,49 @@ export class DenunciasService {
       items: visibleItems,
       count: items.length,
       filters: { status: status ?? 'all' },
+    };
+  }
+
+  async findPublicMap(subcategory?: string) {
+    if (subcategory && !publicMapSubcategories.includes(subcategory)) {
+      throw new BadRequestException(
+        'La subcategoría no está disponible en el mapa',
+      );
+    }
+    const [zones, resolvedCount] = await Promise.all([
+      this.prisma.$queryRaw<
+        Array<{ latitudeCell: number; longitudeCell: number; count: number }>
+      >(Prisma.sql`
+        SELECT
+          FLOOR(report."latitude" / ${publicMapGridSizeDegrees})::int AS "latitudeCell",
+          FLOOR(report."longitude" / ${publicMapGridSizeDegrees})::int AS "longitudeCell",
+          COUNT(*)::int AS "count"
+        FROM "Report" AS report
+        INNER JOIN "Category" AS category ON category."id" = report."categoryId"
+        WHERE report."status" = ${ReportStatus.EN_PROCESO}
+          AND report."archivedAt" IS NULL
+          AND report."publicMapConsent" = true
+          AND category."name" IN (${Prisma.join(publicMapCategoryNames)})
+          AND report."title" IN (${Prisma.join(publicMapSubcategories)})
+          ${subcategory ? Prisma.sql`AND report."title" = ${subcategory}` : Prisma.empty}
+        GROUP BY "latitudeCell", "longitudeCell"
+        HAVING COUNT(*) >= 1
+        ORDER BY "count" DESC
+        LIMIT ${maxPublicMapZones}
+      `),
+      this.prisma.report.count({
+        where: { status: ReportStatus.RESUELTO },
+      }),
+    ]);
+
+    return {
+      items: zones.map((zone) => ({
+        latitude: publicMapGridCenter(zone.latitudeCell),
+        longitude: publicMapGridCenter(zone.longitudeCell),
+        count: zone.count,
+      })),
+      resolvedCount,
+      subcategories: publicMapSubcategories,
     };
   }
 
@@ -290,6 +359,11 @@ export class DenunciasService {
       where: { id: dto.categoryId },
       select: { name: true },
     });
+    if (dto.publicMapConsent && !isPublicMapCategory(category?.name)) {
+      throw new BadRequestException(
+        'Esta categoría no puede publicarse en el mapa',
+      );
+    }
     const organizationOverride = reportOrganizationOverrides.find(
       (route) =>
         route.type === dto.type &&
@@ -325,6 +399,7 @@ export class DenunciasService {
         longitude: dto.longitude,
         address: dto.address,
         reference: dto.reference,
+        publicMapConsent: dto.publicMapConsent === true,
         reporter: { connect: { id: reporterId } },
         category: { connect: { id: dto.categoryId } },
       },
@@ -709,12 +784,23 @@ export class DenunciasService {
   }
 
   async update(id: string, user: AuthenticatedUser, dto: UpdateReportDto) {
-    const report = await this.prisma.report.findUnique({ where: { id } });
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { category: true },
+    });
     await this.assertCanAccess(report, user);
 
     if (dto.status || dto.assigneeId) {
       throw new ForbiddenException(
         'Usa el flujo de gestión para cambiar estado o asignación',
+      );
+    }
+    if (
+      dto.publicMapConsent === true &&
+      !isPublicMapCategory(report?.category.name)
+    ) {
+      throw new BadRequestException(
+        'Esta categoría no puede publicarse en el mapa',
       );
     }
 
