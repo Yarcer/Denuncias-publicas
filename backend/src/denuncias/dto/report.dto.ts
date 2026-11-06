@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  IsBoolean,
 } from 'class-validator';
 
 export class CreateReportDto {
@@ -38,6 +39,10 @@ export class CreateReportDto {
   @IsString()
   @IsNotEmpty()
   categoryId!: string;
+
+  @IsBoolean()
+  @IsOptional()
+  publicMapConsent?: boolean;
 }
 
 export class UpdateReportDto {
@@ -64,4 +69,8 @@ export class UpdateReportDto {
   @IsString()
   @IsOptional()
   reference?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  publicMapConsent?: boolean;
 }

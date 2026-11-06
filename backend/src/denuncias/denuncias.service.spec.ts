@@ -1,5 +1,5 @@
-import { ForbiddenException } from '@nestjs/common';
-import { ReportStatus } from '@prisma/client';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Prisma, ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DenunciasService } from './denuncias.service';
 
@@ -70,6 +70,7 @@ describe('DenunciasService', () => {
     const createInput = reportCreate.mock.calls[0]?.[0];
     expect(createInput?.data.entityName).toBe(entityName);
     expect(createInput?.data.priority).toBe('MEDIA');
+    expect(createInput?.data.publicMapConsent).toBe(false);
   });
 
   it('assigns low priority to anonymous reports', async () => {
@@ -97,6 +98,65 @@ describe('DenunciasService', () => {
 
     const createInput = reportCreate.mock.calls[0]?.[0];
     expect(createInput?.data.priority).toBe('BAJA');
+  });
+
+  it('rejects public-map consent for categories that are not allowed', async () => {
+    const reportCreate = createReportMock();
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          isAnonymous: false,
+          role: 'CIUDADANO',
+        }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
+      },
+      category: {
+        findUnique: jest.fn().mockResolvedValue({ name: 'Convivencia' }),
+      },
+      report: { create: reportCreate },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.create('reporter-id', {
+        title: 'Ruidos molestos',
+        description: 'Hay ruidos en la calle.',
+        type: 'URBANO',
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'category-id',
+        publicMapConsent: true,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(reportCreate).not.toHaveBeenCalled();
+  });
+
+  it('stores explicit public-map consent for an allowed category', async () => {
+    const reportCreate = createReportMock();
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          isAnonymous: false,
+          role: 'CIUDADANO',
+        }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
+      },
+      category: {
+        findUnique: jest.fn().mockResolvedValue({ name: 'Infraestructura' }),
+      },
+      report: { create: reportCreate },
+    } as unknown as PrismaService);
+
+    await service.create('reporter-id', {
+      title: 'Luminaria apagada',
+      description: 'La calle está oscura.',
+      type: 'URBANO',
+      latitude: -32.37,
+      longitude: -54.17,
+      categoryId: 'category-id',
+      publicMapConsent: true,
+    });
+
+    expect(reportCreate.mock.calls[0]?.[0].data.publicMapConsent).toBe(true);
   });
 
   it('leaves reports unrouted when no active user configures the destination organization', async () => {
@@ -186,6 +246,96 @@ describe('DenunciasService', () => {
       }),
     );
     expect(result.items[0]).toMatchObject({ priority: 'URGENTE' });
+  });
+
+  it('returns only aggregated public map zones, never individual report locations', async () => {
+    const queryRaw = jest
+      .fn()
+      .mockResolvedValue([
+        { latitudeCell: -1619, longitudeCell: -2709, count: 4 },
+      ]);
+    const service = new DenunciasService({
+      $queryRaw: queryRaw,
+      report: { count: jest.fn().mockResolvedValue(0) },
+    } as unknown as PrismaService);
+
+    const result = await service.findPublicMap();
+
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    expect(result.items).toEqual([
+      {
+        latitude: -32.37,
+        longitude: -54.17,
+        count: 4,
+      },
+    ]);
+    expect(result.resolvedCount).toBe(0);
+    expect(result.subcategories).toContain('Baches o calles en mal estado');
+  });
+
+  it('filters public map zones by an allowed subcategory', async () => {
+    const queryRaw = jest
+      .fn<
+        Promise<
+          Array<{ latitudeCell: number; longitudeCell: number; count: number }>
+        >,
+        [Prisma.Sql]
+      >()
+      .mockResolvedValue([
+        { latitudeCell: -1619, longitudeCell: -2709, count: 1 },
+      ]);
+    const service = new DenunciasService({
+      $queryRaw: queryRaw,
+      report: { count: jest.fn().mockResolvedValue(7) },
+    } as unknown as PrismaService);
+
+    const result = await service.findPublicMap('Baches o calles en mal estado');
+
+    expect(queryRaw.mock.calls[0]?.[0].values).toContain(
+      'Baches o calles en mal estado',
+    );
+    expect(result.resolvedCount).toBe(7);
+    expect(result.items).toEqual([
+      { latitude: -32.37, longitude: -54.17, count: 1 },
+    ]);
+    expect(queryRaw.mock.calls[0]?.[0].sql).toContain('HAVING COUNT(*) >= 1');
+  });
+
+  it('shows a zone with one report when no subcategory filter is selected', async () => {
+    const queryRaw = jest
+      .fn<
+        Promise<
+          Array<{ latitudeCell: number; longitudeCell: number; count: number }>
+        >,
+        [Prisma.Sql]
+      >()
+      .mockResolvedValue([
+        { latitudeCell: -1619, longitudeCell: -2709, count: 1 },
+      ]);
+    const service = new DenunciasService({
+      $queryRaw: queryRaw,
+      report: { count: jest.fn().mockResolvedValue(0) },
+    } as unknown as PrismaService);
+
+    const result = await service.findPublicMap();
+
+    expect(result.items).toEqual([
+      { latitude: -32.37, longitude: -54.17, count: 1 },
+    ]);
+    expect(queryRaw.mock.calls[0]?.[0].sql).toContain('HAVING COUNT(*) >= 1');
+  });
+
+  it('rejects unsupported public map subcategory filters', async () => {
+    const queryRaw = jest.fn();
+    const service = new DenunciasService({
+      $queryRaw: queryRaw,
+      report: { count: jest.fn() },
+    } as unknown as PrismaService);
+
+    await expect(service.findPublicMap('Convivencia')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(queryRaw).not.toHaveBeenCalled();
   });
 
   it('only returns archived reports from the last 90 days', async () => {
