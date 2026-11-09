@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
 import { DenunciasService } from './denuncias.service';
 
 describe('DenunciasService', () => {
@@ -38,6 +39,17 @@ describe('DenunciasService', () => {
       .mockImplementation(({ data }) =>
         Promise.resolve({ id: reportId, ...data }),
       );
+  const createTransactionalPrisma = (transaction: Record<string, unknown>) =>
+    ({
+      $transaction: (
+        callback: (value: Record<string, unknown>) => Promise<unknown>,
+      ) => callback(transaction),
+    }) as unknown as PrismaService;
+  const createIpAbuseProtection = () =>
+    ({
+      hashIpAddress: jest.fn().mockReturnValue('hashed-client-ip'),
+      acquireIpLock: jest.fn().mockResolvedValue(undefined),
+    }) as unknown as IpAbuseProtectionService;
 
   it.each([
     ['URBANO', 'Municipalidad Demo'],
@@ -45,7 +57,7 @@ describe('DenunciasService', () => {
     ['POLICIAL', 'policia demo'],
   ] as const)('routes %s reports to %s', async (type, entityName) => {
     const reportCreate = createReportMock();
-    const prisma = {
+    const prisma = createTransactionalPrisma({
       user: {
         findUnique: jest.fn().mockResolvedValue({
           isAnonymous: false,
@@ -54,18 +66,22 @@ describe('DenunciasService', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
       },
       category: { findUnique: jest.fn().mockResolvedValue(null) },
-      report: { create: reportCreate },
-    };
-    const service = new DenunciasService(prisma as unknown as PrismaService);
-
-    await service.create('reporter-id', {
-      title: 'Luminaria apagada',
-      description: 'La calle está oscura.',
-      type,
-      latitude: -32.37,
-      longitude: -54.17,
-      categoryId: 'category-id',
+      report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
     });
+    const service = new DenunciasService(prisma, createIpAbuseProtection());
+
+    await service.create(
+      'reporter-id',
+      {
+        title: 'Luminaria apagada',
+        description: 'La calle está oscura.',
+        type,
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'category-id',
+      },
+      '203.0.113.1',
+    );
 
     const createInput = reportCreate.mock.calls[0]?.[0];
     expect(createInput?.data.entityName).toBe(entityName);
@@ -74,26 +90,33 @@ describe('DenunciasService', () => {
 
   it('assigns low priority to anonymous reports', async () => {
     const reportCreate = createReportMock();
-    const service = new DenunciasService({
-      user: {
-        findUnique: jest.fn().mockResolvedValue({
-          isAnonymous: true,
-          role: 'CIUDADANO',
-        }),
-        findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
-      },
-      category: { findUnique: jest.fn().mockResolvedValue(null) },
-      report: { create: reportCreate },
-    } as unknown as PrismaService);
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            isAnonymous: true,
+            role: 'CIUDADANO',
+          }),
+          findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
+        },
+        category: { findUnique: jest.fn().mockResolvedValue(null) },
+        report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
 
-    await service.create('anonymous-id', {
-      title: 'Incendio activo',
-      description: 'Hay una persona herida.',
-      type: 'BOMBEROS',
-      latitude: -32.37,
-      longitude: -54.17,
-      categoryId: 'category-id',
-    });
+    await service.create(
+      'anonymous-id',
+      {
+        title: 'Incendio activo',
+        description: 'Hay una persona herida.',
+        type: 'BOMBEROS',
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'category-id',
+      },
+      '203.0.113.1',
+    );
 
     const createInput = reportCreate.mock.calls[0]?.[0];
     expect(createInput?.data.priority).toBe('BAJA');
@@ -101,26 +124,33 @@ describe('DenunciasService', () => {
 
   it('leaves reports unrouted when no active user configures the destination organization', async () => {
     const reportCreate = createReportMock();
-    const service = new DenunciasService({
-      user: {
-        findUnique: jest.fn().mockResolvedValue({
-          isAnonymous: false,
-          role: 'CIUDADANO',
-        }),
-        findFirst: jest.fn().mockResolvedValue(null),
-      },
-      category: { findUnique: jest.fn().mockResolvedValue(null) },
-      report: { create: reportCreate },
-    } as unknown as PrismaService);
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            isAnonymous: false,
+            role: 'CIUDADANO',
+          }),
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        category: { findUnique: jest.fn().mockResolvedValue(null) },
+        report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
 
-    await service.create('reporter-id', {
-      title: 'Incendio',
-      description: 'Un foco apagado.',
-      type: 'BOMBEROS',
-      latitude: -32.37,
-      longitude: -54.17,
-      categoryId: 'category-id',
-    });
+    await service.create(
+      'reporter-id',
+      {
+        title: 'Incendio',
+        description: 'Un foco apagado.',
+        type: 'BOMBEROS',
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'category-id',
+      },
+      '203.0.113.1',
+    );
 
     expect(reportCreate.mock.calls[0]?.[0].data.entityName).toBeNull();
   });
@@ -130,28 +160,35 @@ describe('DenunciasService', () => {
     const findFirst = jest
       .fn<Promise<{ id: string }>, [{ where: { entityName: string } }]>()
       .mockResolvedValue({ id: 'police-user' });
-    const service = new DenunciasService({
-      user: {
-        findUnique: jest.fn().mockResolvedValue({
-          isAnonymous: true,
-          role: 'CIUDADANO',
-        }),
-        findFirst,
-      },
-      category: {
-        findUnique: jest.fn().mockResolvedValue({ name: 'Convivencia' }),
-      },
-      report: { create: reportCreate },
-    } as unknown as PrismaService);
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            isAnonymous: true,
+            role: 'CIUDADANO',
+          }),
+          findFirst,
+        },
+        category: {
+          findUnique: jest.fn().mockResolvedValue({ name: 'Convivencia' }),
+        },
+        report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
 
-    await service.create('anonymous-id', {
-      title: 'Ruidos molestos',
-      description: 'Hay ruidos molestos en la calle.',
-      type: 'URBANO',
-      latitude: -32.37,
-      longitude: -54.17,
-      categoryId: 'convivencia',
-    });
+    await service.create(
+      'anonymous-id',
+      {
+        title: 'Ruidos molestos',
+        description: 'Hay ruidos molestos en la calle.',
+        type: 'URBANO',
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'convivencia',
+      },
+      '203.0.113.1',
+    );
 
     expect(findFirst.mock.calls[0]?.[0]).toMatchObject({
       where: { entityName: 'Policía Municipal' },
@@ -160,6 +197,38 @@ describe('DenunciasService', () => {
       type: 'URBANO',
       entityName: 'Policía Municipal',
     });
+  });
+
+  it('limits report creation to five per IP per hour', async () => {
+    const reportCreate = jest.fn();
+    const reportCount = jest
+      .fn<Promise<number>, [Record<string, unknown>]>()
+      .mockResolvedValue(5);
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        report: { count: reportCount, create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
+
+    await expect(
+      service.create(
+        'reporter-id',
+        {
+          title: 'Luminaria apagada',
+          description: 'La calle está oscura.',
+          type: 'URBANO',
+          latitude: -32.37,
+          longitude: -54.17,
+          categoryId: 'category-id',
+        },
+        '203.0.113.1',
+      ),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(reportCount.mock.calls[0]?.[0]).toMatchObject({
+      where: { reporterIpHash: 'hashed-client-ip' },
+    });
+    expect(reportCreate).not.toHaveBeenCalled();
   });
 
   it('scopes management report lists to their organization and unassigned reports', async () => {
@@ -186,6 +255,18 @@ describe('DenunciasService', () => {
       }),
     );
     expect(result.items[0]).toMatchObject({ priority: 'URGENTE' });
+  });
+
+  it('denies superadmins access to report lists', async () => {
+    const findMany = jest.fn();
+    const service = new DenunciasService({
+      report: { findMany },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.findAll({ sub: 'superadmin-id', role: 'SUPERADMINISTRADOR' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(findMany).not.toHaveBeenCalled();
   });
 
   it('only returns archived reports from the last 90 days', async () => {

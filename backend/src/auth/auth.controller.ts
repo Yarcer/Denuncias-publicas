@@ -32,6 +32,7 @@ export class AuthController {
   ) {}
 
   @Post('register')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async register(
     @Body() dto: RegisterUserDto,
     @Res({ passthrough: true }) response: Response,
@@ -40,6 +41,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async login(
     @Body() dto: LoginUserDto,
     @Res({ passthrough: true }) response: Response,
@@ -49,9 +51,12 @@ export class AuthController {
 
   @Post('anonymous')
   @Throttle({ default: { limit: 20, ttl: 60 * 60 * 1000 } })
-  async anonymousLogin(@Res({ passthrough: true }) response: Response) {
+  async anonymousLogin(
+    @Req() req: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     return this.createSession(
-      await this.authService.anonymousLogin(),
+      await this.authService.anonymousLogin(req.ip),
       response,
     );
   }

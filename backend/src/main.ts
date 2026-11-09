@@ -11,6 +11,10 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
+  if (configService.get<string>('nodeEnv') === 'production') {
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  }
+
   // Seguridad
   app.use(helmet());
 

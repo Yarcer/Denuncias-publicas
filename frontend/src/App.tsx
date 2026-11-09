@@ -1533,6 +1533,8 @@ function App() {
   }, []);
 
   const cargarDatos = useCallback(async () => {
+    if (user?.role !== 'CIUDADANO') return;
+
     try {
       const response = await api.get('/denuncias');
       setReports(response.data.data.items);
@@ -1542,10 +1544,10 @@ function App() {
     } finally {
       setActualizandoReportes(false);
     }
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => {
-    if (!user) return;
+    if (user?.role !== 'CIUDADANO') return;
     let active = true;
 
     async function fetchReports() {

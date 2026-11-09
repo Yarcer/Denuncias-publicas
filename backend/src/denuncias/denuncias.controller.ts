@@ -100,7 +100,11 @@ export class DenunciasController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CIUDADANO')
   async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateReportDto) {
-    const report = await this.denunciasService.create(req.user.sub, dto);
+    const report = await this.denunciasService.create(
+      req.user.sub,
+      dto,
+      req.ip,
+    );
     const emailConfirmation = req.user.email
       ? await this.confirmationMailService.sendReportConfirmation({
           email: req.user.email,

@@ -1,8 +1,12 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
@@ -18,6 +22,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
 import { determineReportPriority } from './report-priority';
+import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
 
 type UploadedImage = {
   buffer: Buffer;
@@ -32,6 +37,8 @@ const terminalStatuses: ReportStatus[] = [
   ReportStatus.CERRADO,
 ];
 const archivedReportRetentionMs = 90 * 24 * 60 * 60 * 1000;
+const reportCreationLimit = 5;
+const reportCreationWindowMs = 60 * 60 * 1000;
 const sharedReportOrganizations: {
   type: ReportType;
   names: readonly string[];
@@ -64,7 +71,11 @@ function normalizeOrganizationName(name: string) {
 
 @Injectable()
 export class DenunciasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly ipAbuseProtection?: IpAbuseProtectionService,
+  ) {}
 
   private readonly organizations: Record<CreateReportDto['type'], string> = {
     URBANO: 'Municipalidad Demo',
@@ -73,6 +84,15 @@ export class DenunciasService {
   };
 
   async findAll(user: AuthenticatedUser, status?: string) {
+    if (
+      user.role === Role.SUPERADMINISTRADOR ||
+      (user.role !== Role.CIUDADANO && !managementRoles.includes(user.role))
+    ) {
+      throw new ForbiddenException(
+        'No tienes permisos para consultar denuncias',
+      );
+    }
+
     const actor = managementRoles.includes(user.role)
       ? await this.getManagementEntity(user)
       : null;
@@ -281,59 +301,94 @@ export class DenunciasService {
     return { items, count: items.length };
   }
 
-  async create(reporterId: string, dto: CreateReportDto) {
-    const reporter = await this.prisma.user.findUnique({
-      where: { id: reporterId },
-      select: { isAnonymous: true, role: true },
-    });
-    const category = await this.prisma.category.findUnique({
-      where: { id: dto.categoryId },
-      select: { name: true },
-    });
-    const organizationOverride = reportOrganizationOverrides.find(
-      (route) =>
-        route.type === dto.type &&
-        normalizeOrganizationName(route.categoryName) ===
-          normalizeOrganizationName(category?.name ?? ''),
-    );
-    const entityName =
-      organizationOverride?.organizationName ?? this.organizations[dto.type];
-    const configuredOrganization = await this.prisma.user.findFirst({
-      where: {
-        entityName,
-        status: 'ACTIVO',
-        role: {
-          in: [Role.FUNCIONARIO, Role.FUNCIONARIO_ADMINISTRADOR],
+  async create(
+    reporterId: string,
+    dto: CreateReportDto,
+    ipAddress: string | undefined,
+  ) {
+    const ipAbuseProtection = this.ipAbuseProtection;
+    if (!ipAbuseProtection) {
+      throw new ServiceUnavailableException(
+        'La protección de reportes por IP no está configurada',
+      );
+    }
+
+    const ipHash = ipAbuseProtection.hashIpAddress(ipAddress);
+
+    return this.prisma.$transaction(async (transaction) => {
+      await ipAbuseProtection.acquireIpLock(
+        transaction,
+        'report-creation',
+        ipHash,
+      );
+      const recentReports = await transaction.report.count({
+        where: {
+          reporterIpHash: ipHash,
+          createdAt: { gte: new Date(Date.now() - reportCreationWindowMs) },
         },
-      },
-      select: { id: true },
-    });
-    const priority = determineReportPriority(
-      dto.title,
-      dto.description,
-      reporter?.isAnonymous ?? false,
-    );
+      });
 
-    const report = await this.prisma.report.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        type: dto.type,
-        priority,
-        entityName: configuredOrganization ? entityName : null,
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        address: dto.address,
-        reference: dto.reference,
-        reporter: { connect: { id: reporterId } },
-        category: { connect: { id: dto.categoryId } },
-      },
-      include: { category: true },
-    });
+      if (recentReports >= reportCreationLimit) {
+        throw new HttpException(
+          'Se alcanzó el límite de reportes para esta conexión. Inténtalo más tarde.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
 
-    return reporter?.role === 'SUPERADMINISTRADOR'
-      ? report
-      : this.withoutPriority(report);
+      const reporter = await transaction.user.findUnique({
+        where: { id: reporterId },
+        select: { isAnonymous: true, role: true },
+      });
+      const category = await transaction.category.findUnique({
+        where: { id: dto.categoryId },
+        select: { name: true },
+      });
+      const organizationOverride = reportOrganizationOverrides.find(
+        (route) =>
+          route.type === dto.type &&
+          normalizeOrganizationName(route.categoryName) ===
+            normalizeOrganizationName(category?.name ?? ''),
+      );
+      const entityName =
+        organizationOverride?.organizationName ?? this.organizations[dto.type];
+      const configuredOrganization = await transaction.user.findFirst({
+        where: {
+          entityName,
+          status: 'ACTIVO',
+          role: {
+            in: [Role.FUNCIONARIO, Role.FUNCIONARIO_ADMINISTRADOR],
+          },
+        },
+        select: { id: true },
+      });
+      const priority = determineReportPriority(
+        dto.title,
+        dto.description,
+        reporter?.isAnonymous ?? false,
+      );
+
+      const report = await transaction.report.create({
+        data: {
+          title: dto.title,
+          description: dto.description,
+          type: dto.type,
+          priority,
+          entityName: configuredOrganization ? entityName : null,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          address: dto.address,
+          reference: dto.reference,
+          reporterIpHash: ipHash,
+          reporter: { connect: { id: reporterId } },
+          category: { connect: { id: dto.categoryId } },
+        },
+        include: { category: true },
+      });
+
+      return reporter?.role === 'SUPERADMINISTRADOR'
+        ? report
+        : this.withoutPriority(report);
+    });
   }
 
   async uploadEvidence(
