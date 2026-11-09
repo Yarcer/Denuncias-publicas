@@ -100,6 +100,7 @@ model Report {
   address   String?
   reference String?
   entityName String?
+  publicMapConsent Boolean @default(false)
 
   reporterId     String
   reporter       User    @relation("reportedBy", fields: [reporterId], references: [id])

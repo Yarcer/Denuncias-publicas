@@ -28,6 +28,8 @@ El sistema está dividido en tres grandes experiencias, según quién lo use:
 - Se registra o entra como visitante.
 - Crea denuncias con prioridad automática.
 - Consulta el estado de sus propios reportes.
+- Puede autorizar la ubicación aproximada de un reporte para el mapa público de la homepage; solo se mostrará mientras esté en `EN_PROCESO` y el permiso puede retirarse desde “Mis reportes”.
+- El mapa agrupa los reportes en zonas circulares de aproximadamente 2 km y usa colores más intensos donde hay mayor concentración. Muestra una zona si contiene al menos un reporte autorizado, tanto con filtro como sin él. Permite filtrar por subcategoría, muestra el total de reportes actualmente resueltos y excluye categorías no habilitadas, incluida Convivencia; no muestra direcciones exactas ni datos personales.
 - Recibe el identificador de seguimiento y, si corresponde, confirmación por correo.
 - Tiene accesos directos a emergencias, bomberos y asistencia médica.
 

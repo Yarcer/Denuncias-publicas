@@ -120,6 +120,7 @@ function CrearDenuncia() {
   const [ubicacion, setUbicacion] = useState('')
   const [latitud, setLatitud] = useState<number | null>(null)
   const [longitud, setLongitud] = useState<number | null>(null)
+  const [consentimientoMapa, setConsentimientoMapa] = useState(false)
   const [error, setError] = useState('')
   const [resultado, setResultado] = useState<{
     codigo: string
@@ -188,6 +189,7 @@ function CrearDenuncia() {
     )
 
     setCategoriaNombre(categoriaSeleccionada?.name ?? '')
+    setConsentimientoMapa(false)
   }
 
   function seleccionarUbicacion(
@@ -355,6 +357,7 @@ function CrearDenuncia() {
         longitude: Number(longitud),
         address: ubicacion,
         categoryId: categoriaId,
+        publicMapConsent: consentimientoMapa,
       })
 
       let fotoAdjuntada = true
@@ -412,6 +415,11 @@ function CrearDenuncia() {
   }
 
   const claveCategoria = obtenerClaveCategoria(categoriaNombre)
+  const categoriaPublicable = [
+    'Infraestructura',
+    'Limpieza',
+    'Saneamiento',
+  ].includes(categoriaNombre.trim())
 
   return (
     <main className="denuncia-page">
@@ -544,6 +552,30 @@ function CrearDenuncia() {
             />
             <CentrarUbicacion latitud={latitud} longitud={longitud} />
           </MapContainer>
+
+          {categoriaPublicable ? (
+            <div className="public-map-consent">
+              <label htmlFor="publicMapConsent">
+                <input
+                  id="publicMapConsent"
+                  type="checkbox"
+                  checked={consentimientoMapa}
+                  onChange={(event) => setConsentimientoMapa(event.target.checked)}
+                />
+                <span>Permito mostrar la ubicación aproximada y el tipo de reporte en el mapa público.</span>
+              </label>
+              <p>
+                Es opcional y estará desmarcado por defecto. Solo se mostrará
+                cuando el reporte esté en proceso; no se publicarán tu dirección
+                exacta, descripción ni datos personales. Podés retirar el permiso
+                desde “Mis reportes”.
+              </p>
+            </div>
+          ) : categoriaNombre.toLowerCase().includes('convivencia') ? (
+            <p className="public-map-consent-note">
+              Los reportes de convivencia no se publican en el mapa.
+            </p>
+          ) : null}
 
           {latitud !== null && longitud !== null && (
             <p className="ubicacion-seleccionada">

@@ -1,5 +1,5 @@
-import { ForbiddenException } from '@nestjs/common';
-import { ReportStatus } from '@prisma/client';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Prisma, ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
 import { DenunciasService } from './denuncias.service';
@@ -86,6 +86,7 @@ describe('DenunciasService', () => {
     const createInput = reportCreate.mock.calls[0]?.[0];
     expect(createInput?.data.entityName).toBe(entityName);
     expect(createInput?.data.priority).toBe('MEDIA');
+    expect(createInput?.data.publicMapConsent).toBe(false);
   });
 
   it('assigns low priority to anonymous reports', async () => {
@@ -122,7 +123,37 @@ describe('DenunciasService', () => {
     expect(createInput?.data.priority).toBe('BAJA');
   });
 
-  it('leaves reports unrouted when no active user configures the destination organization', async () => {
+  it('rejects public-map consent for categories that are not allowed', async () => {
+    const reportCreate = createReportMock();
+    const service = new DenunciasService({
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          isAnonymous: false,
+          role: 'CIUDADANO',
+        }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
+      },
+      category: {
+        findUnique: jest.fn().mockResolvedValue({ name: 'Convivencia' }),
+      },
+      report: { create: reportCreate },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.create('reporter-id', {
+        title: 'Ruidos molestos',
+        description: 'Hay ruidos en la calle.',
+        type: 'URBANO',
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'category-id',
+        publicMapConsent: true,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(reportCreate).not.toHaveBeenCalled();
+  });
+
+  it('stores explicit public-map consent for an allowed category', async () => {
     const reportCreate = createReportMock();
     const service = new DenunciasService(
       createTransactionalPrisma({

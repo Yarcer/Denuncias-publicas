@@ -7,6 +7,7 @@ import { api } from './lib/api';
 import { getApiErrorMessage } from './lib/api-error';
 import { useAuthStore } from './stores/auth-store';
 import CrearDenuncia from './pages/CrearDenuncia'
+import PublicReportMap from './components/PublicReportMap'
 import { formatReportIdentifier } from './lib/report-id';
 import GestionUsuarios from './pages/GestionUsuarios';
 import SolicitudesFuncionarios from './pages/SolicitudesFuncionarios';
@@ -23,7 +24,15 @@ function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   return 'login';
 }
 
-type Report = { id: string; title: string; description: string; status: string; priority?: string };
+type Report = {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority?: string;
+  publicMapConsent?: boolean;
+  category?: { name: string };
+};
 type ReportHistoryEntry = {
   id: string;
   fromStatus: string;
@@ -1491,6 +1500,7 @@ function App() {
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
   const [menuCiudadanoAbierto, setMenuCiudadanoAbierto] = useState(false);
   const [actualizandoReportes, setActualizandoReportes] = useState(false);
+  const [actualizandoConsentimiento, setActualizandoConsentimiento] = useState('');
   const [errorReportes, setErrorReportes] = useState('');
   const [vistaCiudadano, setVistaCiudadano] =
     useState<'crear' | 'reportes'>('crear');
@@ -1545,6 +1555,26 @@ function App() {
       setActualizandoReportes(false);
     }
   }, [user?.role]);
+
+  async function cambiarConsentimientoMapa(report: Report) {
+    const publicMapConsent = !report.publicMapConsent;
+    setActualizandoConsentimiento(report.id);
+    setErrorReportes('');
+    try {
+      await api.patch(`/denuncias/${report.id}`, { publicMapConsent });
+      setReports((currentReports) =>
+        currentReports.map((item) =>
+          item.id === report.id ? { ...item, publicMapConsent } : item,
+        ),
+      );
+    } catch (updateError: unknown) {
+      setErrorReportes(
+        getApiErrorMessage(updateError, 'No se pudo actualizar el permiso del mapa.'),
+      );
+    } finally {
+      setActualizandoConsentimiento('');
+    }
+  }
 
   useEffect(() => {
     if (user?.role !== 'CIUDADANO') return;
@@ -1692,6 +1722,7 @@ function App() {
               </a>
 
               <EmergencyShortcuts />
+              <PublicReportMap />
             </section>
           ) : (
             <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
@@ -2140,6 +2171,23 @@ function App() {
                   >
                     {item.status.toLowerCase().replace(/_/g, ' ')}
                   </span>
+                  {(item.publicMapConsent ||
+                    ['Infraestructura', 'Limpieza', 'Saneamiento'].includes(
+                      item.category?.name.trim() ?? '',
+                    )) && (
+                    <button
+                      type="button"
+                      className="report-map-consent-toggle"
+                      onClick={() => void cambiarConsentimientoMapa(item)}
+                      disabled={actualizandoConsentimiento === item.id}
+                    >
+                      {actualizandoConsentimiento === item.id
+                        ? 'Actualizando permiso...'
+                        : item.publicMapConsent
+                          ? 'Retirar permiso del mapa'
+                          : 'Permitir ubicación aproximada en el mapa'}
+                    </button>
+                  )}
                 </article>
               ))
             )}
