@@ -32,6 +32,7 @@ type Report = {
   priority?: string;
   publicMapConsent?: boolean;
   category?: { name: string };
+  rejectionReason?: string | null;
 };
 type ReportHistoryEntry = {
   id: string;
@@ -77,6 +78,21 @@ type ManagedReport = Report & {
     type: string;
   }[];
 };
+
+const rejectionReasons = [
+  { value: 'DUPLICATE', label: 'Reporte duplicado' },
+  { value: 'INSUFFICIENT_INFORMATION', label: 'Información insuficiente' },
+  { value: 'ISSUE_NOT_FOUND', label: 'No se detectó el problema' },
+] as const;
+
+const rejectionReason = [
+  { value: 'DUPLICATE', label: 'Reporte Duplicado' },
+  {
+    value: 'INSUFFICIENT_INFORMATION',
+    label: 'Información Insuficiente'
+  },
+  { value: 'ISSUE_NOT_FOUND', label: 'No se encontró el problema' },
+] as const;
 
 function normalizeExportValue(value: string | number | null | undefined): string {
   const normalized = String(value ?? '').replace(/\r?\n/g, ' ');
@@ -572,6 +588,8 @@ function ManagementDashboard({
   const updateSession = useAuthStore((state) => state.setSession);
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const [rejectionTarget, setRejectionTarget] = useState<ManagedReport | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
   const [managementView, setManagementView] = useState<
     'home' | 'reports' | 'history' | 'users' | 'create-user' | 'statistics' | 'requests'
   >('home');
@@ -782,11 +800,41 @@ function ManagementDashboard({
   }
 
   async function changeStatus(id: string, status: string) {
+    if (status === 'RECHAZADO') {
+      const report = reports.find((item) => item.id === id);
+      if (!report) return;
+
+      setRejectionTarget(report);
+      setRejectionReason('');
+      return;
+    }
+
     try {
       await api.patch(`/denuncias/${id}/estado`, { status });
       await loadReports();
     } catch (statusError: unknown) {
-      setError(getApiErrorMessage(statusError, 'No se pudo actualizar el estado.'));
+      setError(
+        getApiErrorMessage(statusError, 'No se pudo actualizar el estado.'),
+      );
+    }
+  }
+
+  async function confirmReportRejection() {
+    if (!rejectionTarget || !rejectionReason) return;
+
+    try {
+      await api.patch(`/denuncias/${rejectionTarget.id}/estado`, {
+        status: 'RECHAZADO',
+        rejectionReason,
+      });
+
+      setRejectionTarget(null);
+      setRejectionReason('');
+      await loadReports();
+    } catch (statusError: unknown) {
+      setError(
+        getApiErrorMessage(statusError, 'No se pudo rechazar el reporte.'),
+      );
     }
   }
 
@@ -903,9 +951,8 @@ function ManagementDashboard({
 
   return (
     <main
-      className={`app-shell admin-app-shell ${
-        isAdmin ? 'superadmin-shell' : isEntityAdmin ? 'entity-shell' : 'staff-shell'
-      }`}
+      className={`app-shell admin-app-shell ${isAdmin ? 'superadmin-shell' : isEntityAdmin ? 'entity-shell' : 'staff-shell'
+        }`}
     >
       <header className="admin-account-header">
         <div className="admin-brand" aria-label="PuntoReporte">
@@ -1476,6 +1523,54 @@ function ManagementDashboard({
           )}
         </section>
       </div>
+
+      {rejectionTarget && (
+        <div className="rejection-dialog-backdrop">
+          <section
+            className="rejection-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rejection-dialog-title"
+          >
+            <h2 id="rejection-dialog-title">Denegar reporte</h2>
+            <p>Seleccioná el motivo del rechazo.</p>
+
+            <label htmlFor="rejection-reason">Motivo</label>
+            <select
+              id="rejection-reason"
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+            >
+              <option value="">Seleccioná un motivo</option>
+              {rejectionReasons.map((reason) => (
+                <option key={reason.value} value={reason.value}>
+                  {reason.label}
+                </option>
+              ))}
+            </select>
+
+            <div className="rejection-dialog-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setRejectionTarget(null);
+                  setRejectionReason('');
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="danger"
+                disabled={!rejectionReason}
+                onClick={() => void confirmReportRejection()}
+              >
+                Confirmar rechazo
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -2171,23 +2266,31 @@ function App() {
                   >
                     {item.status.toLowerCase().replace(/_/g, ' ')}
                   </span>
+
+                  {item.status === 'RECHAZADO' && item.rejectionReason && (
+                    <div className="report-rejection-reason">
+                      <strong>Motivo del rechazo</strong>
+                      <p>{item.rejectionReason}</p>
+                    </div>
+                  )}
+
                   {(item.publicMapConsent ||
                     ['Infraestructura', 'Limpieza', 'Saneamiento'].includes(
                       item.category?.name.trim() ?? '',
                     )) && (
-                    <button
-                      type="button"
-                      className="report-map-consent-toggle"
-                      onClick={() => void cambiarConsentimientoMapa(item)}
-                      disabled={actualizandoConsentimiento === item.id}
-                    >
-                      {actualizandoConsentimiento === item.id
-                        ? 'Actualizando permiso...'
-                        : item.publicMapConsent
-                          ? 'Retirar permiso del mapa'
-                          : 'Permitir ubicación aproximada en el mapa'}
-                    </button>
-                  )}
+                      <button
+                        type="button"
+                        className="report-map-consent-toggle"
+                        onClick={() => void cambiarConsentimientoMapa(item)}
+                        disabled={actualizandoConsentimiento === item.id}
+                      >
+                        {actualizandoConsentimiento === item.id
+                          ? 'Actualizando permiso...'
+                          : item.publicMapConsent
+                            ? 'Retirar permiso del mapa'
+                            : 'Permitir ubicación aproximada en el mapa'}
+                      </button>
+                    )}
                 </article>
               ))
             )}

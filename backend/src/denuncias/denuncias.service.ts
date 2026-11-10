@@ -20,7 +20,11 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
-import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
+import {
+  AssignReportDto,
+  ManageReportDto,
+  RejectionReason,
+} from './dto/manage-report.dto';
 import { determineReportPriority } from './report-priority';
 import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
 
@@ -53,6 +57,12 @@ const publicMapSubcategories = [
 ];
 const publicMapGridSizeDegrees = 0.02;
 const maxPublicMapZones = 300;
+export const rejectionReasonLabels: Record<RejectionReason, string> = {
+  [RejectionReason.DUPLICATE]: 'Reporte duplicado',
+  [RejectionReason.INSUFFICIENT_INFORMATION]: 'Información insuficiente',
+  [RejectionReason.ISSUE_NOT_FOUND]: 'No se encontró el problema',
+};
+
 
 function isPublicMapCategory(name?: string | null) {
   return publicMapCategoryNames.includes(name?.trim() ?? '');
@@ -69,9 +79,9 @@ const sharedReportOrganizations: {
   type: ReportType;
   names: readonly string[];
 }[] = [
-  { type: ReportType.URBANO, names: ['Municipalidad Demo', 'Intendencia'] },
-  { type: ReportType.POLICIAL, names: ['policia demo', 'Policía Municipal'] },
-];
+    { type: ReportType.URBANO, names: ['Municipalidad Demo', 'Intendencia'] },
+    { type: ReportType.POLICIAL, names: ['policia demo', 'Policía Municipal'] },
+  ];
 const reportOrganizationOverrides = [
   {
     type: ReportType.URBANO,
@@ -101,7 +111,7 @@ export class DenunciasService {
     private readonly prisma: PrismaService,
     @Optional()
     private readonly ipAbuseProtection?: IpAbuseProtectionService,
-  ) {}
+  ) { }
 
   private readonly organizations: Record<CreateReportDto['type'], string> = {
     URBANO: 'Municipalidad Demo',
@@ -129,13 +139,13 @@ export class DenunciasService {
       ...(user.role === 'CIUDADANO' ? { reporterId: user.sub } : {}),
       ...(actor
         ? {
-            OR: [
-              { entityName: actor.entityName },
-              { entityName: null },
-              ...sharedOrganizationWhere,
-              ...this.reportOrganizationFilters(actor.entityName),
-            ],
-          }
+          OR: [
+            { entityName: actor.entityName },
+            { entityName: null },
+            ...sharedOrganizationWhere,
+            ...this.reportOrganizationFilters(actor.entityName),
+          ],
+        }
         : {}),
       ...(status ? { status: status as never } : {}),
     };
@@ -234,17 +244,17 @@ export class DenunciasService {
     const statusWhere: Prisma.ReportWhereInput =
       status === 'archived'
         ? {
-            archivedAt: {
-              not: null,
-              gte: new Date(Date.now() - archivedReportRetentionMs),
-            },
-          }
+          archivedAt: {
+            not: null,
+            gte: new Date(Date.now() - archivedReportRetentionMs),
+          },
+        }
         : status
           ? { status: status as ReportStatus, archivedAt: null }
           : {
-              status: { notIn: terminalStatuses },
-              archivedAt: null,
-            };
+            status: { notIn: terminalStatuses },
+            archivedAt: null,
+          };
     const where: Prisma.ReportWhereInput = {
       ...statusWhere,
       OR: [
@@ -311,15 +321,15 @@ export class DenunciasService {
     const responsibleIds = [...new Set(items.map((item) => item.changedBy))];
     const responsibleUsers = responsibleIds.length
       ? await this.prisma.user.findMany({
-          where: { id: { in: responsibleIds } },
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            entityName: true,
-          },
-        })
+        where: { id: { in: responsibleIds } },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          entityName: true,
+        },
+      })
       : [];
     const usersById = new Map(
       responsibleUsers.map((responsible) => [responsible.id, responsible]),
@@ -338,9 +348,9 @@ export class DenunciasService {
     this.assertManagementRole(user);
     const actor = managementRoles.includes(user.role)
       ? await this.prisma.user.findUnique({
-          where: { id: user.sub },
-          select: { entityName: true },
-        })
+        where: { id: user.sub },
+        select: { entityName: true },
+      })
       : null;
 
     if (managementRoles.includes(user.role) && (!actor || !actor.entityName)) {
@@ -416,7 +426,7 @@ export class DenunciasService {
         (route) =>
           route.type === dto.type &&
           normalizeOrganizationName(route.categoryName) ===
-            normalizeOrganizationName(category?.name ?? ''),
+          normalizeOrganizationName(category?.name ?? ''),
       );
       const entityName =
         organizationOverride?.organizationName ?? this.organizations[dto.type];
@@ -436,22 +446,22 @@ export class DenunciasService {
         reporter?.isAnonymous ?? false,
       );
 
-    const report = await this.prisma.report.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        type: dto.type,
-        priority,
-        entityName: configuredOrganization ? entityName : null,
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        address: dto.address,
-        reference: dto.reference,
-        reporter: { connect: { id: reporterId } },
-        category: { connect: { id: dto.categoryId } },
-      },
-      include: { category: true },
-    });
+      const report = await this.prisma.report.create({
+        data: {
+          title: dto.title,
+          description: dto.description,
+          type: dto.type,
+          priority,
+          entityName: configuredOrganization ? entityName : null,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          address: dto.address,
+          reference: dto.reference,
+          reporter: { connect: { id: reporterId } },
+          category: { connect: { id: dto.categoryId } },
+        },
+        include: { category: true },
+      });
 
       return reporter?.role === 'SUPERADMINISTRADOR'
         ? report
@@ -720,7 +730,7 @@ export class DenunciasService {
           resolvedAt: dto.status === ReportStatus.RESUELTO ? new Date() : null,
           archivedAt:
             dto.status === ReportStatus.RESUELTO ||
-            dto.status === ReportStatus.RECHAZADO
+              dto.status === ReportStatus.RECHAZADO
               ? (report.archivedAt ?? new Date())
               : null,
         },
@@ -741,6 +751,10 @@ export class DenunciasService {
             fromStatus: report.status,
             toStatus: dto.status,
             changedBy: user.sub,
+            comment:
+              dto.status === ReportStatus.RECHAZADO && dto.rejectionReason
+                ? rejectionReasonLabels[dto.rejectionReason]
+                : null,
           },
         });
       }
@@ -768,11 +782,11 @@ export class DenunciasService {
     const where: Prisma.ReportWhereInput = {
       ...(fromDate || toExclusive
         ? {
-            createdAt: {
-              ...(fromDate ? { gte: fromDate } : {}),
-              ...(toExclusive ? { lt: toExclusive } : {}),
-            },
-          }
+          createdAt: {
+            ...(fromDate ? { gte: fromDate } : {}),
+            ...(toExclusive ? { lt: toExclusive } : {}),
+          },
+        }
         : {}),
     };
     const dateFilters = [
@@ -933,7 +947,7 @@ export class DenunciasService {
     if (
       !report.entityName ||
       normalizeOrganizationName(report.entityName) ===
-        normalizeOrganizationName(actorEntityName)
+      normalizeOrganizationName(actorEntityName)
     ) {
       return;
     }
@@ -1040,7 +1054,7 @@ export class DenunciasService {
       (route) =>
         route.type === report.type &&
         normalizeOrganizationName(route.categoryName) ===
-          normalizeOrganizationName(report.category?.name ?? ''),
+        normalizeOrganizationName(report.category?.name ?? ''),
     );
   }
 
