@@ -127,15 +127,7 @@ function EmergencyShortcuts() {
   );
 }
 
-function PublicHomePage({
-  onNavigate,
-  onCreateReport,
-  error,
-}: {
-  onNavigate: (route: AuthRoute) => void;
-  onCreateReport: () => void;
-  error: string;
-}) {
+function PublicHomePage({ onNavigate }: { onNavigate: (route: AuthRoute) => void }) {
   return (
     <main className="public-home-page">
       <header className="public-home-header">
@@ -170,32 +162,6 @@ function PublicHomePage({
             Reportá problemas de tu entorno y ayudá a mejorar los espacios y
             servicios que compartimos.
           </p>
-          <div className="public-home-hero-actions">
-            <a
-              className="public-home-primary-cta"
-              href="/anonimo"
-              onClick={(event) => {
-                event.preventDefault();
-                onCreateReport();
-              }}
-            >
-              Crear reporte <span aria-hidden="true">→</span>
-            </a>
-            <a
-              className="public-home-secondary-cta"
-              href="/anonimo"
-              onClick={(event) => {
-                event.preventDefault();
-                onNavigate('anonymous');
-              }}
-            >
-              Crear reporte como anónimo
-            </a>
-          </div>
-          <span className="public-home-note">
-            El formulario se abre enseguida; no necesitás registrarte.
-          </span>
-          {error && <p className="public-home-error" role="alert">{error}</p>}
         </div>
         <div className="public-home-map-frame">
           <PublicReportMap />
@@ -1858,8 +1824,6 @@ function App() {
       return (
         <PublicHomePage
           onNavigate={navigateAuth}
-          onCreateReport={handleAnonymousLogin}
-          error={error}
         />
       );
     }

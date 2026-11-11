@@ -4438,9 +4438,7 @@ body {
 
 .public-home-nav a:focus-visible,
 .public-home-footer a:focus-visible,
-.public-home-brand:focus-visible,
-.public-home-primary-cta:focus-visible,
-.public-home-secondary-cta:focus-visible {
+.public-home-brand:focus-visible {
   border-radius: 6px;
   outline: 3px solid rgba(18, 115, 84, 0.35);
   outline-offset: 4px;
@@ -4491,63 +4489,6 @@ body {
   color: #536b63;
   font-size: clamp(1rem, 1.4vw, 1.12rem);
   line-height: 1.75;
-}
-
-.public-home-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 30px;
-}
-
-.public-home-primary-cta,
-.public-home-secondary-cta {
-  display: inline-flex;
-  min-height: 52px;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 0 20px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  font-size: 0.95rem;
-  font-weight: 750;
-  text-decoration: none;
-  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
-}
-
-.public-home-primary-cta {
-  background: #147253;
-  color: #fff;
-}
-
-.public-home-primary-cta:hover {
-  transform: translateY(-2px);
-  background: #105d44;
-}
-
-.public-home-primary-cta span {
-  font-size: 1.2rem;
-}
-
-.public-home-secondary-cta {
-  border-color: #c9d8d1;
-  background: rgba(255, 255, 255, 0.58);
-  color: #294d43;
-}
-
-.public-home-secondary-cta:hover {
-  transform: translateY(-2px);
-  border-color: #8db4a2;
-  background: #fff;
-}
-
-.public-home-note {
-  display: block;
-  margin-top: 14px;
-  color: #71847c;
-  font-size: 0.84rem;
 }
 
 .public-home-map-frame {
@@ -4636,13 +4577,6 @@ body {
   margin: 0;
   color: #536b63;
   font-size: 0.72rem;
-}
-
-.public-home-error {
-  margin: 12px 0 0;
-  color: #a42520;
-  font-size: 0.9rem;
-  line-height: 1.5;
 }
 
 .public-home-image-caption {
@@ -4817,16 +4751,6 @@ body {
 
   .public-home-hero h1 {
     font-size: clamp(2.55rem, 12vw, 3.35rem);
-  }
-
-  .public-home-hero-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .public-home-primary-cta,
-  .public-home-secondary-cta {
-    width: 100%;
   }
 
   .public-home-page > .emergency-shortcuts {
