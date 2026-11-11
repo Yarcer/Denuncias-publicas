@@ -244,7 +244,15 @@ function PublicHomePage({
   );
 }
 
-function PublicAccessPage({ onNavigate }: { onNavigate: (route: AuthRoute) => void }) {
+function PublicAccessPage({
+  onNavigate,
+  onAnonymousLogin,
+  error,
+}: {
+  onNavigate: (route: AuthRoute) => void;
+  onAnonymousLogin: () => void;
+  error: string;
+}) {
   const options: { label: string; route: AuthRoute; description: string }[] = [
     { label: 'Iniciar sesión', route: 'login', description: 'Accedé a tu cuenta ciudadana.' },
     { label: 'Crear cuenta', route: 'register', description: 'Registrate para seguir tus reportes.' },
@@ -278,7 +286,11 @@ function PublicAccessPage({ onNavigate }: { onNavigate: (route: AuthRoute) => vo
               href={option.route === 'login' ? '/login' : option.route === 'register' ? '/registro' : '/anonimo'}
               onClick={(event) => {
                 event.preventDefault();
-                onNavigate(option.route);
+                if (option.route === 'anonymous') {
+                  onAnonymousLogin();
+                } else {
+                  onNavigate(option.route);
+                }
               }}
             >
               <span>
@@ -289,6 +301,7 @@ function PublicAccessPage({ onNavigate }: { onNavigate: (route: AuthRoute) => vo
             </a>
           ))}
         </nav>
+        {error && <p className="public-login-error" role="alert">{error}</p>}
       </section>
     </main>
   );
@@ -1852,7 +1865,13 @@ function App() {
     }
 
     if (authRoute === 'access') {
-      return <PublicAccessPage onNavigate={navigateAuth} />;
+      return (
+        <PublicAccessPage
+          onNavigate={navigateAuth}
+          onAnonymousLogin={handleAnonymousLogin}
+          error={error}
+        />
+      );
     }
 
     if (authRoute === 'login') {
