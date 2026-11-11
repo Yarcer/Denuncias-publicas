@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -22,6 +23,7 @@ import { ConfirmationMailService } from './confirmation-mail.service';
 import { DenunciasService } from './denuncias.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
+import { Throttle } from '@nestjs/throttler';
 
 type AuthenticatedRequest = Request & {
   user: { sub: string; role: string; email?: string };
@@ -33,6 +35,13 @@ export class DenunciasController {
     private readonly denunciasService: DenunciasService,
     private readonly confirmationMailService: ConfirmationMailService,
   ) {}
+
+  @Get('public/mapa')
+  @Header('Cache-Control', 'no-store')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  publicMap(@Query('subcategory') subcategory?: string) {
+    return this.denunciasService.findPublicMap(subcategory);
+  }
 
   @Get()
   @UseGuards(AuthGuard('jwt'))

@@ -96,6 +96,7 @@ model Report {
   address   String?
   reference String?
   entityName String?
+  publicMapConsent Boolean @default(false)
 
   reporterId String
   reporter   User   @relation("reportedBy", fields: [reporterId], references: [id])
@@ -120,6 +121,7 @@ model Report {
   @@index([type])
   @@index([priority])
   @@index([entityName])
+  @@index([status, publicMapConsent, archivedAt, updatedAt])
 }
 
 model Evidence {
