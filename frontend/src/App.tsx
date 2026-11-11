@@ -160,16 +160,6 @@ function PublicHomePage({
           >
             Iniciar sesión
           </a>
-          <a
-            className="public-home-nav-cta"
-            href="/anonimo"
-            onClick={(event) => {
-              event.preventDefault();
-              onCreateReport();
-            }}
-          >
-            Crear reporte
-          </a>
         </nav>
       </header>
 
@@ -189,21 +179,21 @@ function PublicHomePage({
                 onCreateReport();
               }}
             >
-              Hacer un reporte <span aria-hidden="true">→</span>
+              Crear reporte <span aria-hidden="true">→</span>
             </a>
             <a
               className="public-home-secondary-cta"
-              href="/registro"
+              href="/anonimo"
               onClick={(event) => {
                 event.preventDefault();
-                onNavigate('register');
+                onNavigate('anonymous');
               }}
             >
-              Crear una cuenta
+              Crear reporte como anónimo
             </a>
           </div>
           <span className="public-home-note">
-            También podés reportar sin registrarte.
+            El formulario se abre enseguida; no necesitás registrarte.
           </span>
           {error && <p className="public-home-error" role="alert">{error}</p>}
         </div>
@@ -387,6 +377,136 @@ function PublicLoginPage({
           }}
         >
           Volver al inicio
+        </a>
+      </section>
+    </main>
+  );
+}
+
+function PublicRegisterPage({
+  credentials,
+  onCredentialChange,
+  showPassword,
+  onTogglePassword,
+  onSubmit,
+  error,
+  onNavigate,
+}: {
+  credentials: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+  };
+  onCredentialChange: (
+    field: 'firstName' | 'lastName' | 'email' | 'password' | 'confirmPassword',
+    value: string,
+  ) => void;
+  showPassword: boolean;
+  onTogglePassword: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  error: string;
+  onNavigate: (route: AuthRoute) => void;
+}) {
+  return (
+    <main className="public-access-page">
+      <div className="public-access-backdrop" aria-hidden="true">
+        <img src={plazaConstitucionMelo} alt="" />
+      </div>
+      <section className="public-access-card public-login-card public-register-card" aria-labelledby="public-register-title">
+        <a
+          className="public-access-home-link"
+          href="/acceso"
+          onClick={(event) => {
+            event.preventDefault();
+            onNavigate('access');
+          }}
+        >
+          <span aria-hidden="true">←</span> Volver a las opciones
+        </a>
+        <img className="public-access-logo" src={puntoReporteLogo} alt="PuntoReporte" />
+        <h1 id="public-register-title">Crear cuenta</h1>
+        <p>Registrate para crear y seguir tus reportes.</p>
+        <form className="public-login-form" onSubmit={onSubmit}>
+          <div className="public-register-name-fields">
+            <label>
+              Nombre
+              <input
+                autoComplete="given-name"
+                placeholder="Tu nombre"
+                required
+                value={credentials.firstName}
+                onChange={(event) => onCredentialChange('firstName', event.target.value)}
+              />
+            </label>
+            <label>
+              Apellido
+              <input
+                autoComplete="family-name"
+                placeholder="Tu apellido"
+                required
+                value={credentials.lastName}
+                onChange={(event) => onCredentialChange('lastName', event.target.value)}
+              />
+            </label>
+          </div>
+          <label htmlFor="public-register-email">Correo electrónico</label>
+          <input
+            id="public-register-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="nombre@correo.com"
+            required
+            value={credentials.email}
+            onChange={(event) => onCredentialChange('email', event.target.value)}
+          />
+          <label htmlFor="public-register-password">Contraseña</label>
+          <input
+            id="public-register-password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            placeholder="Ingresá una contraseña"
+            required
+            minLength={6}
+            value={credentials.password}
+            onChange={(event) => onCredentialChange('password', event.target.value)}
+          />
+          <label htmlFor="public-register-confirm-password">Confirmar contraseña</label>
+          <input
+            id="public-register-confirm-password"
+            name="confirmPassword"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            placeholder="Ingresá nuevamente la contraseña"
+            required
+            minLength={6}
+            value={credentials.confirmPassword}
+            onChange={(event) => onCredentialChange('confirmPassword', event.target.value)}
+          />
+          <button
+            type="button"
+            className="public-register-password-toggle"
+            onClick={onTogglePassword}
+            aria-label={showPassword ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
+            aria-pressed={showPassword}
+          >
+            {showPassword ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
+          </button>
+          {error && <p className="public-login-error" role="alert">{error}</p>}
+          <button className="public-login-submit" type="submit">Crear mi cuenta</button>
+        </form>
+        <a
+          className="public-login-home-link"
+          href="/login"
+          onClick={(event) => {
+            event.preventDefault();
+            onNavigate('login');
+          }}
+        >
+          Ya tengo cuenta · Iniciar sesión
         </a>
       </section>
     </main>
@@ -1713,6 +1833,7 @@ function App() {
     setError('');
     try {
       const response = await api.post('/auth/anonymous');
+      setVistaCiudadano('crear');
       setSession(response.data.data.user, response.data.data.csrfToken);
     } catch (anonymousError: unknown) {
       setError(getApiErrorMessage(anonymousError, 'No se pudo crear la sesión temporal.'));
@@ -1737,6 +1858,22 @@ function App() {
     if (authRoute === 'login') {
       return (
         <PublicLoginPage
+          credentials={credentials}
+          onCredentialChange={(field, value) =>
+            setCredentials({ ...credentials, [field]: value })
+          }
+          showPassword={showPassword}
+          onTogglePassword={() => setShowPassword((visible) => !visible)}
+          onSubmit={handleAuth}
+          error={error}
+          onNavigate={navigateAuth}
+        />
+      );
+    }
+
+    if (authRoute === 'register') {
+      return (
+        <PublicRegisterPage
           credentials={credentials}
           onCredentialChange={(field, value) =>
             setCredentials({ ...credentials, [field]: value })
@@ -1811,8 +1948,6 @@ function App() {
                     </a>
                     <a
                       href="/registro"
-                      className={authRoute === 'register' ? 'active' : ''}
-                      aria-current={authRoute === 'register' ? 'page' : undefined}
                       onClick={(event) => {
                         event.preventDefault();
                         navigateAuth('register');

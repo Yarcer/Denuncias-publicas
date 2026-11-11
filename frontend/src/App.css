@@ -4864,7 +4864,8 @@ body {
   min-height: 100vh;
   min-height: 100svh;
   place-items: center;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 28px 20px;
   background: #19372f;
 }
@@ -5024,6 +5025,7 @@ body {
 }
 
 .public-login-form > input,
+.public-register-name-fields input,
 .public-login-password input {
   min-height: 48px;
   padding: 11px 13px;
@@ -5035,6 +5037,7 @@ body {
 }
 
 .public-login-form > input:focus,
+.public-register-name-fields input:focus,
 .public-login-password input:focus {
   border-color: #39886b;
   outline: 3px solid rgba(20, 114, 83, 0.15);
@@ -5114,8 +5117,64 @@ body {
   outline-offset: 3px;
 }
 
+.public-register-card {
+  width: min(560px, 100%);
+}
+
+.public-register-card .public-access-logo {
+  margin-top: 20px;
+  margin-bottom: 16px;
+}
+
+.public-register-card > p {
+  margin-bottom: 16px;
+}
+
+.public-register-name-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.public-register-name-fields label {
+  display: grid;
+  gap: 9px;
+  color: #294d43;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.public-register-name-fields input {
+  min-width: 0;
+}
+
+.public-register-password-toggle {
+  justify-self: end;
+  padding: 4px 0;
+  background: transparent;
+  box-shadow: none;
+  color: #147253;
+  font-size: 0.8rem;
+}
+
+.public-register-password-toggle:hover {
+  transform: none;
+  background: transparent;
+  box-shadow: none;
+  color: #105d44;
+  text-decoration: underline;
+}
+
+.public-register-password-toggle:focus-visible {
+  border-radius: 4px;
+  outline: 3px solid rgba(20, 114, 83, 0.3);
+  outline-offset: 3px;
+}
+
 @media (max-width: 480px) {
   .public-access-page {
+    align-items: start;
+    overflow-y: auto;
     padding: 16px;
   }
 
@@ -5132,5 +5191,10 @@ body {
   .public-access-option {
     min-height: 66px;
     padding: 10px 12px;
+  }
+
+  .public-register-name-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
   }
 }
