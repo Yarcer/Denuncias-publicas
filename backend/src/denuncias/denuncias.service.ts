@@ -151,13 +151,34 @@ export class DenunciasService {
     };
     const items = await this.prisma.report.findMany({
       where,
-      include: { category: true },
+      include: {
+        category: true,
+        ...(user.role === Role.CIUDADANO
+          ? {
+            history: {
+              where: { toStatus: ReportStatus.RECHAZADO },
+              select: { comment: true },
+              orderBy: { createdAt: 'desc' as const },
+              take: 1,
+            },
+          }
+          : {}),
+      },
       orderBy: { createdAt: 'desc' },
     });
 
     const visibleItems =
-      user.role === 'CIUDADANO'
-        ? items.map((item) => this.withoutPriority(item))
+      user.role === Role.CIUDADANO
+        ? items.map((item) => {
+          const { history, ...report } = item as typeof item & {
+            history?: Array<{ comment: string | null }>;
+          };
+
+          return this.withoutPriority({
+            ...report,
+            rejectionReason: history?.[0]?.comment ?? null,
+          });
+        })
         : items;
 
     return {

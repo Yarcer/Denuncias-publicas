@@ -381,7 +381,10 @@ textarea {
 }
 
 .report-rejection-reason {
-  flex: 1 0 100%;
+  width: 100%;
+  max-width: 560px;
+  box-sizing: border-box;
+  margin-top: 12px;
   padding: 12px 14px;
   border: 1px solid #fecaca;
   border-radius: 10px;
@@ -1203,18 +1206,18 @@ textarea {
   color: #132542;
 }
 
-.admin-account-popover > strong {
+.admin-account-popover>strong {
   overflow-wrap: anywhere;
   font-size: 0.95rem;
 }
 
-.admin-account-popover > span {
+.admin-account-popover>span {
   overflow-wrap: anywhere;
   color: #64748b;
   font-size: 0.82rem;
 }
 
-.admin-account-popover > .admin-account-error {
+.admin-account-popover>.admin-account-error {
   color: #b91c1c;
 }
 
@@ -3506,6 +3509,7 @@ body {
 }
 
 @media (max-width: 1450px) {
+
   .admin-board-active,
   .admin-board-kanban {
     grid-template-columns: repeat(2, minmax(235px, 1fr));
@@ -3520,6 +3524,7 @@ body {
 }
 
 @media (max-width: 760px) {
+
   .admin-export-actions,
   .admin-search,
   .admin-filter-panel {
@@ -4219,7 +4224,7 @@ body {
   font-weight: 700;
 }
 
-.reports-actions > button {
+.reports-actions>button {
   width: auto;
   min-height: 42px;
   padding: 0 18px;
@@ -4275,4 +4280,30 @@ body {
   color: #475569;
   background: #f1f5f9;
   border-color: #cbd5e1;
+}
+
+.report-rejection-control {
+  display: grid;
+  flex: 1 1 100%;
+  gap: 6px;
+  color: #52647c;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.report-rejection-control select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  font-size: 0.82rem;
+}
+
+.admin-report-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.report-item-details {
+  flex: 1 1 auto;
+  min-width: 0;
 }
