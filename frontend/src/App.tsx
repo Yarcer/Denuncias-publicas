@@ -25,7 +25,14 @@ function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   return 'login';
 }
 
-type Report = { id: string; title: string; description: string; status: string; priority?: string };
+type Report = {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority?: string;
+  rejectionReason?: string | null;
+};
 type ManagedReport = Report & {
   type?: string;
   entityName?: string | null;
@@ -60,8 +67,9 @@ type ManagedReport = Report & {
 const rejectionReasons = [
   { value: 'DUPLICATE', label: 'Reporte duplicado' },
   { value: 'INSUFFICIENT_INFORMATION', label: 'Información insuficiente' },
-  { value: 'ISSUE_NOT_FOUND', label: 'No se detectó el problema' },
+  { value: 'ISSUE_NOT_FOUND', label: 'No se encontró el problema' },
 ] as const;
+const rejectionReasonRequiredMessage = 'Seleccioná el motivo del rechazo.';
 
 function normalizeExportValue(value: string | number | null | undefined): string {
   const normalized = String(value ?? '').replace(/\r?\n/g, ' ');
@@ -1040,7 +1048,10 @@ function ManagementDashboard({
   async function changeStatus(id: string, status: string) {
     const rejectionReason = rejectionReasonsByReport[id];
 
-    if (status === 'RECHAZADO' && !rejectionReason) return;
+    if (status === 'RECHAZADO' && !rejectionReason) {
+      setError(rejectionReasonRequiredMessage);
+      return;
+    }
     if (status === 'RECHAZADO') setIsSubmittingRejectionFor(id);
 
     try {
@@ -1383,19 +1394,6 @@ function ManagementDashboard({
                           aria-label="Buscar denuncias"
                         />
                       </label>
-                      {!isArchivedView && (
-                        <select
-                          className="admin-filter"
-                          value={filter}
-                          onChange={(event) => changeReportFilter(event.target.value)}
-                          aria-label="Filtrar denuncias por estado"
-                        >
-                          <option value="active">Todas</option>
-                          <option value="PENDIENTE">Pendientes</option>
-                          <option value="EN_PROCESO">En proceso</option>
-                          <option value="RESUELTO">Resueltas</option>
-                        </select>
-                      )}
                       <div className="admin-export-actions" aria-label="Exportar denuncias">
                         <button
                           type="button"
@@ -1453,6 +1451,96 @@ function ManagementDashboard({
                       <div><span>En proceso</span><strong>{inProgressCount}</strong></div>
                     </article>
                   </section>
+
+                  <aside className="admin-filter-panel" aria-label="Filtros de denuncias">
+                    <details open>
+                      <summary className="admin-filter-heading">
+                        <span aria-hidden="true">☷</span>
+                        <span className="admin-filter-title">
+                          <strong>Filtros</strong>
+                          <small>Acotá los reportes por estado, fecha, tipo o modalidad.</small>
+                        </span>
+                        <span className="admin-filter-chevron" aria-hidden="true">⌄</span>
+                      </summary>
+
+                      <div className="admin-filter-fields">
+                        {!isArchivedView && (
+                          <label className="admin-filter-control">
+                            <span>Estado</span>
+                            <select value={filter} onChange={(event) => changeReportFilter(event.target.value)}>
+                              <option value="active">Todas</option>
+                              <option value="PENDIENTE">Pendientes</option>
+                              <option value="EN_PROCESO">En proceso</option>
+                              <option value="RESUELTO">Resueltas</option>
+                            </select>
+                          </label>
+                        )}
+
+                        <fieldset className="admin-filter-group">
+                          <legend>Fecha de reporte</legend>
+
+                          <label className="admin-filter-control">
+                            <span>Desde</span>
+                            <input
+                              type="date"
+                              value={dateFrom}
+                              max={dateTo || undefined}
+                              onChange={(event) => setDateFrom(event.target.value)}
+                            />
+                          </label>
+
+                          <label className="admin-filter-control">
+                            <span>Hasta</span>
+                            <input
+                              type="date"
+                              value={dateTo}
+                              min={dateFrom || undefined}
+                              onChange={(event) => setDateTo(event.target.value)}
+                            />
+                          </label>
+
+                          <label className="admin-filter-control">
+                            <span>Ordenar por fecha</span>
+                            <select
+                              value={dateOrder}
+                              onChange={(event) =>
+                                setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'newest')
+                              }
+                            >
+                              <option value="newest">Más recientes</option>
+                              <option value="oldest">Más antiguas</option>
+                            </select>
+                          </label>
+                        </fieldset>
+
+                        <label className="admin-filter-control">
+                          <span>Tipo de denuncia</span>
+                          <select
+                            value={categoryFilter}
+                            onChange={(event) => setCategoryFilter(event.target.value)}
+                          >
+                            <option value="">Todos los tipos</option>
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="admin-filter-control">
+                          <span>Modalidad</span>
+                          <select
+                            value={modalityFilter}
+                            onChange={(event) => setModalityFilter(event.target.value)}
+                          >
+                            <option value="">Todas</option>
+                            <option value="identified">Identificadas</option>
+                            <option value="anonymous">Anónimas</option>
+                          </select>
+                        </label>
+                      </div>
+                    </details>
+                  </aside>
 
                   <div className="admin-results">
                     <div className="admin-board-heading" id="admin-board">
@@ -1607,8 +1695,43 @@ function ManagementDashboard({
                                         <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
                                           Marcar resuelta
                                         </button>
-                                        <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
-                                          Denegar
+                                        <label className="report-rejection-reason">
+                                          <span>Motivo del rechazo</span>
+                                          <select
+                                            value={rejectionReasonsByReport[item.id] ?? ''}
+                                            disabled={isSubmittingRejectionFor === item.id}
+                                            onChange={(event) => {
+                                              setRejectionReasonsByReport((current) => ({
+                                                ...current,
+                                                [item.id]: event.target.value,
+                                              }));
+                                              setError((current) =>
+                                                current === rejectionReasonRequiredMessage
+                                                  ? ''
+                                                  : current,
+                                              );
+                                            }}
+                                          >
+                                            <option value="">Seleccioná un motivo</option>
+                                            {rejectionReasons.map((reason) => (
+                                              <option key={reason.value} value={reason.value}>
+                                                {reason.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        <button
+                                          type="button"
+                                          className="danger"
+                                          disabled={
+                                            !rejectionReasonsByReport[item.id] ||
+                                            isSubmittingRejectionFor === item.id
+                                          }
+                                          onClick={() => changeStatus(item.id, 'RECHAZADO')}
+                                        >
+                                          {isSubmittingRejectionFor === item.id
+                                            ? 'Rechazando...'
+                                            : 'Denegar'}
                                         </button>
                                       </>
                                     )}
@@ -1628,94 +1751,6 @@ function ManagementDashboard({
                   </div>
                 </div>
 
-                <aside className="admin-filter-panel" aria-label="Filtros de denuncias">
-                  <details open>
-                    <summary className="admin-filter-heading">
-                      <span aria-hidden="true">☷</span>
-                      <span className="admin-filter-title">
-                        <strong>Filtros</strong>
-                      </span>
-                      <span className="admin-filter-chevron" aria-hidden="true">⌄</span>
-                    </summary>
-
-                    <div className="admin-filter-fields">
-                      {!isArchivedView && (
-                        <label className="admin-filter-control">
-                          <span>Estado</span>
-                          <select value={filter} onChange={(event) => changeReportFilter(event.target.value)}>
-                            <option value="active">Todas</option>
-                            <option value="PENDIENTE">Pendientes</option>
-                            <option value="EN_PROCESO">En proceso</option>
-                            <option value="RESUELTO">Resueltas</option>
-                          </select>
-                        </label>
-                      )}
-
-                      <fieldset className="admin-filter-group">
-                        <legend>Fecha de reporte</legend>
-
-                        <label className="admin-filter-control">
-                          <span>Desde</span>
-                          <input
-                            type="date"
-                            value={dateFrom}
-                            max={dateTo || undefined}
-                            onChange={(event) => setDateFrom(event.target.value)}
-                          />
-                        </label>
-
-                        <label className="admin-filter-control">
-                          <span>Hasta</span>
-                          <input
-                            type="date"
-                            value={dateTo}
-                            min={dateFrom || undefined}
-                            onChange={(event) => setDateTo(event.target.value)}
-                          />
-                        </label>
-
-                        <label className="admin-filter-control">
-                          <span>Ordenar por fecha</span>
-                          <select
-                            value={dateOrder}
-                            onChange={(event) =>
-                              setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'newest')
-                            }
-                          >
-                            <option value="newest">Más recientes</option>
-                            <option value="oldest">Más antiguas</option>
-                          </select>
-                        </label>
-                      </fieldset>
-
-                      <label className="admin-filter-control">
-                        <span>Tipo de denuncia</span>
-                        <select
-                          value={categoryFilter}
-                          onChange={(event) => setCategoryFilter(event.target.value)}
-                        >
-                          <option value="">Todos los tipos</option>
-                          {categories.map((category) => (
-                            <option key={category.id} value={category.id}>
-                              {category.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="admin-filter-control">
-                        <span>Modalidad</span>
-                        <select
-                          value={modalityFilter}
-                          onChange={(event) => setModalityFilter(event.target.value)}
-                        >
-                          <option value="">Todas</option>
-                          <option value="identified">Identificadas</option>
-                          <option value="anonymous">Anónimas</option>
-                        </select>
-                      </label>
-                    </div>
-                  </details>
-                </aside>
               </div>
             </>
           )}

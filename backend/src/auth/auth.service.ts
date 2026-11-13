@@ -17,6 +17,24 @@ const anonymousAccountLimit = 3;
 const anonymousAccountWindowMs = 20 * 24 * 60 * 60 * 1000;
 const cleanupBatchSize = 500;
 
+function formatWaitDuration(milliseconds: number) {
+  let remainingMinutes = Math.max(1, Math.ceil(milliseconds / 60_000));
+  const days = Math.floor(remainingMinutes / (24 * 60));
+  remainingMinutes %= 24 * 60;
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
+  const parts: string[] = [];
+
+  if (days) parts.push(`${days} ${days === 1 ? 'día' : 'días'}`);
+  if (hours) parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`);
+  if (minutes) {
+    parts.push(`${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`);
+  }
+
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -103,17 +121,39 @@ export class AuthService {
           'anonymous-account',
           ipHash,
         );
-        const recentAccounts = await transaction.user.count({
-          where: {
-            isAnonymous: true,
-            anonymousIpHash: ipHash,
-            createdAt: { gte: new Date(Date.now() - anonymousAccountWindowMs) },
+        const now = new Date();
+        const recentAccountsWhere = {
+          isAnonymous: true,
+          anonymousIpHash: ipHash,
+          createdAt: {
+            gte: new Date(now.getTime() - anonymousAccountWindowMs),
           },
+        };
+        const recentAccounts = await transaction.user.count({
+          where: recentAccountsWhere,
         });
 
         if (recentAccounts >= anonymousAccountLimit) {
+          const oldestRecentAccount = await transaction.user.findFirst({
+            where: recentAccountsWhere,
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true },
+          });
+          if (!oldestRecentAccount) {
+            throw new ServiceUnavailableException(
+              'No se pudo determinar cuándo podrás volver a crear una sesión anónima.',
+            );
+          }
+
+          const retryIn = formatWaitDuration(
+            oldestRecentAccount.createdAt.getTime() +
+              anonymousAccountWindowMs -
+              now.getTime(),
+          );
           throw new HttpException(
-            'Se alcanzó el límite de sesiones anónimas para esta conexión. Inténtalo más tarde.',
+            {
+              message: `Se alcanzó el límite de sesiones anónimas para esta conexión. Podrás volver a intentarlo en ${retryIn}.`,
+            },
             HttpStatus.TOO_MANY_REQUESTS,
           );
         }

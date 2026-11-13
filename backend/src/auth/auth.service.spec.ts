@@ -28,13 +28,21 @@ describe('AuthService anonymous sessions', () => {
     [AnonymousAccountCreateArgs]
   >();
   const userCount = jest.fn<Promise<number>, [AnonymousAccountCountArgs]>();
+  const userFindFirst = jest.fn<
+    Promise<{ createdAt: Date } | null>,
+    [Record<string, unknown>]
+  >();
   const acquireIpLock = jest.fn().mockResolvedValue(undefined);
   const service = new AuthService(
     {
       $transaction: (callback: (transaction: unknown) => Promise<unknown>) =>
         callback({
           $queryRaw: jest.fn(),
-          user: { count: userCount, create: userCreate },
+          user: {
+            count: userCount,
+            create: userCreate,
+            findFirst: userFindFirst,
+          },
         }),
     } as unknown as PrismaService,
     {
@@ -115,10 +123,26 @@ describe('AuthService anonymous sessions', () => {
 
   it('rejects a fourth account for the IP within the 20-day window', async () => {
     userCount.mockResolvedValue(3);
+    userFindFirst.mockResolvedValue({
+      createdAt: new Date(
+        Date.now() - 19 * 24 * 60 * 60 * 1000 - 23 * 60 * 60 * 1000,
+      ),
+    });
 
     await expect(service.anonymousLogin('203.0.113.1')).rejects.toMatchObject({
       status: 429,
+      response: {
+        message: expect.stringContaining(
+          'Podrás volver a intentarlo en 1 hora.',
+        ),
+      },
     });
+    expect(userFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+    );
     expect(userCreate).not.toHaveBeenCalled();
   });
 

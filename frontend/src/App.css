@@ -1637,6 +1637,10 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.admin-board-list .report-rejection-reason {
+  grid-column: 1 / -1;
+}
+
 .admin-board-list .admin-report-actions button {
   min-width: 0;
 }
@@ -1973,6 +1977,11 @@ textarea {
   background: #c83a3a;
 }
 
+.admin-report-actions .danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 @media (max-width: 1200px) {
   .admin-layout {
     grid-template-columns: 220px minmax(0, 1fr);
@@ -2089,8 +2098,7 @@ textarea {
   }
 
   .admin-export-actions,
-  .admin-search,
-  .admin-filter-panel {
+  .admin-search {
     order: 0;
   }
 
@@ -2166,9 +2174,6 @@ textarea {
     align-items: flex-start;
   }
 
-  .admin-filter-panel details {
-    padding: 8px 12px;
-  }
 }
 
 @media (min-width: 761px) and (max-width: 1200px) {
@@ -3335,6 +3340,22 @@ textarea {
   font-size: 0.82rem;
 }
 
+.report-rejection-reason {
+  display: grid;
+  flex: 1 1 100%;
+  gap: 6px;
+  color: #52647c;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.report-rejection-reason select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  font-size: 0.82rem;
+}
+
 .assigned-to {
   flex: 1 1 100%;
   margin: 0;
@@ -3462,25 +3483,21 @@ body {
 .admin-filter-panel {
   min-width: 0;
   margin: 0 0 24px;
-  order: 1;
-  position: relative;
-  z-index: 2;
 }
 
 .admin-filter-panel details {
-  position: relative;
-  padding: 6px 10px;
+  padding: 16px 18px;
   border: 1px solid #dce7f3;
-  border-radius: 12px;
+  border-radius: 16px;
   background: #fff;
-  box-shadow: 0 4px 16px rgba(19, 37, 66, 0.045);
+  box-shadow: 0 5px 18px rgba(19, 37, 66, 0.06);
 }
 
 .admin-filter-heading {
   display: flex;
   align-items: center;
-  min-height: 44px;
-  gap: 8px;
+  min-height: 42px;
+  gap: 12px;
   cursor: pointer;
   list-style: none;
 }
@@ -3491,23 +3508,30 @@ body {
 
 .admin-filter-heading>span:first-child {
   display: grid;
-  width: 28px;
-  height: 28px;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
   place-items: center;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #e3efff;
   color: #1556b5;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
 }
 
 .admin-filter-title {
   display: grid;
-  gap: 3px;
+  gap: 4px;
 }
 
 .admin-filter-title strong {
   color: #132542;
-  font-size: 0.9rem;
+  font-size: 1rem;
+}
+
+.admin-filter-title small {
+  color: #718198;
+  font-size: 0.82rem;
+  font-weight: 500;
 }
 
 .admin-filter-chevron {
@@ -3521,30 +3545,21 @@ body {
 }
 
 .admin-filter-fields {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 5;
   display: grid;
-  gap: 16px;
-  box-sizing: border-box;
-  width: min(340px, calc(100vw - 32px));
-  max-height: min(70vh, 640px);
-  overflow-y: auto;
-  margin: 0;
-  padding: 16px;
-  border: 1px solid #dce7f3;
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 12px 30px rgba(19, 37, 66, 0.16);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e8eef5;
 }
 
 .admin-filter-control {
   display: grid;
-  gap: 7px;
+  align-content: start;
+  gap: 6px;
   color: #435670;
   font-size: 0.84rem;
-  font-weight: 500;
+  font-weight: 650;
 }
 
 .admin-filter-control select,
@@ -3552,22 +3567,30 @@ body {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  min-height: 42px;
+  min-height: 44px;
   margin: 0;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid #d7e1ed;
-  border-radius: 10px;
-  background: #fff;
+  border-radius: 11px;
+  background: #f9fbfe;
   color: #10213b;
+  font: inherit;
+}
+
+.admin-filter-control select:focus,
+.admin-filter-control input:focus {
+  border-color: #75a8e8;
+  outline: 3px solid rgba(37, 99, 235, 0.14);
+  background: #fff;
 }
 
 .admin-filter-group {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px 18px;
   margin: 0;
-  padding: 12px 0 0;
+  padding: 14px 0 0;
   border: 0;
   border-top: 1px solid #e8eef5;
 }
@@ -3613,8 +3636,7 @@ body {
   }
 
   .admin-filter-fields {
-    right: auto;
-    left: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .admin-filter-group {
@@ -3625,19 +3647,23 @@ body {
 @media (max-width: 760px) {
 
   .admin-export-actions,
-  .admin-search,
-  .admin-filter-panel {
+  .admin-search {
     order: 0;
   }
 }
 
 @media (max-width: 640px) {
-  .admin-filter-group {
+  .admin-filter-panel details {
+    padding: 14px;
+  }
+
+  .admin-filter-fields {
     grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
   }
 
   .admin-filter-group {
-    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .admin-summary {
