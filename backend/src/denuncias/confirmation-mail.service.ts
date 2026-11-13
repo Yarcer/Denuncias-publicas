@@ -43,15 +43,15 @@ export class ConfirmationMailService {
     this.transporter =
       host && port && this.from
         ? createTransport({
-            host,
-            port,
-            secure: port === 465,
-            requireTLS: port !== 465,
-            ...(user && password ? { auth: { user, pass: password } } : {}),
-            connectionTimeout: 10_000,
-            greetingTimeout: 10_000,
-            socketTimeout: 15_000,
-          })
+          host,
+          port,
+          secure: port === 465,
+          requireTLS: port !== 465,
+          ...(user && password ? { auth: { user, pass: password } } : {}),
+          connectionTimeout: 10_000,
+          greetingTimeout: 10_000,
+          socketTimeout: 15_000,
+        })
         : null;
   }
 
@@ -101,4 +101,52 @@ export class ConfirmationMailService {
       return 'failed';
     }
   }
+
+  async sendReportRejectionNotice({
+    email,
+    reportId,
+    title,
+    reason,
+  }: {
+    email: string;
+    reportId: string;
+    title: string;
+    reason: string;
+  }): Promise<ConfirmationEmailStatus> {
+    if (email.endsWith('@anonymous.local')) return 'skipped';
+    if (!this.transporter || !this.from) return 'not_configured';
+
+    const identifier = formatReportIdentifier(reportId);
+    const safeTitle = escapeHtml(title);
+    const safeReason = escapeHtml(reason);
+
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to: email,
+        subject: `Actualización de tu denuncia: ${identifier}`,
+        text: [
+          'Tu denuncia fue rechazada.',
+          `Identificador: ${identifier}`,
+          `Asunto: ${title}`,
+          `Motivo: ${reason}`,
+        ].join('\n'),
+        html: [
+          '<p>Tu denuncia fue rechazada.</p>',
+          `<p><strong>Identificador:</strong> ${identifier}</p>`,
+          `<p><strong>Asunto:</strong> ${safeTitle}</p>`,
+          `<p><strong>Motivo:</strong> ${safeReason}</p>`,
+        ].join(''),
+      });
+
+      return 'sent';
+    } catch (error) {
+      this.logger.error(
+        `No se pudo enviar el aviso de rechazo para la denuncia ${identifier}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return 'failed';
+    }
+  }
+
 }

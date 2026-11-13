@@ -32,6 +32,7 @@ type Report = {
   priority?: string;
   publicMapConsent?: boolean;
   category?: { name: string };
+  rejectionReason?: string | null;
 };
 type ReportHistoryEntry = {
   id: string;
@@ -77,6 +78,12 @@ type ManagedReport = Report & {
     type: string;
   }[];
 };
+
+const rejectionReasons = [
+  { value: 'DUPLICATE', label: 'Reporte duplicado' },
+  { value: 'INSUFFICIENT_INFORMATION', label: 'Información insuficiente' },
+  { value: 'ISSUE_NOT_FOUND', label: 'No se detectó el problema' },
+] as const;
 
 function normalizeExportValue(value: string | number | null | undefined): string {
   const normalized = String(value ?? '').replace(/\r?\n/g, ' ');
@@ -572,6 +579,10 @@ function ManagementDashboard({
   const updateSession = useAuthStore((state) => state.setSession);
   const [reports, setReports] = useState<ManagedReport[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const [rejectionReasonsByReport, setRejectionReasonsByReport] =
+    useState<Record<string, string>>({});
+  const [isSubmittingRejectionFor, setIsSubmittingRejectionFor] =
+    useState<string | null>(null);
   const [managementView, setManagementView] = useState<
     'home' | 'reports' | 'history' | 'users' | 'create-user' | 'statistics' | 'requests'
   >('home');
@@ -782,11 +793,30 @@ function ManagementDashboard({
   }
 
   async function changeStatus(id: string, status: string) {
+    const rejectionReason = rejectionReasonsByReport[id];
+
+    if (status === 'RECHAZADO' && !rejectionReason) return;
+    if (status === 'RECHAZADO') setIsSubmittingRejectionFor(id);
+
     try {
-      await api.patch(`/denuncias/${id}/estado`, { status });
+      await api.patch(`/denuncias/${id}/estado`, {
+        status,
+        ...(status === 'RECHAZADO' ? { rejectionReason } : {}),
+      });
+
+      if (status === 'RECHAZADO') {
+        setRejectionReasonsByReport((current) => {
+          const next = { ...current };
+          delete next[id];
+          return next;
+        });
+      }
+
       await loadReports();
     } catch (statusError: unknown) {
       setError(getApiErrorMessage(statusError, 'No se pudo actualizar el estado.'));
+    } finally {
+      if (status === 'RECHAZADO') setIsSubmittingRejectionFor(null);
     }
   }
 
@@ -903,9 +933,8 @@ function ManagementDashboard({
 
   return (
     <main
-      className={`app-shell admin-app-shell ${
-        isAdmin ? 'superadmin-shell' : isEntityAdmin ? 'entity-shell' : 'staff-shell'
-      }`}
+      className={`app-shell admin-app-shell ${isAdmin ? 'superadmin-shell' : isEntityAdmin ? 'entity-shell' : 'staff-shell'
+        }`}
     >
       <header className="admin-account-header">
         <div className="admin-brand" aria-label="PuntoReporte">
@@ -1454,8 +1483,39 @@ function ManagementDashboard({
                                           <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
                                             Marcar resuelta
                                           </button>
-                                          <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
-                                            Denegar
+                                          <label className="report-rejection-control">
+                                            <span>Motivo del rechazo</span>
+                                            <select
+                                              value={rejectionReasonsByReport[item.id] ?? ''}
+                                              onChange={(event) => {
+                                                const value = event.target.value;
+
+                                                setRejectionReasonsByReport((current) => {
+                                                  const next = { ...current };
+                                                  if (value) next[item.id] = value;
+                                                  else delete next[item.id];
+                                                  return next;
+                                                });
+                                              }}
+                                            >
+                                              <option value="">Seleccioná un motivo</option>
+                                              {rejectionReasons.map((reason) => (
+                                                <option key={reason.value} value={reason.value}>
+                                                  {reason.label}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          </label>
+
+                                          <button
+                                            className="danger"
+                                            onClick={() => void changeStatus(item.id, 'RECHAZADO')}
+                                            disabled={
+                                              !rejectionReasonsByReport[item.id] ||
+                                              isSubmittingRejectionFor === item.id
+                                            }
+                                          >
+                                            {isSubmittingRejectionFor === item.id ? 'Rechazando...' : 'Rechazar'}
                                           </button>
                                         </>
                                       )}
@@ -1476,6 +1536,7 @@ function ManagementDashboard({
           )}
         </section>
       </div>
+
     </main>
   );
 }
@@ -2158,12 +2219,18 @@ function App() {
                   className="report-item"
                   key={item.id}
                 >
-                  <div>
+                  <div className="report-item-details">
                     <small className="report-identifier">
                       Identificador: {formatReportIdentifier(item.id)}
                     </small>
                     <strong>{item.title}</strong>
                     <p>{item.description}</p>
+                    {item.status === 'RECHAZADO' && item.rejectionReason && (
+                      <div className="report-rejection-reason">
+                        <strong>Motivo del rechazo:</strong>
+                        <p>{item.rejectionReason}</p>
+                      </div>
+                    )}
                   </div>
 
                   <span
@@ -2171,23 +2238,24 @@ function App() {
                   >
                     {item.status.toLowerCase().replace(/_/g, ' ')}
                   </span>
+
                   {(item.publicMapConsent ||
                     ['Infraestructura', 'Limpieza', 'Saneamiento'].includes(
                       item.category?.name.trim() ?? '',
                     )) && (
-                    <button
-                      type="button"
-                      className="report-map-consent-toggle"
-                      onClick={() => void cambiarConsentimientoMapa(item)}
-                      disabled={actualizandoConsentimiento === item.id}
-                    >
-                      {actualizandoConsentimiento === item.id
-                        ? 'Actualizando permiso...'
-                        : item.publicMapConsent
-                          ? 'Retirar permiso del mapa'
-                          : 'Permitir ubicación aproximada en el mapa'}
-                    </button>
-                  )}
+                      <button
+                        type="button"
+                        className="report-map-consent-toggle"
+                        onClick={() => void cambiarConsentimientoMapa(item)}
+                        disabled={actualizandoConsentimiento === item.id}
+                      >
+                        {actualizandoConsentimiento === item.id
+                          ? 'Actualizando permiso...'
+                          : item.publicMapConsent
+                            ? 'Retirar permiso del mapa'
+                            : 'Permitir ubicación aproximada en el mapa'}
+                      </button>
+                    )}
                 </article>
               ))
             )}
