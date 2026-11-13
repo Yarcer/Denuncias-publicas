@@ -284,9 +284,14 @@ describe('DenunciasService', () => {
       .mockResolvedValue([
         { latitudeCell: -1619, longitudeCell: -2709, count: 1 },
       ]);
+    const reportCount = jest
+      .fn()
+      .mockResolvedValueOnce(7)
+      .mockResolvedValueOnce(10)
+      .mockResolvedValueOnce(3);
     const service = new DenunciasService({
       $queryRaw: queryRaw,
-      report: { count: jest.fn().mockResolvedValue(7) },
+      report: { count: reportCount },
     } as unknown as PrismaService);
 
     const result = await service.findPublicMap('Baches o calles en mal estado');
@@ -295,9 +300,28 @@ describe('DenunciasService', () => {
       'Baches o calles en mal estado',
     );
     expect(result.resolvedCount).toBe(7);
+    expect(result.totalCount).toBe(10);
+    expect(result.inProgressCount).toBe(3);
     expect(result.items).toEqual([
       { latitude: -32.37, longitude: -54.17, count: 1 },
     ]);
+    expect(reportCount).toHaveBeenNthCalledWith(1, {
+      where: { status: ReportStatus.RESUELTO },
+    });
+    expect(reportCount.mock.calls[1]).toEqual([]);
+    expect(reportCount).toHaveBeenNthCalledWith(3, {
+      where: {
+        status: {
+          in: [
+            ReportStatus.PENDIENTE,
+            ReportStatus.EN_REVISION,
+            ReportStatus.ASIGNADO,
+            ReportStatus.EN_PROCESO,
+          ],
+        },
+        archivedAt: null,
+      },
+    });
     expect(queryRaw.mock.calls[0]?.[0].sql).toContain('HAVING COUNT(*) >= 1');
   });
 
