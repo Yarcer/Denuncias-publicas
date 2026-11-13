@@ -14,40 +14,18 @@ import SolicitudesFuncionarios from './pages/SolicitudesFuncionarios';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
-type AuthRoute = 'home' | 'login' | 'register' | 'anonymous' | 'management-login';
+type AuthRoute = 'home' | 'access' | 'login' | 'register' | 'anonymous' | 'management-login';
 
 function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   if (pathname === '/') return 'home';
+  if (pathname === '/acceso') return 'access';
   if (pathname === '/gestion/login') return 'management-login';
   if (pathname === '/registro') return 'register';
   if (pathname === '/anonimo') return 'anonymous';
   return 'login';
 }
 
-type Report = {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  priority?: string;
-  publicMapConsent?: boolean;
-  category?: { name: string };
-  rejectionReason?: string | null;
-};
-type ReportHistoryEntry = {
-  id: string;
-  fromStatus: string;
-  toStatus: string;
-  createdAt: string;
-  report: { id: string; title: string };
-  responsible: {
-    id: string;
-    firstName?: string | null;
-    lastName?: string | null;
-    email: string;
-    entityName?: string | null;
-  } | null;
-};
+type Report = { id: string; title: string; description: string; status: string; priority?: string };
 type ManagedReport = Report & {
   type?: string;
   entityName?: string | null;
@@ -152,6 +130,393 @@ function EmergencyShortcuts() {
         ))}
       </div>
     </section>
+  );
+}
+
+function PublicHomePage({
+  onNavigate,
+  onAnonymousReport,
+  anonymousLoginLoading,
+  error,
+}: {
+  onNavigate: (route: AuthRoute) => void;
+  onAnonymousReport: () => void;
+  anonymousLoginLoading: boolean;
+  error: string;
+}) {
+  return (
+    <main className="public-home-page">
+      <header className="public-home-header">
+        <a
+          className="public-home-brand"
+          href="/"
+          aria-label="PuntoReporte, inicio"
+          onClick={(event) => {
+            event.preventDefault();
+            onNavigate('home');
+          }}
+        >
+          <img src={puntoReporteLogo} alt="PuntoReporte" />
+        </a>
+        <nav className="public-home-nav" aria-label="Navegación principal">
+          <a
+            href="/acceso"
+            onClick={(event) => {
+              event.preventDefault();
+              onNavigate('access');
+            }}
+          >
+            Iniciar sesión
+          </a>
+        </nav>
+      </header>
+      {error && <p className="public-home-error" role="alert">{error}</p>}
+
+      <section className="public-home-hero" aria-labelledby="public-home-title">
+        <div className="public-home-hero-copy">
+          <span className="public-home-kicker">MELO · CERRO LARGO</span>
+          <h1 id="public-home-title">
+            Una ciudad mejor empieza con <span>tu voz.</span>
+          </h1>
+          <p>
+            Reportá problemas de tu entorno y ayudá a mejorar los espacios y
+            servicios que compartimos.
+          </p>
+          <button
+            type="button"
+            className="public-home-report-cta"
+            onClick={onAnonymousReport}
+            disabled={anonymousLoginLoading}
+          >
+            {anonymousLoginLoading ? 'Preparando formulario...' : 'Realizar reporte anónimo'}
+          </button>
+        </div>
+        <div className="public-home-map-frame">
+          <PublicReportMap />
+        </div>
+      </section>
+
+      <section className="public-home-benefits" aria-label="Cómo funciona PuntoReporte">
+        <article>
+          <span className="public-home-benefit-number">01</span>
+          <div>
+            <h2>Contanos qué pasa</h2>
+            <p>Describí el problema y señalá dónde ocurre.</p>
+          </div>
+        </article>
+        <article>
+          <span className="public-home-benefit-number">02</span>
+          <div>
+            <h2>Lo hacemos llegar</h2>
+            <p>Tu reporte se deriva al equipo correspondiente.</p>
+          </div>
+        </article>
+        <article>
+          <span className="public-home-benefit-number">03</span>
+          <div>
+            <h2>Seguimos el avance</h2>
+            <p>Con una cuenta, podés consultar tus reportes.</p>
+          </div>
+        </article>
+      </section>
+
+      <EmergencyShortcuts />
+
+      <footer className="public-home-footer">
+        <span>Una herramienta para construir una mejor comunidad.</span>
+        <a
+          href="/gestion/login"
+          onClick={(event) => {
+            event.preventDefault();
+            onNavigate('management-login');
+          }}
+        >
+          Acceso para funcionarios <span aria-hidden="true">→</span>
+        </a>
+      </footer>
+    </main>
+  );
+}
+
+function PublicAccessPage({
+  onNavigate,
+  onAnonymousLogin,
+  error,
+}: {
+  onNavigate: (route: AuthRoute) => void;
+  onAnonymousLogin: () => void;
+  error: string;
+}) {
+  const options: { label: string; route: AuthRoute; description: string }[] = [
+    { label: 'Iniciar sesión', route: 'login', description: 'Accedé a tu cuenta ciudadana.' },
+    { label: 'Crear cuenta', route: 'register', description: 'Registrate para seguir tus reportes.' },
+    { label: 'Entrar como anónimo', route: 'anonymous', description: 'Continuá sin crear una cuenta.' },
+  ];
+
+  return (
+    <main className="public-access-page">
+      <div className="public-access-backdrop" aria-hidden="true">
+        <img src={plazaConstitucionMelo} alt="" />
+      </div>
+      <section className="public-access-card" aria-labelledby="public-access-title">
+        <a
+          className="public-access-home-link"
+          href="/"
+          onClick={(event) => {
+            event.preventDefault();
+            onNavigate('home');
+          }}
+        >
+          <span aria-hidden="true">←</span> Volver al inicio
+        </a>
+        <img className="public-access-logo" src={puntoReporteLogo} alt="PuntoReporte" />
+        <h1 id="public-access-title">¿Cómo querés continuar?</h1>
+        <p>Elegí una opción para acceder al portal ciudadano.</p>
+        <nav className="public-access-options" aria-label="Opciones de acceso">
+          {options.map((option, index) => (
+            <a
+              key={option.route}
+              className={`public-access-option${index === 0 ? ' public-access-option-primary' : ''}`}
+              href={option.route === 'login' ? '/login' : option.route === 'register' ? '/registro' : '/anonimo'}
+              onClick={(event) => {
+                event.preventDefault();
+                if (option.route === 'anonymous') {
+                  onAnonymousLogin();
+                } else {
+                  onNavigate(option.route);
+                }
+              }}
+            >
+              <span>
+                <strong>{option.label}</strong>
+                <small>{option.description}</small>
+              </span>
+              <b aria-hidden="true">→</b>
+            </a>
+          ))}
+        </nav>
+        {error && <p className="public-login-error" role="alert">{error}</p>}
+      </section>
+    </main>
+  );
+}
+
+function PublicLoginPage({
+  credentials,
+  onCredentialChange,
+  showPassword,
+  onTogglePassword,
+  onSubmit,
+  error,
+  onNavigate,
+}: {
+  credentials: { email: string; password: string };
+  onCredentialChange: (field: 'email' | 'password', value: string) => void;
+  showPassword: boolean;
+  onTogglePassword: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  error: string;
+  onNavigate: (route: AuthRoute) => void;
+}) {
+  return (
+    <main className="public-access-page">
+      <div className="public-access-backdrop" aria-hidden="true">
+        <img src={plazaConstitucionMelo} alt="" />
+      </div>
+      <section className="public-access-card public-login-card" aria-labelledby="public-login-title">
+        <a
+          className="public-access-home-link"
+          href="/acceso"
+          onClick={(event) => {
+            event.preventDefault();
+            onNavigate('access');
+          }}
+        >
+          <span aria-hidden="true">←</span> Volver a las opciones
+        </a>
+        <img className="public-access-logo" src={puntoReporteLogo} alt="PuntoReporte" />
+        <h1 id="public-login-title">Iniciar sesión</h1>
+        <p>Ingresá con el correo y la contraseña de tu cuenta.</p>
+        <form className="public-login-form" onSubmit={onSubmit}>
+          <label htmlFor="public-login-email">Correo electrónico</label>
+          <input
+            id="public-login-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="nombre@correo.com"
+            required
+            value={credentials.email}
+            onChange={(event) => onCredentialChange('email', event.target.value)}
+          />
+          <label htmlFor="public-login-password">Contraseña</label>
+          <div className="public-login-password">
+            <input
+              id="public-login-password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              placeholder="Ingresá tu contraseña"
+              required
+              minLength={6}
+              value={credentials.password}
+              onChange={(event) => onCredentialChange('password', event.target.value)}
+            />
+            <button
+              type="button"
+              className="public-login-password-toggle"
+              onClick={onTogglePassword}
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              aria-pressed={showPassword}
+            >
+              {showPassword ? 'Ocultar' : 'Mostrar'}
+            </button>
+          </div>
+          {error && <p className="public-login-error" role="alert">{error}</p>}
+          <button className="public-login-submit" type="submit">Entrar</button>
+        </form>
+        <a
+          className="public-login-home-link"
+          href="/"
+          onClick={(event) => {
+            event.preventDefault();
+            onNavigate('home');
+          }}
+        >
+          Volver al inicio
+        </a>
+      </section>
+    </main>
+  );
+}
+
+function PublicRegisterPage({
+  credentials,
+  onCredentialChange,
+  showPassword,
+  onTogglePassword,
+  onSubmit,
+  error,
+  onNavigate,
+}: {
+  credentials: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+  };
+  onCredentialChange: (
+    field: 'firstName' | 'lastName' | 'email' | 'password' | 'confirmPassword',
+    value: string,
+  ) => void;
+  showPassword: boolean;
+  onTogglePassword: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  error: string;
+  onNavigate: (route: AuthRoute) => void;
+}) {
+  return (
+    <main className="public-access-page">
+      <div className="public-access-backdrop" aria-hidden="true">
+        <img src={plazaConstitucionMelo} alt="" />
+      </div>
+      <section className="public-access-card public-login-card public-register-card" aria-labelledby="public-register-title">
+        <a
+          className="public-access-home-link"
+          href="/acceso"
+          onClick={(event) => {
+            event.preventDefault();
+            onNavigate('access');
+          }}
+        >
+          <span aria-hidden="true">←</span> Volver a las opciones
+        </a>
+        <img className="public-access-logo" src={puntoReporteLogo} alt="PuntoReporte" />
+        <h1 id="public-register-title">Crear cuenta</h1>
+        <p>Registrate para crear y seguir tus reportes.</p>
+        <form className="public-login-form" onSubmit={onSubmit}>
+          <div className="public-register-name-fields">
+            <label>
+              Nombre
+              <input
+                autoComplete="given-name"
+                placeholder="Tu nombre"
+                required
+                value={credentials.firstName}
+                onChange={(event) => onCredentialChange('firstName', event.target.value)}
+              />
+            </label>
+            <label>
+              Apellido
+              <input
+                autoComplete="family-name"
+                placeholder="Tu apellido"
+                required
+                value={credentials.lastName}
+                onChange={(event) => onCredentialChange('lastName', event.target.value)}
+              />
+            </label>
+          </div>
+          <label htmlFor="public-register-email">Correo electrónico</label>
+          <input
+            id="public-register-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="nombre@correo.com"
+            required
+            value={credentials.email}
+            onChange={(event) => onCredentialChange('email', event.target.value)}
+          />
+          <label htmlFor="public-register-password">Contraseña</label>
+          <input
+            id="public-register-password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            placeholder="Ingresá una contraseña"
+            required
+            minLength={6}
+            value={credentials.password}
+            onChange={(event) => onCredentialChange('password', event.target.value)}
+          />
+          <label htmlFor="public-register-confirm-password">Confirmar contraseña</label>
+          <input
+            id="public-register-confirm-password"
+            name="confirmPassword"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            placeholder="Ingresá nuevamente la contraseña"
+            required
+            minLength={6}
+            value={credentials.confirmPassword}
+            onChange={(event) => onCredentialChange('confirmPassword', event.target.value)}
+          />
+          <button
+            type="button"
+            className="public-register-password-toggle"
+            onClick={onTogglePassword}
+            aria-label={showPassword ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
+            aria-pressed={showPassword}
+          >
+            {showPassword ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
+          </button>
+          {error && <p className="public-login-error" role="alert">{error}</p>}
+          <button className="public-login-submit" type="submit">Crear mi cuenta</button>
+        </form>
+        <a
+          className="public-login-home-link"
+          href="/login"
+          onClick={(event) => {
+            event.preventDefault();
+            onNavigate('login');
+          }}
+        >
+          Ya tengo cuenta · Iniciar sesión
+        </a>
+      </section>
+    </main>
   );
 }
 
@@ -305,124 +670,6 @@ function GeneralStatistics() {
             </article>
           </div>
         </>
-      )}
-    </section>
-  );
-}
-
-function ManagementHistory() {
-  const [historyItems, setHistoryItems] = useState<ReportHistoryEntry[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadHistory() {
-      try {
-        const response = await api.get('/denuncias/gestion/historial');
-        if (active) {
-          setHistoryItems(response.data.data.items as ReportHistoryEntry[]);
-          setError('');
-        }
-      } catch (loadError: unknown) {
-        if (active) {
-          setError(
-            getApiErrorMessage(loadError, 'No se pudo cargar el historial.'),
-          );
-        }
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    }
-
-    void loadHistory();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const search = searchTerm.trim().toLocaleLowerCase('es-UY');
-  const visibleHistory = historyItems.filter((item) => {
-    const responsible = item.responsible;
-    const responsibleText = responsible
-      ? `${responsible.firstName ?? ''} ${responsible.lastName ?? ''} ${responsible.email} ${responsible.entityName ?? ''}`
-      : 'usuario no disponible';
-    return `${item.report.title} ${item.fromStatus} ${item.toStatus} ${responsibleText}`
-      .toLocaleLowerCase('es-UY')
-      .includes(search);
-  });
-
-  return (
-    <section className="management-history">
-      <header className="management-history-header">
-        <div>
-          <span className="eyebrow">Gestión de reportes</span>
-          <h1>Historial de cambios</h1>
-          <p>Consulta cuándo cambió el estado de cada reporte y quién realizó el cambio.</p>
-        </div>
-        <label className="admin-search">
-          <span aria-hidden="true">⌕</span>
-          <input
-            type="search"
-            placeholder="Buscar en el historial..."
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            aria-label="Buscar en el historial"
-          />
-        </label>
-      </header>
-
-      {error && <p className="error management-error">{error}</p>}
-      <div className="admin-board-heading">
-        <div>
-          <h2>Actividad registrada</h2>
-          <p>{visibleHistory.length} {visibleHistory.length === 1 ? 'cambio' : 'cambios'}</p>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <p className="admin-column-empty">Cargando historial...</p>
-      ) : visibleHistory.length === 0 ? (
-        <p className="admin-column-empty">
-          {search ? 'No hay cambios que coincidan con la búsqueda.' : 'Todavía no hay cambios de estado registrados.'}
-        </p>
-      ) : (
-        <div className="admin-history-list">
-          {visibleHistory.map((item) => {
-            const fullName = `${item.responsible?.firstName ?? ''} ${item.responsible?.lastName ?? ''}`.trim();
-            const responsibleName =
-              fullName || item.responsible?.email || 'Usuario no disponible';
-
-            return (
-              <article className="admin-history-card" key={item.id}>
-                <div className="admin-history-change">
-                  <span className={`admin-status-chip admin-status-${item.fromStatus.toLowerCase()}`}>
-                    {item.fromStatus.replace(/_/g, ' ')}
-                  </span>
-                  <span aria-hidden="true">→</span>
-                  <span className={`admin-status-chip admin-status-${item.toStatus.toLowerCase()}`}>
-                    {item.toStatus.replace(/_/g, ' ')}
-                  </span>
-                </div>
-                <h3>{item.report.title}</h3>
-                <p>
-                  Modificado por <strong>{responsibleName}</strong>
-                  {fullName && item.responsible?.email && (
-                    <span className="admin-history-email"> · {item.responsible.email}</span>
-                  )}
-                </p>
-                <time dateTime={item.createdAt}>
-                  {new Intl.DateTimeFormat('es-UY', {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  }).format(new Date(item.createdAt))}
-                </time>
-              </article>
-            );
-          })}
-        </div>
       )}
     </section>
   );
@@ -584,7 +831,7 @@ function ManagementDashboard({
   const [isSubmittingRejectionFor, setIsSubmittingRejectionFor] =
     useState<string | null>(null);
   const [managementView, setManagementView] = useState<
-    'home' | 'reports' | 'history' | 'users' | 'create-user' | 'statistics' | 'requests'
+    'home' | 'reports' | 'users' | 'create-user' | 'statistics' | 'requests'
   >('home');
   const [dateOrder, setDateOrder] = useState<'newest' | 'oldest'>('newest');
   const [dateFrom, setDateFrom] = useState('');
@@ -727,7 +974,7 @@ function ManagementDashboard({
       return;
     }
 
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
     const headers = Object.keys(rows[0]);
     const tableRows = rows.map((row) => headers.map((header) => row[header as keyof typeof row] ?? ''));
 
@@ -740,19 +987,8 @@ function ManagementDashboard({
       head: [headers],
       body: tableRows,
       startY: 84,
-      margin: { left: 32, right: 32 },
-      styles: { fontSize: 7, cellPadding: 4, minCellWidth: 48 },
-      columnStyles: {
-        1: { minCellWidth: 70 },
-        2: { minCellWidth: 100 },
-        5: { minCellWidth: 80 },
-        6: { minCellWidth: 85 },
-        7: { minCellWidth: 75 },
-        8: { minCellWidth: 90 },
-        11: { minCellWidth: 85 },
-      },
-      horizontalPageBreak: true,
-      horizontalPageBreakRepeat: 0,
+      margin: { left: 40, right: 40 },
+      styles: { fontSize: 7, cellPadding: 4 },
       headStyles: { fillColor: [21, 86, 181], textColor: 255 },
       alternateRowStyles: { fillColor: [247, 250, 255] },
     });
@@ -773,6 +1009,15 @@ function ManagementDashboard({
 
     void loadAssignableUsers();
   }, [isAdmin]);
+
+  async function archiveReport(id: string) {
+    try {
+      await api.patch(`/denuncias/${id}/archivar`);
+      await loadReports();
+    } catch (archiveError: unknown) {
+      setError(getApiErrorMessage(archiveError, 'No se pudo archivar la denuncia.'));
+    }
+  }
 
   async function takeReport(id: string) {
     try {
@@ -854,16 +1099,6 @@ function ManagementDashboard({
     if (selectedFilter !== 'active') setIsKanbanView(false);
   }
 
-  function clearReportFilters() {
-    setFilter(filter === 'archived' ? 'archived' : 'active');
-    setDateOrder('newest');
-    setDateFrom('');
-    setDateTo('');
-    setCategoryFilter('');
-    setModalityFilter('');
-    setSearchTerm('');
-  }
-
   const kanbanColumns = [
     { title: 'Pendiente', status: 'PENDIENTE', statuses: ['PENDIENTE', 'ASIGNADO', 'EN_REVISION'] },
     { title: 'En proceso', status: 'EN_PROCESO', statuses: ['EN_PROCESO'] },
@@ -932,10 +1167,7 @@ function ManagementDashboard({
   }
 
   return (
-    <main
-      className={`app-shell admin-app-shell ${isAdmin ? 'superadmin-shell' : isEntityAdmin ? 'entity-shell' : 'staff-shell'
-        }`}
-    >
+    <main className={`app-shell admin-app-shell ${isAdmin ? 'superadmin-shell' : 'entity-shell'}`}>
       <header className="admin-account-header">
         <div className="admin-brand" aria-label="PuntoReporte">
           <span>Punto</span>Reporte
@@ -999,13 +1231,6 @@ function ManagementDashboard({
                 >
                   <span aria-hidden="true">▣</span> Archivadas
                 </button>
-                <button
-                  type="button"
-                  className={managementView === 'history' ? 'admin-nav-active' : ''}
-                  onClick={() => setManagementView('history')}
-                >
-                  <span aria-hidden="true">◷</span> Historial de cambios
-                </button>
               </>
             )}
             {isAdmin && (
@@ -1061,13 +1286,7 @@ function ManagementDashboard({
                 <span className="eyebrow">
                   {isAdmin ? 'Administración general' : 'Gestión de reportes'}
                 </span>
-                <h1>
-                  {isAdmin
-                    ? 'Inicio del superadministrador'
-                    : isEntityAdmin
-                      ? 'Inicio de administrador de ente público'
-                      : 'Inicio del funcionario'}
-                </h1>
+                <h1>{isAdmin ? 'Inicio del superadministrador' : 'Inicio del funcionario'}</h1>
                 <p>
                   {isAdmin
                     ? 'Administra las cuentas, solicitudes y estadísticas de la plataforma.'
@@ -1119,11 +1338,6 @@ function ManagementDashboard({
                       <strong>Reportes archivados</strong>
                       <small>Consultar reportes ya archivados.</small>
                     </button>
-                    <button type="button" onClick={() => setManagementView('history')}>
-                      <span aria-hidden="true">◷</span>
-                      <strong>Historial de cambios</strong>
-                      <small>Consultar los cambios de estado y sus responsables.</small>
-                    </button>
                     {isEntityAdmin && (
                       <button type="button" onClick={() => setManagementView('requests')}>
                         <span aria-hidden="true">＋</span>
@@ -1135,8 +1349,6 @@ function ManagementDashboard({
                 )}
               </div>
             </section>
-          ) : managementView === 'history' ? (
-            <ManagementHistory />
           ) : managementView === 'requests' ? (
             <SolicitudesFuncionarios isSuperAdmin={isAdmin} />
           ) : isAdmin ? (
@@ -1155,9 +1367,7 @@ function ManagementDashboard({
                 <div className="admin-page-content">
                   <header className="admin-header">
                     <div className="admin-page-title">
-                      <span className="eyebrow">
-                        {isAdmin ? 'Administración' : isEntityAdmin ? 'Administradores' : 'Funcionarios'}
-                      </span>
+                      <span className="eyebrow">{isAdmin ? 'Administración' : 'Funcionarios'}</span>
                       <h1>Bandeja de reportes</h1>
                       <p>Organiza y sigue los reportes de la ciudad.</p>
                     </div>
@@ -1173,101 +1383,19 @@ function ManagementDashboard({
                           aria-label="Buscar denuncias"
                         />
                       </label>
-                      <div className="admin-filter-panel" aria-label="Filtros de denuncias">
-                        <details>
-                          <summary className="admin-filter-heading">
-                            <span aria-hidden="true">☷</span>
-                            <span className="admin-filter-title">
-                              <strong>Filtros</strong>
-                            </span>
-                            <span className="admin-filter-chevron" aria-hidden="true">⌄</span>
-                          </summary>
-
-                          <div className="admin-filter-fields">
-                            {!isArchivedView && (
-                              <label className="admin-filter-control">
-                                <span>Estado</span>
-                                <select value={filter} onChange={(event) => changeReportFilter(event.target.value)}>
-                                  <option value="active">Todas</option>
-                                  <option value="PENDIENTE">Pendientes</option>
-                                  <option value="EN_PROCESO">En proceso</option>
-                                  <option value="RESUELTO">Resueltas</option>
-                                </select>
-                              </label>
-                            )}
-
-                            <fieldset className="admin-filter-group">
-                              <legend>Fecha de reporte</legend>
-
-                              <label className="admin-filter-control">
-                                <span>Desde</span>
-                                <input
-                                  type="date"
-                                  value={dateFrom}
-                                  max={dateTo || undefined}
-                                  onChange={(event) => setDateFrom(event.target.value)}
-                                />
-                              </label>
-
-                              <label className="admin-filter-control">
-                                <span>Hasta</span>
-                                <input
-                                  type="date"
-                                  value={dateTo}
-                                  min={dateFrom || undefined}
-                                  onChange={(event) => setDateTo(event.target.value)}
-                                />
-                              </label>
-
-                              <label className="admin-filter-control">
-                                <span>Ordenar por fecha</span>
-                                <select
-                                  value={dateOrder}
-                                  onChange={(event) =>
-                                    setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'newest')
-                                  }
-                                >
-                                  <option value="newest">Más recientes</option>
-                                  <option value="oldest">Más antiguas</option>
-                                </select>
-                              </label>
-                            </fieldset>
-
-                            <label className="admin-filter-control">
-                              <span>Tipo de denuncia</span>
-                              <select
-                                value={categoryFilter}
-                                onChange={(event) => setCategoryFilter(event.target.value)}
-                              >
-                                <option value="">Todos los tipos</option>
-                                {categories.map((category) => (
-                                  <option key={category.id} value={category.id}>
-                                    {category.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="admin-filter-control">
-                              <span>Modalidad</span>
-                              <select
-                                value={modalityFilter}
-                                onChange={(event) => setModalityFilter(event.target.value)}
-                              >
-                                <option value="">Todas</option>
-                                <option value="identified">Identificadas</option>
-                                <option value="anonymous">Anónimas</option>
-                              </select>
-                            </label>
-                            <button
-                              className="admin-clear-filters"
-                              type="button"
-                              onClick={clearReportFilters}
-                            >
-                              Limpiar filtros
-                            </button>
-                          </div>
-                        </details>
-                      </div>
+                      {!isArchivedView && (
+                        <select
+                          className="admin-filter"
+                          value={filter}
+                          onChange={(event) => changeReportFilter(event.target.value)}
+                          aria-label="Filtrar denuncias por estado"
+                        >
+                          <option value="active">Todas</option>
+                          <option value="PENDIENTE">Pendientes</option>
+                          <option value="EN_PROCESO">En proceso</option>
+                          <option value="RESUELTO">Resueltas</option>
+                        </select>
+                      )}
                       <div className="admin-export-actions" aria-label="Exportar denuncias">
                         <button
                           type="button"
@@ -1330,10 +1458,7 @@ function ManagementDashboard({
                     <div className="admin-board-heading" id="admin-board">
                       <div>
                         <h2>{isArchivedView ? 'Reportes archivados' : 'Flujo de trabajo'}</h2>
-                        <p>
-                          {visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}
-                          {isArchivedView && ' · Los reportes se ocultan luego de 90 días archivados.'}
-                        </p>
+                        <p>{visibleReports.length} {visibleReports.length === 1 ? 'reporte visible' : 'reportes visibles'}</p>
                       </div>
                       {!isArchivedView && (
                         <button
@@ -1350,7 +1475,7 @@ function ManagementDashboard({
                       )}
                     </div>
 
-                    <section className={`admin-board ${isKanbanView && filter === 'active' ? 'admin-board-kanban' : filter === 'active' ? 'admin-board-list' : 'admin-board-single'}`}>
+                    <section className={`admin-board ${isKanbanView && filter === 'active' ? 'admin-board-kanban' : filter === 'active' ? 'admin-board-active' : 'admin-board-single'}`}>
                       {columns.map((column) => {
                         const columnReports = column.status
                           ? visibleReports.filter((item) => column.statuses.includes(item.status))
@@ -1447,80 +1572,52 @@ function ManagementDashboard({
                                     ))}
                                   </div>
 
-                                  {!isArchivedView && (
-                                    <div className="admin-report-actions">
-                                      <label className="report-assignment">
-                                        <span>Asignar a</span>
-                                        <select
-                                          value={item.assignee?.id ?? ''}
-                                          onChange={(event) => {
-                                            if (event.target.value) {
-                                              void assignReport(item.id, event.target.value);
-                                            }
-                                          }}
-                                        >
-                                          <option value="">Seleccionar funcionario</option>
-                                          {assignableUsers.map((assignableUser) => (
-                                            <option key={assignableUser.id} value={assignableUser.id}>
-                                              {[assignableUser.firstName, assignableUser.lastName]
-                                                .filter(Boolean)
-                                                .join(' ') || assignableUser.email}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </label>
-                                      {!item.assignee && (
-                                        <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
-                                      )}
-                                      {item.assignee && (
-                                        <>
-                                          <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
-                                            En revisión
-                                          </button>
-                                          <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
-                                            Iniciar trabajo
-                                          </button>
-                                          <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
-                                            Marcar resuelta
-                                          </button>
-                                          <label className="report-rejection-control">
-                                            <span>Motivo del rechazo</span>
-                                            <select
-                                              value={rejectionReasonsByReport[item.id] ?? ''}
-                                              onChange={(event) => {
-                                                const value = event.target.value;
-
-                                                setRejectionReasonsByReport((current) => {
-                                                  const next = { ...current };
-                                                  if (value) next[item.id] = value;
-                                                  else delete next[item.id];
-                                                  return next;
-                                                });
-                                              }}
-                                            >
-                                              <option value="">Seleccioná un motivo</option>
-                                              {rejectionReasons.map((reason) => (
-                                                <option key={reason.value} value={reason.value}>
-                                                  {reason.label}
-                                                </option>
-                                              ))}
-                                            </select>
-                                          </label>
-
-                                          <button
-                                            className="danger"
-                                            onClick={() => void changeStatus(item.id, 'RECHAZADO')}
-                                            disabled={
-                                              !rejectionReasonsByReport[item.id] ||
-                                              isSubmittingRejectionFor === item.id
-                                            }
-                                          >
-                                            {isSubmittingRejectionFor === item.id ? 'Rechazando...' : 'Rechazar'}
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
+                                  <div className="admin-report-actions">
+                                    <label className="report-assignment">
+                                      <span>Asignar a</span>
+                                      <select
+                                        value={item.assignee?.id ?? ''}
+                                        onChange={(event) => {
+                                          if (event.target.value) {
+                                            void assignReport(item.id, event.target.value);
+                                          }
+                                        }}
+                                      >
+                                        <option value="">Seleccionar funcionario</option>
+                                        {assignableUsers.map((assignableUser) => (
+                                          <option key={assignableUser.id} value={assignableUser.id}>
+                                            {[assignableUser.firstName, assignableUser.lastName]
+                                              .filter(Boolean)
+                                              .join(' ') || assignableUser.email}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    {!item.assignee && (
+                                      <button onClick={() => takeReport(item.id)}>Tomar denuncia</button>
+                                    )}
+                                    {item.assignee && (
+                                      <>
+                                        <button className="secondary" onClick={() => changeStatus(item.id, 'EN_REVISION')}>
+                                          En revisión
+                                        </button>
+                                        <button className="secondary" onClick={() => changeStatus(item.id, 'EN_PROCESO')}>
+                                          Iniciar trabajo
+                                        </button>
+                                        <button onClick={() => changeStatus(item.id, 'RESUELTO')}>
+                                          Marcar resuelta
+                                        </button>
+                                        <button className="danger" onClick={() => changeStatus(item.id, 'RECHAZADO')}>
+                                          Denegar
+                                        </button>
+                                      </>
+                                    )}
+                                    {item.status === 'RECHAZADO' && filter !== 'archived' && (
+                                      <button className="secondary" onClick={() => archiveReport(item.id)}>
+                                        Archivar
+                                      </button>
+                                    )}
+                                  </div>
                                 </article>
                               ))}
                             </div>
@@ -1531,6 +1628,94 @@ function ManagementDashboard({
                   </div>
                 </div>
 
+                <aside className="admin-filter-panel" aria-label="Filtros de denuncias">
+                  <details open>
+                    <summary className="admin-filter-heading">
+                      <span aria-hidden="true">☷</span>
+                      <span className="admin-filter-title">
+                        <strong>Filtros</strong>
+                      </span>
+                      <span className="admin-filter-chevron" aria-hidden="true">⌄</span>
+                    </summary>
+
+                    <div className="admin-filter-fields">
+                      {!isArchivedView && (
+                        <label className="admin-filter-control">
+                          <span>Estado</span>
+                          <select value={filter} onChange={(event) => changeReportFilter(event.target.value)}>
+                            <option value="active">Todas</option>
+                            <option value="PENDIENTE">Pendientes</option>
+                            <option value="EN_PROCESO">En proceso</option>
+                            <option value="RESUELTO">Resueltas</option>
+                          </select>
+                        </label>
+                      )}
+
+                      <fieldset className="admin-filter-group">
+                        <legend>Fecha de reporte</legend>
+
+                        <label className="admin-filter-control">
+                          <span>Desde</span>
+                          <input
+                            type="date"
+                            value={dateFrom}
+                            max={dateTo || undefined}
+                            onChange={(event) => setDateFrom(event.target.value)}
+                          />
+                        </label>
+
+                        <label className="admin-filter-control">
+                          <span>Hasta</span>
+                          <input
+                            type="date"
+                            value={dateTo}
+                            min={dateFrom || undefined}
+                            onChange={(event) => setDateTo(event.target.value)}
+                          />
+                        </label>
+
+                        <label className="admin-filter-control">
+                          <span>Ordenar por fecha</span>
+                          <select
+                            value={dateOrder}
+                            onChange={(event) =>
+                              setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'newest')
+                            }
+                          >
+                            <option value="newest">Más recientes</option>
+                            <option value="oldest">Más antiguas</option>
+                          </select>
+                        </label>
+                      </fieldset>
+
+                      <label className="admin-filter-control">
+                        <span>Tipo de denuncia</span>
+                        <select
+                          value={categoryFilter}
+                          onChange={(event) => setCategoryFilter(event.target.value)}
+                        >
+                          <option value="">Todos los tipos</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {category.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="admin-filter-control">
+                        <span>Modalidad</span>
+                        <select
+                          value={modalityFilter}
+                          onChange={(event) => setModalityFilter(event.target.value)}
+                        >
+                          <option value="">Todas</option>
+                          <option value="identified">Identificadas</option>
+                          <option value="anonymous">Anónimas</option>
+                        </select>
+                      </label>
+                    </div>
+                  </details>
+                </aside>
               </div>
             </>
           )}
@@ -1558,10 +1743,10 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [error, setError] = useState('');
+  const [anonymousLoginLoading, setAnonymousLoginLoading] = useState(false);
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
   const [menuCiudadanoAbierto, setMenuCiudadanoAbierto] = useState(false);
   const [actualizandoReportes, setActualizandoReportes] = useState(false);
-  const [actualizandoConsentimiento, setActualizandoConsentimiento] = useState('');
   const [errorReportes, setErrorReportes] = useState('');
   const [vistaCiudadano, setVistaCiudadano] =
     useState<'crear' | 'reportes'>('crear');
@@ -1582,6 +1767,7 @@ function App() {
   function navigateAuth(route: AuthRoute) {
     const routePaths: Record<AuthRoute, string> = {
       home: '/',
+      access: '/acceso',
       login: '/login',
       register: '/registro',
       anonymous: '/anonimo',
@@ -1615,27 +1801,7 @@ function App() {
     } finally {
       setActualizandoReportes(false);
     }
-  }, [user?.role]);
-
-  async function cambiarConsentimientoMapa(report: Report) {
-    const publicMapConsent = !report.publicMapConsent;
-    setActualizandoConsentimiento(report.id);
-    setErrorReportes('');
-    try {
-      await api.patch(`/denuncias/${report.id}`, { publicMapConsent });
-      setReports((currentReports) =>
-        currentReports.map((item) =>
-          item.id === report.id ? { ...item, publicMapConsent } : item,
-        ),
-      );
-    } catch (updateError: unknown) {
-      setErrorReportes(
-        getApiErrorMessage(updateError, 'No se pudo actualizar el permiso del mapa.'),
-      );
-    } finally {
-      setActualizandoConsentimiento('');
-    }
-  }
+  }, []);
 
   useEffect(() => {
     if (user?.role !== 'CIUDADANO') return;
@@ -1699,15 +1865,72 @@ function App() {
 
   async function handleAnonymousLogin() {
     setError('');
+    setAnonymousLoginLoading(true);
     try {
       const response = await api.post('/auth/anonymous');
+      setVistaCiudadano('crear');
       setSession(response.data.data.user, response.data.data.csrfToken);
     } catch (anonymousError: unknown) {
       setError(getApiErrorMessage(anonymousError, 'No se pudo crear la sesión temporal.'));
+    } finally {
+      setAnonymousLoginLoading(false);
     }
   }
 
   if (!user) {
+    if (authRoute === 'home') {
+      return (
+        <PublicHomePage
+          onNavigate={navigateAuth}
+          onAnonymousReport={handleAnonymousLogin}
+          anonymousLoginLoading={anonymousLoginLoading}
+          error={error}
+        />
+      );
+    }
+
+    if (authRoute === 'access') {
+      return (
+        <PublicAccessPage
+          onNavigate={navigateAuth}
+          onAnonymousLogin={handleAnonymousLogin}
+          error={error}
+        />
+      );
+    }
+
+    if (authRoute === 'login') {
+      return (
+        <PublicLoginPage
+          credentials={credentials}
+          onCredentialChange={(field, value) =>
+            setCredentials({ ...credentials, [field]: value })
+          }
+          showPassword={showPassword}
+          onTogglePassword={() => setShowPassword((visible) => !visible)}
+          onSubmit={handleAuth}
+          error={error}
+          onNavigate={navigateAuth}
+        />
+      );
+    }
+
+    if (authRoute === 'register') {
+      return (
+        <PublicRegisterPage
+          credentials={credentials}
+          onCredentialChange={(field, value) =>
+            setCredentials({ ...credentials, [field]: value })
+          }
+          showPassword={showPassword}
+          onTogglePassword={() => setShowPassword((visible) => !visible)}
+          onSubmit={handleAuth}
+          error={error}
+          onNavigate={navigateAuth}
+        />
+      );
+    }
+
     return (
       <main className="app-shell auth-shell">
         <div className="auth-background" aria-hidden="true">
@@ -1726,67 +1949,7 @@ function App() {
             className="auth-brand-logo"
           />
 
-          {authRoute === 'home' ? (
-            <section className="public-home" aria-labelledby="public-home-title">
-              <span className="public-home-kicker">PuntoReporte · Melo</span>
-              <h1 id="public-home-title">Tu ciudad, un lugar mejor</h1>
-              <p>
-                Reportá problemas de tu entorno y ayudá a mejorar los espacios
-                y servicios de la comunidad.
-              </p>
-
-              <div className="public-home-actions">
-                <a
-                  className="public-home-action public-home-action-primary"
-                  href="/anonimo"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    navigateAuth('anonymous');
-                  }}
-                >
-                  Crear reporte
-                  <small>Podés continuar sin una cuenta</small>
-                </a>
-                <a
-                  className="public-home-action"
-                  href="/login"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    navigateAuth('login');
-                  }}
-                >
-                  Iniciar sesión
-                  <small>Seguí tus reportes</small>
-                </a>
-                <a
-                  className="public-home-action"
-                  href="/registro"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    navigateAuth('register');
-                  }}
-                >
-                  Crear cuenta
-                  <small>Registrate como ciudadano</small>
-                </a>
-              </div>
-
-              <a
-                className="public-home-staff-link"
-                href="/gestion/login"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateAuth('management-login');
-                }}
-              >
-                Acceso para funcionarios
-              </a>
-
-              <EmergencyShortcuts />
-              <PublicReportMap />
-            </section>
-          ) : (
-            <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
+          <section className={`auth-panel auth-route-${authRoute}`} aria-label="Acceso a PuntoReporte">
               <a
                 className="auth-home-link"
                 href="/"
@@ -1816,8 +1979,6 @@ function App() {
                   <>
                     <a
                       href="/login"
-                      className={authRoute === 'login' ? 'active' : ''}
-                      aria-current={authRoute === 'login' ? 'page' : undefined}
                       onClick={(event) => {
                         event.preventDefault();
                         navigateAuth('login');
@@ -1831,8 +1992,6 @@ function App() {
                     </a>
                     <a
                       href="/registro"
-                      className={authRoute === 'register' ? 'active' : ''}
-                      aria-current={authRoute === 'register' ? 'page' : undefined}
                       onClick={(event) => {
                         event.preventDefault();
                         navigateAuth('register');
@@ -2058,8 +2217,7 @@ function App() {
               <p className="auth-panel-footer">
                 Reportá. Informá. Mejorá.
               </p>
-            </section>
-          )}
+          </section>
         </div>
       </main>
     );
@@ -2238,24 +2396,6 @@ function App() {
                   >
                     {item.status.toLowerCase().replace(/_/g, ' ')}
                   </span>
-
-                  {(item.publicMapConsent ||
-                    ['Infraestructura', 'Limpieza', 'Saneamiento'].includes(
-                      item.category?.name.trim() ?? '',
-                    )) && (
-                      <button
-                        type="button"
-                        className="report-map-consent-toggle"
-                        onClick={() => void cambiarConsentimientoMapa(item)}
-                        disabled={actualizandoConsentimiento === item.id}
-                      >
-                        {actualizandoConsentimiento === item.id
-                          ? 'Actualizando permiso...'
-                          : item.publicMapConsent
-                            ? 'Retirar permiso del mapa'
-                            : 'Permitir ubicación aproximada en el mapa'}
-                      </button>
-                    )}
                 </article>
               ))
             )}
