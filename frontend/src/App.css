@@ -4385,13 +4385,19 @@ body {
 }
 
 .public-home-page {
+  --home-blue: #07539b;
+  --home-blue-dark: #073766;
+  --home-red: #d71920;
+  --home-ink: #122b49;
+  --home-muted: #52677e;
   min-height: 100vh;
-  padding: 0 clamp(20px, 5vw, 72px) 28px;
+  padding: 0 clamp(20px, 5vw, 72px) 40px;
   overflow: hidden;
   background:
-    radial-gradient(ellipse at 86% 16%, rgba(196, 224, 214, 0.42), transparent 34%),
-    linear-gradient(180deg, #f8faf8 0%, #f1f6f3 100%);
-  color: #18332e;
+    radial-gradient(ellipse at 91% 8%, rgba(215, 25, 32, 0.08), transparent 24%),
+    radial-gradient(ellipse at 5% 34%, rgba(7, 83, 155, 0.08), transparent 28%),
+    linear-gradient(180deg, #ffffff 0%, #f3f7fc 72%, #fff 100%);
+  color: var(--home-ink);
 }
 
 .public-home-header {
@@ -4402,7 +4408,7 @@ body {
   justify-content: space-between;
   gap: 24px;
   margin: 0 auto;
-  border-bottom: 1px solid rgba(24, 51, 46, 0.1);
+  border-bottom: 1px solid rgba(7, 55, 102, 0.13);
 }
 
 .public-home-brand {
@@ -4426,7 +4432,7 @@ body {
 .public-home-nav a,
 .public-home-nav button,
 .public-home-footer a {
-  color: #294d43;
+  color: var(--home-blue-dark);
   font-size: 0.92rem;
   font-weight: 700;
   text-decoration: none;
@@ -4435,7 +4441,7 @@ body {
 .public-home-nav a:hover,
 .public-home-nav button:hover,
 .public-home-footer a:hover {
-  color: #127354;
+  color: var(--home-red);
 }
 
 .public-home-nav a:focus-visible,
@@ -4443,35 +4449,46 @@ body {
 .public-home-footer a:focus-visible,
 .public-home-brand:focus-visible {
   border-radius: 6px;
-  outline: 3px solid rgba(18, 115, 84, 0.35);
+  outline: 3px solid rgba(7, 83, 155, 0.4);
   outline-offset: 4px;
 }
 
+.public-home-nav a {
+  padding: 11px 17px;
+  border: 1px solid rgba(7, 83, 155, 0.22);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.public-home-nav a:hover {
+  border-color: rgba(215, 25, 32, 0.3);
+}
+
 .public-home-report-cta {
-  min-height: 64px;
-  margin-top: 24px;
-  padding: 16px 28px;
+  min-height: 68px;
+  margin-top: 28px;
+  padding: 17px 30px;
   border: 0;
-  border-radius: 12px;
-  background: #1769c2;
-  box-shadow: 0 8px 20px rgba(23, 105, 194, 0.24);
+  border-radius: 14px;
+  background: linear-gradient(115deg, var(--home-blue-dark), var(--home-blue));
+  box-shadow: 0 12px 26px rgba(7, 83, 155, 0.25);
   color: #fff;
   cursor: pointer;
   font: inherit;
-  font-size: 1.15rem;
-  font-weight: 750;
+  font-size: 1.2rem;
+  font-weight: 800;
   transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .public-home-report-cta:hover {
   transform: translateY(-1px);
-  background: #1057a5;
-  box-shadow: 0 10px 24px rgba(23, 105, 194, 0.3);
+  background: linear-gradient(115deg, #06457f, #064b89);
+  box-shadow: 0 14px 30px rgba(7, 83, 155, 0.31);
   color: white;
 }
 
 .public-home-report-cta:focus-visible {
-  outline: 4px solid rgba(23, 105, 194, 0.35);
+  outline: 4px solid rgba(7, 83, 155, 0.35);
   outline-offset: 4px;
 }
 
@@ -4483,19 +4500,19 @@ body {
 .public-home-error {
   width: min(1200px, 100%);
   margin: 12px auto 0;
-  color: #b42318;
+  color: #b4232a;
   font-size: 0.9rem;
 }
 
 .public-home-hero {
   display: grid;
   width: min(1200px, 100%);
-  min-height: 520px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.94fr);
+  min-height: 500px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   align-items: center;
-  gap: clamp(40px, 7vw, 92px);
+  gap: clamp(36px, 6vw, 76px);
   margin: 0 auto;
-  padding: 46px 0 54px;
+  padding: 48px 0 58px;
 }
 
 .public-home-hero-copy {
@@ -4503,65 +4520,112 @@ body {
   padding: 18px 0;
 }
 
+.public-home-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--home-red);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+
+.public-home-kicker::before {
+  width: 24px;
+  height: 3px;
+  border-radius: 4px;
+  background: var(--home-red);
+  content: "";
+}
+
 .public-home-hero h1 {
-  margin: 0 0 18px;
-  color: #18332e;
+  margin: 18px 0;
+  color: var(--home-blue-dark);
   font-size: clamp(2.8rem, 5.4vw, 5rem);
   font-weight: 800;
   letter-spacing: -0.065em;
   line-height: 1.03;
 }
 
+.public-home-hero h1 span {
+  color: var(--home-red);
+}
+
 .public-home-hero-copy > p {
   max-width: 470px;
   margin: 0;
-  color: #536b63;
-  font-size: clamp(1rem, 1.4vw, 1.12rem);
-  line-height: 1.75;
+  color: var(--home-muted);
+  font-size: clamp(1.05rem, 1.45vw, 1.2rem);
+  line-height: 1.8;
+}
+
+.public-home-photo {
+  position: relative;
+  min-width: 0;
+  height: clamp(340px, 39vw, 470px);
+  overflow: hidden;
+  margin: 0;
+  border: 7px solid #fff;
+  border-radius: 30px 30px 100px 30px;
+  background: #d9e6f2;
+  box-shadow: 0 28px 65px rgba(7, 55, 102, 0.2);
+}
+
+.public-home-photo::after {
+  position: absolute;
+  inset: 35% 0 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(5, 28, 54, 0.76) 100%);
+  content: "";
+}
+
+.public-home-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 .public-home-map-frame {
   position: relative;
   min-width: 0;
-  height: clamp(340px, 39vw, 470px);
-  overflow: hidden;
-  border-radius: 26px 26px 110px 26px;
-  background: #c9d8d1;
-  box-shadow: 0 28px 60px rgba(24, 51, 46, 0.16);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 14px 38px rgba(7, 55, 102, 0.1);
 }
 
 .public-home-map-frame .public-report-map {
   display: flex;
-  height: 100%;
   flex-direction: column;
   gap: 8px;
   margin: 0;
-  padding: clamp(14px, 2vw, 22px);
+  padding: clamp(18px, 3vw, 30px);
   border: 0;
 }
 
 .public-home-map-frame .public-report-map h2 {
   margin: 0;
-  color: #18332e;
-  font-size: 1.12rem;
+  color: var(--home-blue-dark);
+  font-size: 1.25rem;
 }
 
 .public-home-map-frame .public-report-map-intro {
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
   margin: 0;
 }
 
-.public-home-map-frame .public-report-map-intro > p {
-  display: none;
+.public-home-map-frame .public-report-map-intro > p,
+.public-home-map-frame .public-report-map-legend {
+  color: var(--home-muted);
 }
 
 .public-home-map-frame .public-report-map-resolved {
-  min-width: 82px;
-  padding: 5px 8px;
-  border-color: #b7d8c6;
-  background: #eaf5ee;
-  color: #17613f;
+  min-width: 90px;
+  padding: 7px 10px;
+  border-color: rgba(7, 83, 155, 0.2);
+  background: #eef5fc;
+  color: var(--home-blue-dark);
 }
 
 .public-home-map-frame .public-report-map-resolved strong {
@@ -4576,7 +4640,7 @@ body {
   min-height: 36px;
   gap: 8px;
   margin: 0;
-  color: #405b4f;
+  color: var(--home-ink);
   font-size: 0.78rem;
 }
 
@@ -4584,96 +4648,134 @@ body {
   flex: 1;
   min-height: 36px;
   padding: 7px 30px 7px 10px;
-  border-color: #c3d6cc;
-  color: #294d43;
+  border-color: #c5d7e9;
+  color: var(--home-blue-dark);
   font-size: 0.78rem;
 }
 
 .public-home-map-frame .public-report-map-canvas {
-  min-height: 0;
-  height: auto;
-  flex: 1;
-  border-color: #bfd0c5;
-  border-radius: 14px 14px 76px 14px;
+  min-height: 300px;
+  border-color: #d3e0ee;
+  border-radius: 14px;
 }
 
-.public-home-map-frame .public-report-map-legend {
-  margin-top: 0;
-  color: #536b63;
+.public-home-map-frame .public-report-map-error {
+  color: var(--home-red);
 }
 
 .public-home-map-frame .public-report-map-empty {
-  margin: 0;
-  color: #536b63;
+  color: var(--home-muted);
   font-size: 0.72rem;
 }
 
 .public-home-image-caption {
   position: absolute;
   z-index: 1;
-  right: 24px;
-  bottom: 22px;
-  left: 24px;
+  right: 28px;
+  bottom: 28px;
+  left: 30px;
+  display: grid;
+  gap: 7px;
   color: #fff;
-  font-size: 0.9rem;
-  font-weight: 700;
-  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
 }
 
 .public-home-image-caption span {
-  margin-right: 7px;
-  color: #a7e0c3;
+  color: #ffb8bb;
   font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+}
+
+.public-home-image-caption strong {
+  font-size: clamp(1.2rem, 2.2vw, 1.7rem);
+  line-height: 1.2;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
 }
 
 .public-home-benefits {
   display: grid;
   width: min(1200px, 100%);
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0 auto;
-  padding: 26px 0 32px;
-  border-top: 1px solid rgba(24, 51, 46, 0.12);
-  border-bottom: 1px solid rgba(24, 51, 46, 0.12);
+  gap: 18px;
+  margin: 0 auto 72px;
 }
 
 .public-home-benefits article {
   display: flex;
   gap: 16px;
-  padding: 8px clamp(14px, 2.8vw, 34px);
+  padding: 22px 20px;
+  border: 1px solid rgba(7, 83, 155, 0.1);
+  border-top: 3px solid var(--home-blue);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 9px 24px rgba(7, 55, 102, 0.06);
 }
 
-.public-home-benefits article:first-child {
-  padding-left: 0;
-}
-
-.public-home-benefits article + article {
-  border-left: 1px solid rgba(24, 51, 46, 0.12);
+.public-home-benefits article:nth-child(2) {
+  border-top-color: var(--home-red);
 }
 
 .public-home-benefit-number {
-  padding-top: 2px;
-  color: #c27d43;
-  font-size: 0.76rem;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf4fc;
+  color: var(--home-blue);
+  font-size: 0.78rem;
   font-weight: 850;
-  letter-spacing: 0.08em;
+}
+
+.public-home-benefits article:nth-child(2) .public-home-benefit-number {
+  background: #fff0f0;
+  color: var(--home-red);
 }
 
 .public-home-benefits h2 {
   margin: 0 0 6px;
-  color: #18332e;
+  color: var(--home-blue-dark);
   font-size: 1rem;
 }
 
 .public-home-benefits p {
   margin: 0;
-  color: #65796f;
+  color: var(--home-muted);
   font-size: 0.86rem;
   line-height: 1.55;
 }
 
+.public-home-map-section {
+  width: min(1200px, 100%);
+  margin: 0 auto 56px;
+}
+
+.public-home-map-heading {
+  margin-bottom: 20px;
+}
+
+.public-home-map-heading h2 {
+  margin: 10px 0 6px;
+  color: var(--home-blue-dark);
+  font-size: clamp(1.7rem, 3vw, 2.3rem);
+  letter-spacing: -0.04em;
+}
+
+.public-home-map-heading p {
+  margin: 0;
+  color: var(--home-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
 .public-home-page > .emergency-shortcuts {
   width: min(1200px, 100%);
-  margin: 28px auto 0;
+  margin: 0 auto;
+  border-color: rgba(255, 255, 255, 0.35);
+  border-radius: 18px;
+  background: linear-gradient(110deg, var(--home-blue-dark), var(--home-blue));
+  box-shadow: 0 14px 32px rgba(7, 55, 102, 0.18);
 }
 
 .public-home-footer {
@@ -4683,8 +4785,9 @@ body {
   justify-content: space-between;
   gap: 16px;
   margin: 0 auto;
-  padding: 22px 0 0;
-  color: #71847c;
+  padding: 28px 0 0;
+  border-top: 1px solid rgba(7, 55, 102, 0.13);
+  color: var(--home-muted);
   font-size: 0.82rem;
 }
 
@@ -4701,7 +4804,7 @@ body {
     min-height: 0;
     grid-template-columns: minmax(0, 1fr);
     gap: 28px;
-    padding: 48px 0 36px;
+    padding: 44px 0 40px;
   }
 
   .public-home-hero-copy {
@@ -4713,30 +4816,32 @@ body {
     font-size: clamp(2.8rem, 9vw, 4.2rem);
   }
 
-  .public-home-map-frame {
+  .public-home-photo {
     height: clamp(400px, 65vw, 480px);
     border-bottom-right-radius: 76px;
   }
 
   .public-home-benefits {
     grid-template-columns: minmax(0, 1fr);
-    padding: 10px 0;
+    gap: 12px;
   }
 
-  .public-home-benefits article,
-  .public-home-benefits article:first-child {
-    padding: 16px 4px;
+  .public-home-benefits article {
+    padding: 18px;
   }
 
-  .public-home-benefits article + article {
-    border-top: 1px solid rgba(24, 51, 46, 0.12);
-    border-left: 0;
+  .public-home-benefits {
+    margin-bottom: 52px;
   }
 
   .public-home-page > .emergency-shortcuts {
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
-    padding: 16px;
+    padding: 18px;
+  }
+
+  .public-home-map-section {
+    margin-bottom: 44px;
   }
 }
 
@@ -4761,13 +4866,12 @@ body {
 
   .public-home-nav {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: flex-start;
     flex-wrap: wrap;
     gap: 16px;
   }
 
-  .public-home-nav a,
-  .public-home-nav button {
+  .public-home-nav a {
     font-size: 0.8rem;
     white-space: nowrap;
   }
@@ -4788,10 +4892,6 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .public-home-map-frame {
-    height: clamp(420px, 110vw, 460px);
-  }
-
   .public-home-map-frame .public-report-map-intro {
     align-items: center;
   }
@@ -4805,6 +4905,26 @@ body {
     align-items: flex-start;
     flex-direction: column;
     padding-bottom: 8px;
+  }
+
+  .public-home-photo {
+    height: 340px;
+    border-radius: 22px 22px 72px 22px;
+  }
+
+  .public-home-map-frame .public-report-map {
+    padding: 16px;
+  }
+
+  .public-home-map-frame .public-report-map-canvas {
+    min-height: 260px;
+  }
+
+  .public-home-report-cta {
+    width: 100%;
+    min-height: 64px;
+    padding: 15px 18px;
+    font-size: 1.08rem;
   }
 }
 
