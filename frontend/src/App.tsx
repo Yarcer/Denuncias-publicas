@@ -127,7 +127,17 @@ function EmergencyShortcuts() {
   );
 }
 
-function PublicHomePage({ onNavigate }: { onNavigate: (route: AuthRoute) => void }) {
+function PublicHomePage({
+  onNavigate,
+  onAnonymousReport,
+  anonymousLoginLoading,
+  error,
+}: {
+  onNavigate: (route: AuthRoute) => void;
+  onAnonymousReport: () => void;
+  anonymousLoginLoading: boolean;
+  error: string;
+}) {
   return (
     <main className="public-home-page">
       <header className="public-home-header">
@@ -152,8 +162,17 @@ function PublicHomePage({ onNavigate }: { onNavigate: (route: AuthRoute) => void
           >
             Iniciar sesión
           </a>
+          <button
+            type="button"
+            className="public-home-nav-cta"
+            onClick={onAnonymousReport}
+            disabled={anonymousLoginLoading}
+          >
+            {anonymousLoginLoading ? 'Preparando formulario...' : 'Reportar como anónimo'}
+          </button>
         </nav>
       </header>
+      {error && <p className="public-home-error" role="alert">{error}</p>}
 
       <section className="public-home-hero" aria-labelledby="public-home-title">
         <div className="public-home-hero-copy">
@@ -1691,6 +1710,7 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [error, setError] = useState('');
+  const [anonymousLoginLoading, setAnonymousLoginLoading] = useState(false);
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
   const [menuCiudadanoAbierto, setMenuCiudadanoAbierto] = useState(false);
   const [actualizandoReportes, setActualizandoReportes] = useState(false);
@@ -1810,12 +1830,15 @@ function App() {
 
   async function handleAnonymousLogin() {
     setError('');
+    setAnonymousLoginLoading(true);
     try {
       const response = await api.post('/auth/anonymous');
       setVistaCiudadano('crear');
       setSession(response.data.data.user, response.data.data.csrfToken);
     } catch (anonymousError: unknown) {
       setError(getApiErrorMessage(anonymousError, 'No se pudo crear la sesión temporal.'));
+    } finally {
+      setAnonymousLoginLoading(false);
     }
   }
 
@@ -1824,6 +1847,9 @@ function App() {
       return (
         <PublicHomePage
           onNavigate={navigateAuth}
+          onAnonymousReport={handleAnonymousLogin}
+          anonymousLoginLoading={anonymousLoginLoading}
+          error={error}
         />
       );
     }

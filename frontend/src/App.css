@@ -4424,6 +4424,7 @@ body {
 }
 
 .public-home-nav a,
+.public-home-nav button,
 .public-home-footer a {
   color: #294d43;
   font-size: 0.92rem;
@@ -4432,11 +4433,13 @@ body {
 }
 
 .public-home-nav a:hover,
+.public-home-nav button:hover,
 .public-home-footer a:hover {
   color: #127354;
 }
 
 .public-home-nav a:focus-visible,
+.public-home-nav button:focus-visible,
 .public-home-footer a:focus-visible,
 .public-home-brand:focus-visible {
   border-radius: 6px;
@@ -4445,10 +4448,13 @@ body {
 }
 
 .public-home-nav .public-home-nav-cta {
+  border: 0;
   padding: 12px 18px;
   border-radius: 10px;
   background: #147253;
   color: white;
+  cursor: pointer;
+  font: inherit;
   transition: background-color 160ms ease, transform 160ms ease;
 }
 
@@ -4456,6 +4462,18 @@ body {
   transform: translateY(-1px);
   background: #105d44;
   color: white;
+}
+
+.public-home-nav .public-home-nav-cta:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.public-home-error {
+  width: min(1200px, 100%);
+  margin: 12px auto 0;
+  color: #b42318;
+  font-size: 0.9rem;
 }
 
 .public-home-hero {
@@ -4733,16 +4751,19 @@ body {
   .public-home-nav {
     width: 100%;
     justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 16px;
   }
 
-  .public-home-nav a {
+  .public-home-nav a,
+  .public-home-nav button {
     font-size: 0.8rem;
     white-space: nowrap;
   }
 
   .public-home-nav .public-home-nav-cta {
     padding: 10px 12px;
+    white-space: normal;
   }
 
   .public-home-hero {
