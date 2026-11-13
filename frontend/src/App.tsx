@@ -162,14 +162,6 @@ function PublicHomePage({
           >
             Iniciar sesión
           </a>
-          <button
-            type="button"
-            className="public-home-nav-cta"
-            onClick={onAnonymousReport}
-            disabled={anonymousLoginLoading}
-          >
-            {anonymousLoginLoading ? 'Preparando formulario...' : 'Reportar como anónimo'}
-          </button>
         </nav>
       </header>
       {error && <p className="public-home-error" role="alert">{error}</p>}
@@ -181,6 +173,14 @@ function PublicHomePage({
             Reportá problemas de tu entorno y ayudá a mejorar los espacios y
             servicios que compartimos.
           </p>
+          <button
+            type="button"
+            className="public-home-report-cta"
+            onClick={onAnonymousReport}
+            disabled={anonymousLoginLoading}
+          >
+            {anonymousLoginLoading ? 'Preparando formulario...' : 'Reportar como anónimo'}
+          </button>
         </div>
         <div className="public-home-map-frame">
           <PublicReportMap />

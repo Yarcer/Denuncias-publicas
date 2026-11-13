@@ -4447,24 +4447,35 @@ body {
   outline-offset: 4px;
 }
 
-.public-home-nav .public-home-nav-cta {
+.public-home-report-cta {
+  min-height: 64px;
+  margin-top: 24px;
+  padding: 16px 28px;
   border: 0;
-  padding: 12px 18px;
-  border-radius: 10px;
-  background: #147253;
-  color: white;
+  border-radius: 12px;
+  background: #1769c2;
+  box-shadow: 0 8px 20px rgba(23, 105, 194, 0.24);
+  color: #fff;
   cursor: pointer;
   font: inherit;
-  transition: background-color 160ms ease, transform 160ms ease;
+  font-size: 1.15rem;
+  font-weight: 750;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-.public-home-nav .public-home-nav-cta:hover {
+.public-home-report-cta:hover {
   transform: translateY(-1px);
-  background: #105d44;
+  background: #1057a5;
+  box-shadow: 0 10px 24px rgba(23, 105, 194, 0.3);
   color: white;
 }
 
-.public-home-nav .public-home-nav-cta:disabled {
+.public-home-report-cta:focus-visible {
+  outline: 4px solid rgba(23, 105, 194, 0.35);
+  outline-offset: 4px;
+}
+
+.public-home-report-cta:disabled {
   cursor: wait;
   opacity: 0.75;
 }
@@ -4759,11 +4770,6 @@ body {
   .public-home-nav button {
     font-size: 0.8rem;
     white-space: nowrap;
-  }
-
-  .public-home-nav .public-home-nav-cta {
-    padding: 10px 12px;
-    white-space: normal;
   }
 
   .public-home-hero {
