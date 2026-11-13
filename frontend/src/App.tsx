@@ -185,16 +185,9 @@ function PublicHomePage({
             {anonymousLoginLoading ? 'Preparando formulario...' : 'Realizar reporte anónimo'}
           </button>
         </div>
-        <figure className="public-home-photo">
-          <img
-            src={plazaConstitucionMelo}
-            alt="Árboles y edificios históricos alrededor de la Plaza Constitución de Melo."
-          />
-          <figcaption className="public-home-image-caption">
-            <span>UN LUGAR PARA TODOS</span>
-            <strong>Plaza Constitución · Melo</strong>
-          </figcaption>
-        </figure>
+        <div className="public-home-map-frame">
+          <PublicReportMap />
+        </div>
       </section>
 
       <section className="public-home-benefits" aria-label="Cómo funciona PuntoReporte">
@@ -219,17 +212,6 @@ function PublicHomePage({
             <p>Con una cuenta, podés consultar tus reportes.</p>
           </div>
         </article>
-      </section>
-
-      <section className="public-home-map-section" aria-labelledby="public-home-map-title">
-        <header className="public-home-map-heading">
-          <span className="public-home-kicker">LA CIUDAD EN EL MAPA</span>
-          <h2 id="public-home-map-title">Reportes de la comunidad</h2>
-          <p>Explorá los reportes activos y conocé lo que pasa en tu entorno.</p>
-        </header>
-        <div className="public-home-map-frame">
-          <PublicReportMap />
-        </div>
       </section>
 
       <EmergencyShortcuts />
