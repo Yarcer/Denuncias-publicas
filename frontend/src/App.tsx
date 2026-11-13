@@ -179,7 +179,7 @@ function PublicHomePage({
             onClick={onAnonymousReport}
             disabled={anonymousLoginLoading}
           >
-            {anonymousLoginLoading ? 'Preparando formulario...' : 'Reportar como anónimo'}
+            {anonymousLoginLoading ? 'Preparando formulario...' : 'Realizar reporte anónimo'}
           </button>
         </div>
         <div className="public-home-map-frame">
