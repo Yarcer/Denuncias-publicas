@@ -4748,6 +4748,12 @@ body {
   font-size: 0.84rem;
 }
 
+.public-home-social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
 @media (max-width: 760px) {
   .public-home-header {
     min-height: 100px;
