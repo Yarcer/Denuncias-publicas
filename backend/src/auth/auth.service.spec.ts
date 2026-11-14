@@ -245,5 +245,49 @@ describe('AuthService anonymous sessions', () => {
         );
       },
     );
+
+    it('keeps superadministrator credentials out of the employee portal', async () => {
+      jest.spyOn(argon2, 'verify').mockResolvedValue(true);
+      const loginService = new AuthService(
+        {
+          user: {
+            findUnique: jest.fn().mockResolvedValue({
+              id: 'admin-id',
+              email: 'admin@example.com',
+              role: 'SUPERADMINISTRADOR',
+              status: 'ACTIVO',
+              passwordHash: 'stored-hash',
+              isAnonymous: false,
+              firstName: 'Admin',
+              lastName: null,
+              entityName: null,
+              phone: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }),
+          },
+        } as unknown as PrismaService,
+        { sign: jest.fn().mockReturnValue('signed-token') } as unknown as JwtService,
+        {} as IpAbuseProtectionService,
+      );
+
+      await expect(
+        loginService.login({
+          email: 'admin@example.com',
+          password: 'valid-password',
+          portal: 'gestion',
+        }),
+      ).rejects.toThrow('Credenciales inválidas');
+      await expect(
+        loginService.login({
+          email: 'admin@example.com',
+          password: 'valid-password',
+          portal: 'superadmin',
+        }),
+      ).resolves.toMatchObject({
+        user: { role: 'SUPERADMINISTRADOR' },
+        accessToken: 'signed-token',
+      });
+    });
   });
 });

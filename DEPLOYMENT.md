@@ -17,8 +17,9 @@ Sube el proyecto a un repositorio privado de GitHub. No subas archivos `.env`, c
 ## 2. Crear la base de datos
 
 1. Crea un proyecto PostgreSQL en Neon.
-2. Copia la cadena de conexión con SSL (`sslmode=require`) y guárdala como secreto; no la publiques.
-3. Conserva esa cadena para la variable `DATABASE_URL` de Render.
+2. Copia la cadena de conexión agrupada (pooled) con SSL (`sslmode=require`) y guárdala como secreto; no la publiques.
+3. Conserva esa cadena para `DATABASE_URL` en Render, que usa la API.
+4. Copia también la cadena directa (sin `-pooler` en el host), con SSL, y consérvala para `DIRECT_URL` en Render. Prisma necesita la conexión directa para ejecutar migraciones y adquirir su advisory lock.
 
 ## 3. Preparar evidencias privadas
 
@@ -31,7 +32,7 @@ Sube el proyecto a un repositorio privado de GitHub. No subas archivos `.env`, c
 
 1. Elige primero el nombre de tu sitio; luego usarás su URL pública completa como origen CORS en Render.
 2. En Render, crea un **Blueprint** desde el repositorio y acepta la configuración de `render.yaml`.
-3. Completa los campos `DATABASE_URL`, `CORS_ORIGIN`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY`. Render genera `JWT_SECRET` y `IP_HASH_SECRET`; conserva este último estable para que el límite por IP siga siendo consistente entre despliegues.
+3. Completa los campos `DATABASE_URL`, `DIRECT_URL`, `CORS_ORIGIN`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY`. Render genera `JWT_SECRET` y `IP_HASH_SECRET`; conserva este último estable para que el límite por IP siga siendo consistente entre despliegues.
 4. Para enviar confirmaciones de denuncias, configura además `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_USER` y `SMTP_PASSWORD` como secretos/variables de entorno. Usa las credenciales SMTP de un proveedor autorizado para enviar desde el dominio indicado en `SMTP_FROM`.
 5. Despliega la API. Render genera el secreto JWT automáticamente.
 6. Comprueba `https://<tu-api>.onrender.com/api/health`.

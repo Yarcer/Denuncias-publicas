@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ReportStatus } from '@prisma/client';
 import { createTransport, type SendMailOptions } from 'nodemailer';
 import {
   ConfirmationMailService,
@@ -97,6 +98,26 @@ describe('ConfirmationMailService', () => {
       }),
     ).resolves.toBe('not_configured');
     expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it('sends an escaped status update to opted-in reporters', async () => {
+    const service = createService();
+
+    await expect(
+      service.sendReportStatusNotification({
+        email: 'citizen@example.com',
+        reportId,
+        title: '<b>Bache</b>',
+        status: ReportStatus.RESUELTO,
+      }),
+    ).resolves.toBe('sent');
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'citizen@example.com',
+        text: expect.stringContaining('Resuelto'),
+        html: expect.stringContaining('&lt;b&gt;Bache&lt;/b&gt;'),
+      }),
+    );
   });
 
   it('does not send mail to anonymous local accounts', async () => {

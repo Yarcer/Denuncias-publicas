@@ -19,6 +19,8 @@ services:
         value: r2
       - key: DATABASE_URL
         sync: false
+      - key: DIRECT_URL
+        sync: false
       - key: CORS_ORIGIN
         sync: false
       - key: R2_ENDPOINT

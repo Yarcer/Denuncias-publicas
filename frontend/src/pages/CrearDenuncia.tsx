@@ -3,6 +3,7 @@ import './CrearDenuncia.css'
 import { api } from '../lib/api'
 import { getApiErrorMessage } from '../lib/api-error'
 import { formatReportIdentifier } from '../lib/report-id'
+import { useAuthStore } from '../stores/auth-store'
 
 import {
   MapContainer,
@@ -112,6 +113,7 @@ function CentrarUbicacion({
 }
 
 function CrearDenuncia() {
+  const user = useAuthStore((state) => state.user)
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriaId, setCategoriaId] = useState('')
   const [categoriaNombre, setCategoriaNombre] = useState('')
@@ -121,6 +123,9 @@ function CrearDenuncia() {
   const [latitud, setLatitud] = useState<number | null>(null)
   const [longitud, setLongitud] = useState<number | null>(null)
   const [consentimientoMapa, setConsentimientoMapa] = useState(false)
+  const [emailNotifications, setEmailNotifications] = useState(false)
+  const [emailNotificationsResolvedOnly, setEmailNotificationsResolvedOnly] =
+    useState(false)
   const [error, setError] = useState('')
   const [resultado, setResultado] = useState<{
     codigo: string
@@ -358,6 +363,9 @@ function CrearDenuncia() {
         address: ubicacion,
         categoryId: categoriaId,
         publicMapConsent: consentimientoMapa,
+        emailNotifications,
+        emailNotificationsResolvedOnly:
+          emailNotifications && emailNotificationsResolvedOnly,
       })
 
       let fotoAdjuntada = true
@@ -381,6 +389,8 @@ function CrearDenuncia() {
       setCategoriaNombre('')
       setSubcategoria('')
       setDescripcion('')
+      setEmailNotifications(false)
+      setEmailNotificationsResolvedOnly(false)
       setUbicacion('')
       ubicacionDesdeMapaRef.current = ''
       setEstadoUbicacion('')
@@ -420,6 +430,7 @@ function CrearDenuncia() {
     'Limpieza',
     'Saneamiento',
   ].includes(categoriaNombre.trim())
+  const registeredCitizen = user?.role === 'CIUDADANO' && !user.isAnonymous
 
   return (
     <main className="denuncia-page">
@@ -531,6 +542,37 @@ function CrearDenuncia() {
             de direcciones usa OpenStreetMap.
           </p>
 
+          {categoriaPublicable ? (
+            <div className="public-map-consent">
+              <label htmlFor="publicMapConsent">
+                <input
+                  id="publicMapConsent"
+                  type="checkbox"
+                  checked={consentimientoMapa}
+                  onChange={(event) => setConsentimientoMapa(event.target.checked)}
+                />
+                <span>Permito mostrar la ubicación aproximada y el tipo de reporte en el mapa público.</span>
+              </label>
+              <p>
+                El punto exacto se usa para ubicar y derivar tu reporte. Este permiso,
+                opcional y desmarcado por defecto, solo muestra una zona aproximada
+                cuando el reporte está en proceso; no publica la dirección exacta,
+                descripción ni datos personales. Podés retirar el permiso desde “Mis reportes”.
+              </p>
+            </div>
+          ) : categoriaNombre ? (
+            <p className="public-map-consent-note">
+              Los reportes de {categoriaNombre.toLowerCase().includes('convivencia')
+                ? 'convivencia'
+                : categoriaNombre} no se publican en el mapa.
+            </p>
+          ) : (
+            <p className="public-map-consent-note">
+              El permiso de publicación aproximada está disponible para reportes de
+              Infraestructura, Limpieza y Saneamiento.
+            </p>
+          )}
+
           <MapContainer
             center={[-32.3667, -54.1833]}
             zoom={14}
@@ -552,30 +594,6 @@ function CrearDenuncia() {
             />
             <CentrarUbicacion latitud={latitud} longitud={longitud} />
           </MapContainer>
-
-          {categoriaPublicable ? (
-            <div className="public-map-consent">
-              <label htmlFor="publicMapConsent">
-                <input
-                  id="publicMapConsent"
-                  type="checkbox"
-                  checked={consentimientoMapa}
-                  onChange={(event) => setConsentimientoMapa(event.target.checked)}
-                />
-                <span>Permito mostrar la ubicación aproximada y el tipo de reporte en el mapa público.</span>
-              </label>
-              <p>
-                Es opcional y estará desmarcado por defecto. Solo se mostrará
-                cuando el reporte esté en proceso; no se publicarán tu dirección
-                exacta, descripción ni datos personales. Podés retirar el permiso
-                desde “Mis reportes”.
-              </p>
-            </div>
-          ) : categoriaNombre.toLowerCase().includes('convivencia') ? (
-            <p className="public-map-consent-note">
-              Los reportes de convivencia no se publican en el mapa.
-            </p>
-          ) : null}
 
           {latitud !== null && longitud !== null && (
             <p className="ubicacion-seleccionada">
@@ -617,6 +635,36 @@ function CrearDenuncia() {
             </div>
           )}
         </div>
+
+        {registeredCitizen && (
+          <div className="report-email-preferences">
+            <label>
+              <input
+                type="checkbox"
+                checked={emailNotifications}
+                onChange={(event) => {
+                  setEmailNotifications(event.target.checked)
+                  if (!event.target.checked) {
+                    setEmailNotificationsResolvedOnly(false)
+                  }
+                }}
+              />
+              <span>Quiero recibir notificaciones por correo sobre este reporte.</span>
+            </label>
+            {emailNotifications && (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={emailNotificationsResolvedOnly}
+                  onChange={(event) =>
+                    setEmailNotificationsResolvedOnly(event.target.checked)
+                  }
+                />
+                <span>Solo quiero notificaciones cuando el reporte esté resuelto.</span>
+              </label>
+            )}
+          </div>
+        )}
 
         {error && <p className="error">{error}</p>}
 

@@ -14,12 +14,20 @@ import SolicitudesFuncionarios from './pages/SolicitudesFuncionarios';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
-type AuthRoute = 'home' | 'access' | 'login' | 'register' | 'anonymous' | 'management-login';
+type AuthRoute =
+  | 'home'
+  | 'access'
+  | 'login'
+  | 'register'
+  | 'anonymous'
+  | 'management-login'
+  | 'superadmin-login';
 
 function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   if (pathname === '/') return 'home';
   if (pathname === '/acceso') return 'access';
   if (pathname === '/gestion/login') return 'management-login';
+  if (pathname === '/superadmin/login') return 'superadmin-login';
   if (pathname === '/registro') return 'register';
   if (pathname === '/anonimo') return 'anonymous';
   return 'login';
@@ -261,16 +269,28 @@ function PublicHomePage({
               <span>Instagram</span>
             </a>
           </nav>
-          <a
-            className="public-home-staff-link"
-            href="/gestion/login"
-            onClick={(event) => {
-              event.preventDefault();
-              onNavigate('management-login');
-            }}
-          >
-            Acceso para funcionarios <span aria-hidden="true">→</span>
-          </a>
+          <div className="public-home-staff-links">
+            <a
+              className="public-home-staff-link"
+              href="/gestion/login"
+              onClick={(event) => {
+                event.preventDefault();
+                onNavigate('management-login');
+              }}
+            >
+              Acceso para funcionarios <span aria-hidden="true">→</span>
+            </a>
+            <a
+              className="public-home-staff-link"
+              href="/superadmin/login"
+              onClick={(event) => {
+                event.preventDefault();
+                onNavigate('superadmin-login');
+              }}
+            >
+              Acceso superadministrador <span aria-hidden="true">→</span>
+            </a>
+          </div>
         </div>
       </footer>
     </main>
@@ -1398,7 +1418,6 @@ function ManagementDashboard({
               <GeneralStatistics />
             ) : (
               <GestionUsuarios
-                currentUserId={currentUserId}
                 view={managementView === 'create-user' ? 'create-user' : 'users'}
                 onViewChange={(view) => setManagementView(view)}
               />
@@ -1799,6 +1818,8 @@ function App() {
   );
   const registering = authRoute === 'register';
   const managementLogin = authRoute === 'management-login';
+  const superadminLogin = authRoute === 'superadmin-login';
+  const isManagementPortal = managementLogin || superadminLogin;
   const [credentials, setCredentials] = useState({
     email: '',
     password: '',
@@ -1838,6 +1859,7 @@ function App() {
       register: '/registro',
       anonymous: '/anonimo',
       'management-login': '/gestion/login',
+      'superadmin-login': '/superadmin/login',
     };
 
     window.history.pushState({}, '', routePaths[route]);
@@ -1920,7 +1942,14 @@ function App() {
         registering ? '/auth/register' : '/auth/login',
         registering
           ? payload
-          : { ...payload, portal: managementLogin ? 'gestion' : 'ciudadano' },
+          : {
+            ...payload,
+            portal: managementLogin
+              ? 'gestion'
+              : superadminLogin
+                ? 'superadmin'
+                : 'ciudadano',
+          },
       );
 
       setSession(response.data.data.user, response.data.data.csrfToken);
@@ -2028,19 +2057,30 @@ function App() {
               </a>
 
               <nav
-                className={`auth-route-nav ${managementLogin ? 'auth-route-nav-management' : ''}`}
+                className={`auth-route-nav ${isManagementPortal ? 'auth-route-nav-management' : ''}`}
                 aria-label="Opciones de acceso"
               >
-                {managementLogin ? (
-                  <a
-                    href="/login"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      navigateAuth('login');
-                    }}
-                  >
-                    Acceso ciudadano
-                  </a>
+                {isManagementPortal ? (
+                  <>
+                    <a
+                      href="/login"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        navigateAuth('login');
+                      }}
+                    >
+                      Acceso ciudadano
+                    </a>
+                    <a
+                      href={managementLogin ? '/superadmin/login' : '/gestion/login'}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        navigateAuth(managementLogin ? 'superadmin-login' : 'management-login');
+                      }}
+                    >
+                      {managementLogin ? 'Acceso superadministrador' : 'Acceso funcionarios'}
+                    </a>
+                  </>
                 ) : (
                   <>
                     <a
@@ -2085,7 +2125,7 @@ function App() {
                 )}
               </nav>
 
-              {!managementLogin && (
+              {!isManagementPortal && (
                 <a
                   className="institutional-access-link"
                   href="/gestion/login"
@@ -2100,6 +2140,26 @@ function App() {
                   <span>
                     <strong>Acceso para funcionarios</strong>
                     <small>Ingresar al portal del ente público</small>
+                  </span>
+                  <b aria-hidden="true">→</b>
+                </a>
+              )}
+              {!isManagementPortal && (
+                <a
+                  className="institutional-access-link"
+                  href="/superadmin/login"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('superadmin-login');
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7l-8-4Z" />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                  <span>
+                    <strong>Acceso superadministrador</strong>
+                    <small>Ingresar al panel independiente</small>
                   </span>
                   <b aria-hidden="true">→</b>
                 </a>
@@ -2125,25 +2185,31 @@ function App() {
               ) : (
                 <form className="auth-form auth-form-redesign" onSubmit={handleAuth}>
                   <span className="auth-section-label">
-                    {managementLogin
-                      ? 'PORTAL INSTITUCIONAL'
-                      : registering
-                        ? 'CUENTA CIUDADANA'
-                        : 'ACCESO CIUDADANO'}
+                    {superadminLogin
+                      ? 'PANEL SUPERADMINISTRADOR'
+                      : managementLogin
+                        ? 'PORTAL INSTITUCIONAL'
+                        : registering
+                          ? 'CUENTA CIUDADANA'
+                          : 'ACCESO CIUDADANO'}
                   </span>
                   <h2>
                     {registering
                       ? 'Crear cuenta'
-                      : managementLogin
-                        ? 'Acceso de ente público'
-                        : 'Bienvenido/a'}
+                      : superadminLogin
+                        ? 'Panel de acceso para Superadministradores'
+                        : managementLogin
+                          ? 'Acceso de ente público'
+                          : 'Bienvenido/a'}
                   </h2>
                   <p className="auth-form-intro">
-                    {managementLogin
-                      ? 'Ingresá con tu cuenta institucional para gestionar denuncias.'
-                      : registering
-                        ? ''
-                        : 'Ingresá para crear y seguir tus denuncias.'}
+                    {superadminLogin
+                      ? 'Ingresá exclusivamente con las credenciales de una cuenta superadministradora.'
+                      : managementLogin
+                        ? 'Ingresá con tu cuenta institucional para gestionar denuncias.'
+                        : registering
+                          ? ''
+                          : 'Ingresá para crear y seguir tus denuncias.'}
                   </p>
 
                   {registering && (

@@ -89,6 +89,82 @@ describe('DenunciasService', () => {
     expect(createInput?.data.publicMapConsent).toBe(false);
   });
 
+  it('stores email preferences for a registered citizen report', async () => {
+    const reportCreate = createReportMock();
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            isAnonymous: false,
+            role: 'CIUDADANO',
+          }),
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        category: { findUnique: jest.fn().mockResolvedValue(null) },
+        report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
+
+    await service.create(
+      'registered-citizen-id',
+      {
+        title: 'Luminaria apagada',
+        description: 'La calle está oscura.',
+        type: 'URBANO',
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'category-id',
+        emailNotifications: true,
+        emailNotificationsResolvedOnly: true,
+      },
+      '203.0.113.1',
+    );
+
+    expect(reportCreate.mock.calls[0]?.[0].data).toMatchObject({
+      emailNotifications: true,
+      emailNotificationsResolvedOnly: true,
+    });
+  });
+
+  it('does not enable email preferences for anonymous reports', async () => {
+    const reportCreate = createReportMock();
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            isAnonymous: true,
+            role: 'CIUDADANO',
+          }),
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        category: { findUnique: jest.fn().mockResolvedValue(null) },
+        report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
+
+    await service.create(
+      'anonymous-citizen-id',
+      {
+        title: 'Luminaria apagada',
+        description: 'La calle está oscura.',
+        type: 'URBANO',
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'category-id',
+        emailNotifications: true,
+        emailNotificationsResolvedOnly: true,
+      },
+      '203.0.113.1',
+    );
+
+    expect(reportCreate.mock.calls[0]?.[0].data).toMatchObject({
+      emailNotifications: false,
+      emailNotificationsResolvedOnly: false,
+    });
+  });
+
   it('assigns low priority to anonymous reports', async () => {
     const reportCreate = createReportMock();
     const service = new DenunciasService(
@@ -125,19 +201,22 @@ describe('DenunciasService', () => {
 
   it('rejects public-map consent for categories that are not allowed', async () => {
     const reportCreate = createReportMock();
-    const service = new DenunciasService({
-      user: {
-        findUnique: jest.fn().mockResolvedValue({
-          isAnonymous: false,
-          role: 'CIUDADANO',
-        }),
-        findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
-      },
-      category: {
-        findUnique: jest.fn().mockResolvedValue({ name: 'Convivencia' }),
-      },
-      report: { create: reportCreate },
-    } as unknown as PrismaService);
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            isAnonymous: false,
+            role: 'CIUDADANO',
+          }),
+          findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
+        },
+        category: {
+          findUnique: jest.fn().mockResolvedValue({ name: 'Convivencia' }),
+        },
+        report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
 
     await expect(
       service.create('reporter-id', {
@@ -148,7 +227,7 @@ describe('DenunciasService', () => {
         longitude: -54.17,
         categoryId: 'category-id',
         publicMapConsent: true,
-      }),
+      }, '203.0.113.1'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(reportCreate).not.toHaveBeenCalled();
   });

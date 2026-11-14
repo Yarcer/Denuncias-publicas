@@ -6,53 +6,65 @@ import { UsuariosService } from './usuarios.service';
 describe('UsuariosService', () => {
   const actor = { sub: 'superadmin-id', role: Role.SUPERADMINISTRADOR };
 
-  it('does not allow creating another superadministrator', async () => {
-    const create = jest.fn();
+  it('creates another superadministrator with a hashed password and no organization', async () => {
+    const create = jest.fn().mockResolvedValue({
+      role: Role.SUPERADMINISTRADOR,
+      status: 'ACTIVO',
+      entityName: null,
+    });
     const service = new UsuariosService({
       user: { create },
     } as unknown as PrismaService);
 
     await expect(
       service.createAdministrativeUser(actor, {
-        email: 'otro-admin@example.com',
+        email: '  OTRO-ADMIN@example.com ',
         password: 'password-segura',
         role: Role.SUPERADMINISTRADOR,
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(create).not.toHaveBeenCalled();
-  });
+    ).resolves.toMatchObject({ role: Role.SUPERADMINISTRADOR });
 
-  it('does not allow changing an employee to superadministrator', async () => {
-    const update = jest.fn();
-    const service = new UsuariosService({
-      user: {
-        findFirst: jest.fn().mockResolvedValue({
-          id: 'employee-id',
-          role: Role.FUNCIONARIO,
-          entityName: 'Policía Municipal',
-        }),
-        update,
-      },
-    } as unknown as PrismaService);
-
-    await expect(
-      service.updateAdministrativeUser(actor, 'employee-id', {
+    const createInput = create.mock.calls[0]?.[0];
+    expect(createInput).toMatchObject({
+      data: {
+        email: 'otro-admin@example.com',
         role: Role.SUPERADMINISTRADOR,
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(update).not.toHaveBeenCalled();
+        entityName: null,
+        status: 'ACTIVO',
+      },
+      select: expect.not.objectContaining({ email: true, firstName: true }),
+    });
+    expect(createInput.data.passwordHash).toMatch(/^\$argon2/);
+    expect(createInput.data.passwordHash).not.toBe('password-segura');
   });
 
-  it('lists funcionario and funcionario administrador accounts only', async () => {
-    const findMany = jest.fn().mockResolvedValue([]);
+  it('returns only grouped, non-identifying account details', async () => {
+    const groupBy = jest.fn().mockResolvedValue([
+      {
+        role: Role.FUNCIONARIO,
+        status: 'ACTIVO',
+        entityName: 'OSE',
+        _count: { _all: 2 },
+      },
+    ]);
     const service = new UsuariosService({
-      user: { findMany },
+      user: { groupBy },
     } as unknown as PrismaService);
 
-    await service.findAdministrativeUsers(actor);
-
-    expect(findMany).toHaveBeenCalledWith(
+    await expect(service.findAdministrativeUsers(actor)).resolves.toEqual({
+      items: [
+        {
+          role: Role.FUNCIONARIO,
+          status: 'ACTIVO',
+          entityName: 'OSE',
+          count: 2,
+        },
+      ],
+      count: 2,
+    });
+    expect(groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
+        by: ['role', 'status', 'entityName'],
         where: {
           role: {
             in: [Role.FUNCIONARIO, Role.FUNCIONARIO_ADMINISTRADOR],
@@ -63,7 +75,7 @@ describe('UsuariosService', () => {
     );
   });
 
-  it('rejects organizations outside the available options when creating accounts', async () => {
+  it('rejects organizations outside the available options when creating staff accounts', async () => {
     const create = jest.fn();
     const service = new UsuariosService({
       user: { create },
@@ -78,26 +90,5 @@ describe('UsuariosService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(create).not.toHaveBeenCalled();
-  });
-
-  it('rejects organizations outside the available options when editing accounts', async () => {
-    const update = jest.fn();
-    const service = new UsuariosService({
-      user: {
-        findFirst: jest.fn().mockResolvedValue({
-          id: 'employee-id',
-          role: Role.FUNCIONARIO,
-          entityName: 'Intendencia',
-        }),
-        update,
-      },
-    } as unknown as PrismaService);
-
-    await expect(
-      service.updateAdministrativeUser(actor, 'employee-id', {
-        entityName: 'Municipalidad Demo',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(update).not.toHaveBeenCalled();
   });
 });

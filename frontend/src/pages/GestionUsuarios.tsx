@@ -3,19 +3,18 @@ import { api } from '../lib/api'
 import { getApiErrorMessage } from '../lib/api-error'
 import './GestionUsuarios.css'
 
-type AdministrativeRole = 'FUNCIONARIO' | 'FUNCIONARIO_ADMINISTRADOR'
+type AdministrativeRole =
+  | 'FUNCIONARIO'
+  | 'FUNCIONARIO_ADMINISTRADOR'
+  | 'SUPERADMINISTRADOR'
 type UserStatus = 'ACTIVO' | 'INACTIVO' | 'BANEADO'
 const organizationOptions = ['Intendencia', 'OSE', 'Policía Municipal'] as const
 
-type AdministrativeUser = {
-  id: string
-  email: string
+type AdministrativeUserGroup = {
   role: AdministrativeRole
   status: UserStatus
-  firstName: string | null
-  lastName: string | null
   entityName: string | null
-  jurisdiction: string | null
+  count: number
 }
 
 type UserForm = {
@@ -38,18 +37,21 @@ const emptyForm: UserForm = {
   jurisdiction: '',
 }
 
+function roleLabel(role: AdministrativeRole) {
+  if (role === 'FUNCIONARIO') return 'Funcionario'
+  if (role === 'FUNCIONARIO_ADMINISTRADOR') return 'Funcionario Administrador'
+  return 'Superadministrador'
+}
+
 function GestionUsuarios({
-  currentUserId,
   view,
   onViewChange,
 }: {
-  currentUserId: string
   view: 'users' | 'create-user'
   onViewChange: (view: 'users' | 'create-user') => void
 }) {
-  const [users, setUsers] = useState<AdministrativeUser[]>([])
+  const [users, setUsers] = useState<AdministrativeUserGroup[]>([])
   const [form, setForm] = useState<UserForm>(emptyForm)
-  const [editingId, setEditingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -61,7 +63,7 @@ function GestionUsuarios({
       setUsers(response.data.data.items)
       setError('')
     } catch (loadError: unknown) {
-      setError(getApiErrorMessage(loadError, 'No se pudieron cargar los usuarios.'))
+      setError(getApiErrorMessage(loadError, 'No se pudieron cargar las cuentas.'))
     } finally {
       setLoading(false)
     }
@@ -79,7 +81,7 @@ function GestionUsuarios({
         }
       } catch (loadError: unknown) {
         if (active) {
-          setError(getApiErrorMessage(loadError, 'No se pudieron cargar los usuarios.'))
+          setError(getApiErrorMessage(loadError, 'No se pudieron cargar las cuentas.'))
         }
       } finally {
         if (active) setLoading(false)
@@ -92,27 +94,7 @@ function GestionUsuarios({
     }
   }, [])
 
-  function startEditing(user: AdministrativeUser) {
-    setEditingId(user.id)
-    setNotice('')
-    setError('')
-    setForm({
-      email: user.email,
-      password: '',
-      role: user.role,
-      firstName: user.firstName ?? '',
-      lastName: user.lastName ?? '',
-      entityName:
-        organizationOptions.find(
-          (organization) => organization === user.entityName,
-        ) ?? '',
-      jurisdiction: user.jurisdiction ?? '',
-    })
-    onViewChange('create-user')
-  }
-
-  function cancelEditing() {
-    setEditingId(null)
+  function cancelCreation() {
     setForm(emptyForm)
     setError('')
     setNotice('')
@@ -127,7 +109,6 @@ function GestionUsuarios({
 
     const payload = {
       ...form,
-      ...(form.password ? {} : { password: undefined }),
       firstName: form.firstName || undefined,
       lastName: form.lastName || undefined,
       entityName: form.entityName || undefined,
@@ -135,209 +116,172 @@ function GestionUsuarios({
     }
 
     try {
-      if (editingId) {
-        await api.patch(`/usuarios/${editingId}`, payload)
-        setNotice('Los cambios del usuario se guardaron.')
-      } else {
-        await api.post('/usuarios/administrativos', payload)
-        setNotice('El usuario administrativo fue creado.')
-      }
-      setEditingId(null)
+      await api.post('/usuarios/administrativos', payload)
+      setNotice('La cuenta fue creada correctamente.')
       setForm(emptyForm)
       await loadUsers()
     } catch (saveError: unknown) {
-      setError(getApiErrorMessage(saveError, 'No se pudo guardar el usuario.'))
+      setError(getApiErrorMessage(saveError, 'No se pudo crear la cuenta.'))
     } finally {
       setSaving(false)
     }
   }
 
-  async function toggleUserStatus(user: AdministrativeUser) {
-    const status = user.status === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO'
-    setError('')
-    setNotice('')
-    try {
-      await api.patch(`/usuarios/${user.id}/estado`, { status })
-      setNotice(status === 'ACTIVO' ? 'Usuario habilitado.' : 'Usuario deshabilitado.')
-      await loadUsers()
-    } catch (statusError: unknown) {
-      setError(getApiErrorMessage(statusError, 'No se pudo cambiar el estado del usuario.'))
-    }
-  }
+  const isStaffRole = form.role !== 'SUPERADMINISTRADOR'
 
   return (
     <section className="admin-users-page">
       <header className="admin-users-heading">
         <div>
           <h1>Bienvenido, Superadministrador</h1>
-          <p>Desde acá, podras administrar los funcionarios, organismos y la configuración del sistema.</p>
+          <p>Creá cuentas administrativas y consultá cantidades por rol y organismo.</p>
         </div>
-        <span className="admin-users-count">{users.length} cuentas</span>
+        <span className="admin-users-count">{users.reduce((total, item) => total + item.count, 0)} cuentas</span>
       </header>
 
       <div className="admin-users-layout">
-        {view === 'create-user' && (
-        <form id="administrative-user-form" className="admin-user-form" onSubmit={saveUser}>
-          <div className="admin-user-form-heading">
-            <div>
-              <h2>{editingId ? 'Editar usuario' : 'Crear usuario funcionario'}</h2>
-              <p>{editingId ? 'Actualiza sus datos administrativos.' : 'Crea una cuenta para gestionar reportes.'}</p>
-            </div>
-            {editingId && (
-              <button type="button" className="admin-user-cancel" onClick={cancelEditing}>
+        {view === 'create-user' ? (
+          <form id="administrative-user-form" className="admin-user-form" onSubmit={saveUser}>
+            <div className="admin-user-form-heading">
+              <div>
+                <h2>Crear cuenta administrativa</h2>
+                <p>Las cuentas se crean con una contraseña inicial segura.</p>
+              </div>
+              <button type="button" className="admin-user-cancel" onClick={cancelCreation}>
                 Cancelar
               </button>
-            )}
-          </div>
-
-          <div className="admin-user-fields">
-            <label>
-              Nombre
-              <input
-                value={form.firstName}
-                onChange={(event) => setForm({ ...form, firstName: event.target.value })}
-                autoComplete="given-name"
-              />
-            </label>
-            <label>
-              Apellido
-              <input
-                value={form.lastName}
-                onChange={(event) => setForm({ ...form, lastName: event.target.value })}
-                autoComplete="family-name"
-              />
-            </label>
-            <label className="admin-user-field-wide">
-              Correo electrónico
-              <input
-                type="email"
-                required
-                value={form.email}
-                onChange={(event) => setForm({ ...form, email: event.target.value })}
-                autoComplete="email"
-              />
-            </label>
-            <label className="admin-user-field-wide">
-              {editingId ? 'Nueva contraseña (opcional)' : 'Contraseña inicial'}
-              <input
-                type="password"
-                required={!editingId}
-                minLength={8}
-                value={form.password}
-                onChange={(event) => setForm({ ...form, password: event.target.value })}
-                autoComplete="new-password"
-                placeholder={editingId ? 'Dejar vacío para conservarla' : 'Mínimo 8 caracteres'}
-              />
-            </label>
-            <label>
-              Rol
-              <select
-                value={form.role}
-                disabled={editingId === currentUserId}
-                onChange={(event) => setForm({ ...form, role: event.target.value as AdministrativeRole })}
-              >
-                <option value="FUNCIONARIO">Funcionario</option>
-                <option value="FUNCIONARIO_ADMINISTRADOR">Funcionario Administrador</option>
-              </select>
-            </label>
-            <label>
-              Organismo
-              <select
-                required
-                value={form.entityName}
-                onChange={(event) => setForm({ ...form, entityName: event.target.value })}
-              >
-                <option value="" disabled>Seleccioná un organismo</option>
-                {organizationOptions.map((organization) => (
-                  <option key={organization} value={organization}>
-                    {organization}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="admin-user-field-wide">
-              Jurisdicción
-              <input
-                value={form.jurisdiction}
-                onChange={(event) => setForm({ ...form, jurisdiction: event.target.value })}
-                placeholder="Ej. Departamento de Cerro Largo"
-              />
-            </label>
-          </div>
-
-          {error && <p className="admin-users-message admin-users-error" role="alert">{error}</p>}
-          {notice && <p className="admin-users-message admin-users-success" role="status">{notice}</p>}
-
-          <button className="admin-user-submit" type="submit" disabled={saving}>
-            {saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Crear usuario'}
-          </button>
-        </form>
-        )}
-
-        {view === 'users' && (
-        <section className="admin-user-list" aria-labelledby="admin-user-list-title">
-          <header>
-            <div>
-              <h2 id="admin-user-list-title">Cuentas registradas</h2>
-              <p>Los usuarios deshabilitados no pueden iniciar sesión.</p>
             </div>
-          </header>
 
-          {loading ? (
-            <p className="admin-user-empty">Cargando usuarios…</p>
-          ) : users.length === 0 ? (
-            <p className="admin-user-empty">Todavía no hay usuarios administrativos.</p>
-          ) : (
-            <div className="admin-user-table-wrap">
-              <table className="admin-user-table">
-                <thead>
-                  <tr>
-                    <th>Usuario</th>
-                    <th>Rol y organismo</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user.id}>
-                      <td>
-                        <strong>{[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}</strong>
-                        <span>{user.email}</span>
-                      </td>
-                      <td>
-                        <strong>
-                          {user.role === 'FUNCIONARIO'
-                            ? 'Funcionario'
-                            : 'Funcionario Administrador'}
-                        </strong>
-                        <span>{user.entityName || user.jurisdiction || 'Sin organismo asignado'}</span>
-                      </td>
-                      <td>
-                        <span className={`admin-user-status admin-user-status-${user.status.toLowerCase()}`}>
-                          {user.status === 'ACTIVO' ? 'Habilitado' : 'Deshabilitado'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="admin-user-actions">
-                          <button type="button" onClick={() => startEditing(user)}>Editar</button>
-                          <button
-                            type="button"
-                            className={user.status === 'ACTIVO' ? 'admin-user-disable' : 'admin-user-enable'}
-                            disabled={user.id === currentUserId}
-                            onClick={() => void toggleUserStatus(user)}
-                          >
-                            {user.status === 'ACTIVO' ? 'Deshabilitar' : 'Habilitar'}
-                          </button>
-                        </div>
-                      </td>
+            <div className="admin-user-fields">
+              <label>
+                Rol
+                <select
+                  value={form.role}
+                  onChange={(event) => {
+                    const role = event.target.value as AdministrativeRole
+                    setForm({
+                      ...form,
+                      role,
+                      ...(role === 'SUPERADMINISTRADOR'
+                        ? { entityName: '', jurisdiction: '' }
+                        : {}),
+                    })
+                  }}
+                >
+                  <option value="FUNCIONARIO">Funcionario</option>
+                  <option value="FUNCIONARIO_ADMINISTRADOR">Funcionario Administrador</option>
+                  <option value="SUPERADMINISTRADOR">Superadministrador</option>
+                </select>
+              </label>
+              <label className="admin-user-field-wide">
+                Correo electrónico
+                <input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(event) => setForm({ ...form, email: event.target.value })}
+                  autoComplete="email"
+                />
+              </label>
+              <label className="admin-user-field-wide">
+                Contraseña inicial
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={form.password}
+                  onChange={(event) => setForm({ ...form, password: event.target.value })}
+                  autoComplete="new-password"
+                  placeholder="Mínimo 8 caracteres"
+                />
+              </label>
+              {isStaffRole && (
+                <>
+                  <label>
+                    Organismo
+                    <select
+                      required
+                      value={form.entityName}
+                      onChange={(event) => setForm({ ...form, entityName: event.target.value })}
+                    >
+                      <option value="" disabled>Seleccioná un organismo</option>
+                      {organizationOptions.map((organization) => (
+                        <option key={organization} value={organization}>
+                          {organization}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Jurisdicción
+                    <input
+                      value={form.jurisdiction}
+                      onChange={(event) => setForm({ ...form, jurisdiction: event.target.value })}
+                      placeholder="Ej. Departamento de Cerro Largo"
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+
+            {error && <p className="admin-users-message admin-users-error" role="alert">{error}</p>}
+            {notice && <p className="admin-users-message admin-users-success" role="status">{notice}</p>}
+
+            <button className="admin-user-submit" type="submit" disabled={saving}>
+              {saving ? 'Guardando…' : 'Crear cuenta'}
+            </button>
+          </form>
+        ) : (
+          <section className="admin-user-list" aria-labelledby="admin-user-list-title">
+            <header>
+              <div>
+                <h2 id="admin-user-list-title">Resumen de cuentas registradas</h2>
+                <p>Los datos personales y credenciales de otras cuentas están protegidos.</p>
+              </div>
+              <button type="button" onClick={() => {
+                setNotice('')
+                setError('')
+                onViewChange('create-user')
+              }}>
+                Crear cuenta
+              </button>
+            </header>
+
+            {error && <p className="admin-users-message admin-users-error" role="alert">{error}</p>}
+            {loading ? (
+              <p className="admin-user-empty">Cargando resumen…</p>
+            ) : users.length === 0 ? (
+              <p className="admin-user-empty">Todavía no hay cuentas administrativas.</p>
+            ) : (
+              <div className="admin-user-table-wrap">
+                <table className="admin-user-table">
+                  <thead>
+                    <tr>
+                      <th>Rol y organismo</th>
+                      <th>Estado</th>
+                      <th>Cuentas</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  </thead>
+                  <tbody>
+                    {users.map((user, index) => (
+                      <tr key={`${user.role}-${user.entityName}-${user.status}-${index}`}>
+                        <td>
+                          <strong>{roleLabel(user.role)}</strong>
+                          <span>{user.entityName || 'Sin organismo asignado'}</span>
+                        </td>
+                        <td>
+                          <span className={`admin-user-status admin-user-status-${user.status.toLowerCase()}`}>
+                            {user.status === 'ACTIVO' ? 'Habilitado' : 'Deshabilitado'}
+                          </span>
+                        </td>
+                        <td>{user.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         )}
       </div>
     </section>

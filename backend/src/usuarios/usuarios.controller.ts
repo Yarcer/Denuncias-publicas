@@ -2,8 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Param,
-  Patch,
   Post,
   Req,
   UseGuards,
@@ -14,8 +12,6 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import type { Request } from 'express';
 import {
   CreateAdministrativeUserDto,
-  UpdateAdministrativeUserDto,
-  UpdateAdministrativeUserStatusDto,
 } from './dto/administrative-user.dto';
 import { UsuariosService } from './usuarios.service';
 
@@ -42,25 +38,4 @@ export class UsuariosController {
     return this.usuariosService.createAdministrativeUser(req.user, dto);
   }
 
-  @Patch(':id/estado')
-  updateAdministrativeUserStatus(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
-    @Body() dto: UpdateAdministrativeUserStatusDto,
-  ) {
-    return this.usuariosService.updateAdministrativeUserStatus(
-      req.user,
-      id,
-      dto,
-    );
-  }
-
-  @Patch(':id')
-  updateAdministrativeUser(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
-    @Body() dto: UpdateAdministrativeUserDto,
-  ) {
-    return this.usuariosService.updateAdministrativeUser(req.user, id, dto);
-  }
 }

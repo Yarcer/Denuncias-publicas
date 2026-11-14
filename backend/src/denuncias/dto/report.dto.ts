@@ -43,6 +43,14 @@ export class CreateReportDto {
   @IsBoolean()
   @IsOptional()
   publicMapConsent?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  emailNotifications?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  emailNotificationsResolvedOnly?: boolean;
 }
 
 export class UpdateReportDto {

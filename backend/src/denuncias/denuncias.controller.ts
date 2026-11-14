@@ -121,7 +121,7 @@ export class DenunciasController {
       dto,
       req.ip,
     );
-    const emailConfirmation = req.user.email
+    const emailConfirmation = report.emailNotifications && req.user.email
       ? await this.confirmationMailService.sendReportConfirmation({
         email: req.user.email,
         reportId: report.id,
@@ -175,22 +175,35 @@ export class DenunciasController {
     @Param('id') id: string,
     @Body() dto: ManageReportDto,
   ) {
-    const report = await this.denunciasService.changeStatus(id, req.user, dto);
+    const { report, previousStatus } = await this.denunciasService.changeStatus(
+      id,
+      req.user,
+      dto,
+    );
+    const {
+      emailNotifications,
+      emailNotificationsResolvedOnly,
+      ...visibleReport
+    } = report;
 
     if (
-      dto.status === ReportStatus.RECHAZADO &&
-      dto.rejectionReason &&
-      report.reporter?.email
+      previousStatus !== dto.status &&
+      report.reporter?.email &&
+      emailNotifications &&
+      (!emailNotificationsResolvedOnly || dto.status === ReportStatus.RESUELTO)
     ) {
-      await this.confirmationMailService.sendReportRejectionNotice({
+      await this.confirmationMailService.sendReportStatusNotification({
         email: report.reporter.email,
         reportId: report.id,
         title: report.title,
-        reason: rejectionReasonLabels[dto.rejectionReason],
+        status: dto.status,
+        ...(dto.status === ReportStatus.RECHAZADO && dto.rejectionReason
+          ? { reason: rejectionReasonLabels[dto.rejectionReason] }
+          : {}),
       });
     }
 
-    return report;
+    return visibleReport;
   }
 
   @Patch(':id')

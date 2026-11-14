@@ -466,6 +466,14 @@ export class DenunciasService {
         where: { id: dto.categoryId },
         select: { name: true },
       });
+      if (
+        dto.publicMapConsent === true &&
+        !isPublicMapCategory(category?.name)
+      ) {
+        throw new BadRequestException(
+          'Esta categoría no puede publicarse en el mapa',
+        );
+      }
       const organizationOverride = reportOrganizationOverrides.find(
         (route) =>
           route.type === dto.type &&
@@ -490,7 +498,7 @@ export class DenunciasService {
         reporter?.isAnonymous ?? false,
       );
 
-      const report = await this.prisma.report.create({
+      const report = await transaction.report.create({
         data: {
           title: dto.title,
           description: dto.description,
@@ -501,8 +509,18 @@ export class DenunciasService {
           longitude: dto.longitude,
           address: dto.address,
           reference: dto.reference,
+          publicMapConsent: dto.publicMapConsent ?? false,
           reporter: { connect: { id: reporterId } },
           category: { connect: { id: dto.categoryId } },
+          emailNotifications:
+            reporter?.role === Role.CIUDADANO &&
+            !reporter.isAnonymous &&
+            dto.emailNotifications === true,
+          emailNotificationsResolvedOnly:
+            reporter?.role === Role.CIUDADANO &&
+            !reporter.isAnonymous &&
+            dto.emailNotifications === true &&
+            dto.emailNotificationsResolvedOnly === true,
         },
         include: { category: true },
       });
@@ -802,7 +820,7 @@ export class DenunciasService {
           },
         });
       }
-      return updated;
+      return { report: updated, previousStatus: report.status };
     });
   }
 

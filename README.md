@@ -17,7 +17,7 @@ El sistema está dividido en tres grandes experiencias, según quién lo use:
 1. **El ciudadano ingresa** con su cuenta o como visitante mediante una sesión temporal.
 2. **Completa el formulario** de denuncia con título, descripción y categoría.
 3. **El sistema calcula una prioridad** según palabras de riesgo en el texto, y deriva la denuncia al organismo correspondiente.
-4. **Recibe un identificador de seguimiento** en pantalla y, si configuró un correo, una confirmación por email.
+4. **Recibe un identificador de seguimiento** en pantalla. Las personas con cuenta pueden optar por recibir una confirmación por email y notificaciones de estado para cada reporte, limitadas al momento de resolución si así lo eligen.
 5. **El ente público** ve la denuncia en su bandeja, la toma o la asigna a un funcionario, y la mueve entre estados: `EN_REVISION`, `RESUELTO` o `RECHAZADO`.
 6. **El ciudadano puede consultar** el avance de sus denuncias en cualquier momento.
 7. **La administración** revisa el historial de cambios, aprueba altas de funcionarios y consulta estadísticas por fecha, estado, tipo, prioridad y evolución mensual.
@@ -31,6 +31,7 @@ El sistema está dividido en tres grandes experiencias, según quién lo use:
 - Puede autorizar la ubicación aproximada de un reporte para el mapa público de la homepage; solo se mostrará mientras esté en `EN_PROCESO` y el permiso puede retirarse desde “Mis reportes”.
 - El mapa agrupa los reportes en zonas circulares de aproximadamente 2 km y usa colores más intensos donde hay mayor concentración. Muestra una zona si contiene al menos un reporte autorizado, tanto con filtro como sin él. Permite filtrar por subcategoría, muestra el total de reportes actualmente resueltos y excluye categorías no habilitadas, incluida Convivencia; no muestra direcciones exactas ni datos personales.
 - Recibe el identificador de seguimiento y, si corresponde, confirmación por correo.
+- Al crear un reporte con una cuenta registrada, puede activar avisos por email para los cambios de estado o elegir recibirlos solo cuando el reporte se resuelva.
 - Tiene accesos directos a emergencias, bomberos y asistencia médica.
 
 ### Ente público
@@ -41,9 +42,9 @@ El sistema está dividido en tres grandes experiencias, según quién lo use:
 - Su administrador puede solicitar el alta de nuevos funcionarios (sujeta a aprobación).
 
 ### Administrador
-- Inicia sesión en el panel de gestión.
+- Inicia sesión en su panel independiente desde `/superadmin/login`.
 - Consulta estadísticas generales con distintos filtros.
-- Administra denuncias, estados y usuarios.
+- Crea cuentas de funcionarios y otros superadministradores; en el resumen de funcionarios solo ve cantidades, roles, organismos y estados, sin datos personales ni acciones para modificar otras cuentas.
 - Revisa el historial de cambios.
 - Aprueba o rechaza solicitudes de creación de funcionarios.
 

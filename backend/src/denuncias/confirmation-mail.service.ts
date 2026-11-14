@@ -1,9 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ReportStatus } from '@prisma/client';
 import { createTransport, type Transporter } from 'nodemailer';
 
 export type ConfirmationEmailStatus =
   'sent' | 'failed' | 'not_configured' | 'skipped';
+
+const reportStatusLabels: Record<ReportStatus, string> = {
+  [ReportStatus.PENDIENTE]: 'Pendiente',
+  [ReportStatus.EN_REVISION]: 'En revisión',
+  [ReportStatus.ASIGNADO]: 'Asignado',
+  [ReportStatus.EN_PROCESO]: 'En proceso',
+  [ReportStatus.RESUELTO]: 'Resuelto',
+  [ReportStatus.RECHAZADO]: 'Rechazado',
+  [ReportStatus.CERRADO]: 'Cerrado',
+};
 
 export function formatReportIdentifier(id: string) {
   const compactId = BigInt(`0x${id.replaceAll('-', '')}`)
@@ -143,6 +154,56 @@ export class ConfirmationMailService {
     } catch (error) {
       this.logger.error(
         `No se pudo enviar el aviso de rechazo para la denuncia ${identifier}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return 'failed';
+    }
+  }
+
+  async sendReportStatusNotification({
+    email,
+    reportId,
+    title,
+    status,
+    reason,
+  }: {
+    email: string;
+    reportId: string;
+    title: string;
+    status: ReportStatus;
+    reason?: string;
+  }): Promise<ConfirmationEmailStatus> {
+    if (email.endsWith('@anonymous.local')) return 'skipped';
+    if (!this.transporter || !this.from) return 'not_configured';
+
+    const identifier = formatReportIdentifier(reportId);
+    const safeTitle = escapeHtml(title);
+    const statusLabel = reportStatusLabels[status];
+    const safeReason = reason ? escapeHtml(reason) : undefined;
+    const text = [
+      `El estado de tu denuncia cambió a: ${statusLabel}.`,
+      `Identificador: ${identifier}`,
+      `Asunto: ${title}`,
+      ...(reason ? [`Motivo: ${reason}`] : []),
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to: email,
+        subject: `Actualización de tu denuncia: ${identifier}`,
+        text,
+        html: [
+          `<p>El estado de tu denuncia cambió a: <strong>${statusLabel}</strong>.</p>`,
+          `<p><strong>Identificador:</strong> ${identifier}</p>`,
+          `<p><strong>Asunto:</strong> ${safeTitle}</p>`,
+          ...(safeReason ? [`<p><strong>Motivo:</strong> ${safeReason}</p>`] : []),
+        ].join(''),
+      });
+      return 'sent';
+    } catch (error) {
+      this.logger.error(
+        `No se pudo enviar la actualización para la denuncia ${identifier}`,
         error instanceof Error ? error.stack : undefined,
       );
       return 'failed';
