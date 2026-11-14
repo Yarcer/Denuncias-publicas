@@ -20,10 +20,14 @@ import type { Request, Response } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { ConfirmationMailService } from './confirmation-mail.service';
-import { DenunciasService } from './denuncias.service';
+import {
+  DenunciasService,
+  rejectionReasonLabels,
+} from './denuncias.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
 import { Throttle } from '@nestjs/throttler';
+import { ReportStatus } from '@prisma/client';
 
 type AuthenticatedRequest = Request & {
   user: { sub: string; role: string; email?: string };
@@ -34,7 +38,7 @@ export class DenunciasController {
   constructor(
     private readonly denunciasService: DenunciasService,
     private readonly confirmationMailService: ConfirmationMailService,
-  ) {}
+  ) { }
 
   @Get('public/mapa')
   @Header('Cache-Control', 'no-store')
@@ -109,13 +113,17 @@ export class DenunciasController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CIUDADANO')
   async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateReportDto) {
-    const report = await this.denunciasService.create(req.user.sub, dto);
+    const report = await this.denunciasService.create(
+      req.user.sub,
+      dto,
+      req.ip,
+    );
     const emailConfirmation = req.user.email
       ? await this.confirmationMailService.sendReportConfirmation({
-          email: req.user.email,
-          reportId: report.id,
-          title: report.title,
-        })
+        email: req.user.email,
+        reportId: report.id,
+        title: report.title,
+      })
       : 'skipped';
 
     return { ...report, emailConfirmation };
@@ -159,12 +167,27 @@ export class DenunciasController {
 
   @Patch(':id/estado')
   @UseGuards(AuthGuard('jwt'))
-  changeStatus(
+  async changeStatus(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() dto: ManageReportDto,
   ) {
-    return this.denunciasService.changeStatus(id, req.user, dto);
+    const report = await this.denunciasService.changeStatus(id, req.user, dto);
+
+    if (
+      dto.status === ReportStatus.RECHAZADO &&
+      dto.rejectionReason &&
+      report.reporter?.email
+    ) {
+      await this.confirmationMailService.sendReportRejectionNotice({
+        email: report.reporter.email,
+        reportId: report.id,
+        title: report.title,
+        reason: rejectionReasonLabels[dto.rejectionReason],
+      });
+    }
+
+    return report;
   }
 
   @Patch(':id')

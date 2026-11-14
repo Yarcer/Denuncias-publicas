@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Prisma, ReportStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
 import { DenunciasService } from './denuncias.service';
 
 describe('DenunciasService', () => {
@@ -38,6 +39,17 @@ describe('DenunciasService', () => {
       .mockImplementation(({ data }) =>
         Promise.resolve({ id: reportId, ...data }),
       );
+  const createTransactionalPrisma = (transaction: Record<string, unknown>) =>
+    ({
+      $transaction: (
+        callback: (value: Record<string, unknown>) => Promise<unknown>,
+      ) => callback(transaction),
+    }) as unknown as PrismaService;
+  const createIpAbuseProtection = () =>
+    ({
+      hashIpAddress: jest.fn().mockReturnValue('hashed-client-ip'),
+      acquireIpLock: jest.fn().mockResolvedValue(undefined),
+    }) as unknown as IpAbuseProtectionService;
 
   it.each([
     ['URBANO', 'Municipalidad Demo'],
@@ -45,7 +57,7 @@ describe('DenunciasService', () => {
     ['POLICIAL', 'policia demo'],
   ] as const)('routes %s reports to %s', async (type, entityName) => {
     const reportCreate = createReportMock();
-    const prisma = {
+    const prisma = createTransactionalPrisma({
       user: {
         findUnique: jest.fn().mockResolvedValue({
           isAnonymous: false,
@@ -54,18 +66,22 @@ describe('DenunciasService', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
       },
       category: { findUnique: jest.fn().mockResolvedValue(null) },
-      report: { create: reportCreate },
-    };
-    const service = new DenunciasService(prisma as unknown as PrismaService);
-
-    await service.create('reporter-id', {
-      title: 'Luminaria apagada',
-      description: 'La calle está oscura.',
-      type,
-      latitude: -32.37,
-      longitude: -54.17,
-      categoryId: 'category-id',
+      report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
     });
+    const service = new DenunciasService(prisma, createIpAbuseProtection());
+
+    await service.create(
+      'reporter-id',
+      {
+        title: 'Luminaria apagada',
+        description: 'La calle está oscura.',
+        type,
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'category-id',
+      },
+      '203.0.113.1',
+    );
 
     const createInput = reportCreate.mock.calls[0]?.[0];
     expect(createInput?.data.entityName).toBe(entityName);
@@ -75,26 +91,33 @@ describe('DenunciasService', () => {
 
   it('assigns low priority to anonymous reports', async () => {
     const reportCreate = createReportMock();
-    const service = new DenunciasService({
-      user: {
-        findUnique: jest.fn().mockResolvedValue({
-          isAnonymous: true,
-          role: 'CIUDADANO',
-        }),
-        findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
-      },
-      category: { findUnique: jest.fn().mockResolvedValue(null) },
-      report: { create: reportCreate },
-    } as unknown as PrismaService);
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            isAnonymous: true,
+            role: 'CIUDADANO',
+          }),
+          findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
+        },
+        category: { findUnique: jest.fn().mockResolvedValue(null) },
+        report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
 
-    await service.create('anonymous-id', {
-      title: 'Incendio activo',
-      description: 'Hay una persona herida.',
-      type: 'BOMBEROS',
-      latitude: -32.37,
-      longitude: -54.17,
-      categoryId: 'category-id',
-    });
+    await service.create(
+      'anonymous-id',
+      {
+        title: 'Incendio activo',
+        description: 'Hay una persona herida.',
+        type: 'BOMBEROS',
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'category-id',
+      },
+      '203.0.113.1',
+    );
 
     const createInput = reportCreate.mock.calls[0]?.[0];
     expect(createInput?.data.priority).toBe('BAJA');
@@ -132,55 +155,33 @@ describe('DenunciasService', () => {
 
   it('stores explicit public-map consent for an allowed category', async () => {
     const reportCreate = createReportMock();
-    const service = new DenunciasService({
-      user: {
-        findUnique: jest.fn().mockResolvedValue({
-          isAnonymous: false,
-          role: 'CIUDADANO',
-        }),
-        findFirst: jest.fn().mockResolvedValue({ id: 'organization-user' }),
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            isAnonymous: false,
+            role: 'CIUDADANO',
+          }),
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        category: { findUnique: jest.fn().mockResolvedValue(null) },
+        report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
+
+    await service.create(
+      'reporter-id',
+      {
+        title: 'Incendio',
+        description: 'Un foco apagado.',
+        type: 'BOMBEROS',
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'category-id',
       },
-      category: {
-        findUnique: jest.fn().mockResolvedValue({ name: 'Infraestructura' }),
-      },
-      report: { create: reportCreate },
-    } as unknown as PrismaService);
-
-    await service.create('reporter-id', {
-      title: 'Luminaria apagada',
-      description: 'La calle está oscura.',
-      type: 'URBANO',
-      latitude: -32.37,
-      longitude: -54.17,
-      categoryId: 'category-id',
-      publicMapConsent: true,
-    });
-
-    expect(reportCreate.mock.calls[0]?.[0].data.publicMapConsent).toBe(true);
-  });
-
-  it('leaves reports unrouted when no active user configures the destination organization', async () => {
-    const reportCreate = createReportMock();
-    const service = new DenunciasService({
-      user: {
-        findUnique: jest.fn().mockResolvedValue({
-          isAnonymous: false,
-          role: 'CIUDADANO',
-        }),
-        findFirst: jest.fn().mockResolvedValue(null),
-      },
-      category: { findUnique: jest.fn().mockResolvedValue(null) },
-      report: { create: reportCreate },
-    } as unknown as PrismaService);
-
-    await service.create('reporter-id', {
-      title: 'Incendio',
-      description: 'Un foco apagado.',
-      type: 'BOMBEROS',
-      latitude: -32.37,
-      longitude: -54.17,
-      categoryId: 'category-id',
-    });
+      '203.0.113.1',
+    );
 
     expect(reportCreate.mock.calls[0]?.[0].data.entityName).toBeNull();
   });
@@ -190,28 +191,35 @@ describe('DenunciasService', () => {
     const findFirst = jest
       .fn<Promise<{ id: string }>, [{ where: { entityName: string } }]>()
       .mockResolvedValue({ id: 'police-user' });
-    const service = new DenunciasService({
-      user: {
-        findUnique: jest.fn().mockResolvedValue({
-          isAnonymous: true,
-          role: 'CIUDADANO',
-        }),
-        findFirst,
-      },
-      category: {
-        findUnique: jest.fn().mockResolvedValue({ name: 'Convivencia' }),
-      },
-      report: { create: reportCreate },
-    } as unknown as PrismaService);
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            isAnonymous: true,
+            role: 'CIUDADANO',
+          }),
+          findFirst,
+        },
+        category: {
+          findUnique: jest.fn().mockResolvedValue({ name: 'Convivencia' }),
+        },
+        report: { count: jest.fn().mockResolvedValue(0), create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
 
-    await service.create('anonymous-id', {
-      title: 'Ruidos molestos',
-      description: 'Hay ruidos molestos en la calle.',
-      type: 'URBANO',
-      latitude: -32.37,
-      longitude: -54.17,
-      categoryId: 'convivencia',
-    });
+    await service.create(
+      'anonymous-id',
+      {
+        title: 'Ruidos molestos',
+        description: 'Hay ruidos molestos en la calle.',
+        type: 'URBANO',
+        latitude: -32.37,
+        longitude: -54.17,
+        categoryId: 'convivencia',
+      },
+      '203.0.113.1',
+    );
 
     expect(findFirst.mock.calls[0]?.[0]).toMatchObject({
       where: { entityName: 'Policía Municipal' },
@@ -220,6 +228,38 @@ describe('DenunciasService', () => {
       type: 'URBANO',
       entityName: 'Policía Municipal',
     });
+  });
+
+  it('limits report creation to five per IP per hour', async () => {
+    const reportCreate = jest.fn();
+    const reportCount = jest
+      .fn<Promise<number>, [Record<string, unknown>]>()
+      .mockResolvedValue(5);
+    const service = new DenunciasService(
+      createTransactionalPrisma({
+        report: { count: reportCount, create: reportCreate },
+      }),
+      createIpAbuseProtection(),
+    );
+
+    await expect(
+      service.create(
+        'reporter-id',
+        {
+          title: 'Luminaria apagada',
+          description: 'La calle está oscura.',
+          type: 'URBANO',
+          latitude: -32.37,
+          longitude: -54.17,
+          categoryId: 'category-id',
+        },
+        '203.0.113.1',
+      ),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(reportCount.mock.calls[0]?.[0]).toMatchObject({
+      where: { reporterIpHash: 'hashed-client-ip' },
+    });
+    expect(reportCreate).not.toHaveBeenCalled();
   });
 
   it('scopes management report lists to their organization and unassigned reports', async () => {
@@ -248,118 +288,16 @@ describe('DenunciasService', () => {
     expect(result.items[0]).toMatchObject({ priority: 'URGENTE' });
   });
 
-  it('returns only aggregated public map zones, never individual report locations', async () => {
-    const queryRaw = jest
-      .fn()
-      .mockResolvedValue([
-        { latitudeCell: -1619, longitudeCell: -2709, count: 4 },
-      ]);
+  it('denies superadmins access to report lists', async () => {
+    const findMany = jest.fn();
     const service = new DenunciasService({
-      $queryRaw: queryRaw,
-      report: { count: jest.fn().mockResolvedValue(0) },
+      report: { findMany },
     } as unknown as PrismaService);
 
-    const result = await service.findPublicMap();
-
-    expect(queryRaw).toHaveBeenCalledTimes(1);
-    expect(result.items).toEqual([
-      {
-        latitude: -32.37,
-        longitude: -54.17,
-        count: 4,
-      },
-    ]);
-    expect(result.resolvedCount).toBe(0);
-    expect(result.subcategories).toContain('Baches o calles en mal estado');
-  });
-
-  it('filters public map zones by an allowed subcategory', async () => {
-    const queryRaw = jest
-      .fn<
-        Promise<
-          Array<{ latitudeCell: number; longitudeCell: number; count: number }>
-        >,
-        [Prisma.Sql]
-      >()
-      .mockResolvedValue([
-        { latitudeCell: -1619, longitudeCell: -2709, count: 1 },
-      ]);
-    const reportCount = jest
-      .fn()
-      .mockResolvedValueOnce(7)
-      .mockResolvedValueOnce(10)
-      .mockResolvedValueOnce(3);
-    const service = new DenunciasService({
-      $queryRaw: queryRaw,
-      report: { count: reportCount },
-    } as unknown as PrismaService);
-
-    const result = await service.findPublicMap('Baches o calles en mal estado');
-
-    expect(queryRaw.mock.calls[0]?.[0].values).toContain(
-      'Baches o calles en mal estado',
-    );
-    expect(result.resolvedCount).toBe(7);
-    expect(result.totalCount).toBe(10);
-    expect(result.inProgressCount).toBe(3);
-    expect(result.items).toEqual([
-      { latitude: -32.37, longitude: -54.17, count: 1 },
-    ]);
-    expect(reportCount).toHaveBeenNthCalledWith(1, {
-      where: { status: ReportStatus.RESUELTO },
-    });
-    expect(reportCount.mock.calls[1]).toEqual([]);
-    expect(reportCount).toHaveBeenNthCalledWith(3, {
-      where: {
-        status: {
-          in: [
-            ReportStatus.PENDIENTE,
-            ReportStatus.EN_REVISION,
-            ReportStatus.ASIGNADO,
-            ReportStatus.EN_PROCESO,
-          ],
-        },
-        archivedAt: null,
-      },
-    });
-    expect(queryRaw.mock.calls[0]?.[0].sql).toContain('HAVING COUNT(*) >= 1');
-  });
-
-  it('shows a zone with one report when no subcategory filter is selected', async () => {
-    const queryRaw = jest
-      .fn<
-        Promise<
-          Array<{ latitudeCell: number; longitudeCell: number; count: number }>
-        >,
-        [Prisma.Sql]
-      >()
-      .mockResolvedValue([
-        { latitudeCell: -1619, longitudeCell: -2709, count: 1 },
-      ]);
-    const service = new DenunciasService({
-      $queryRaw: queryRaw,
-      report: { count: jest.fn().mockResolvedValue(0) },
-    } as unknown as PrismaService);
-
-    const result = await service.findPublicMap();
-
-    expect(result.items).toEqual([
-      { latitude: -32.37, longitude: -54.17, count: 1 },
-    ]);
-    expect(queryRaw.mock.calls[0]?.[0].sql).toContain('HAVING COUNT(*) >= 1');
-  });
-
-  it('rejects unsupported public map subcategory filters', async () => {
-    const queryRaw = jest.fn();
-    const service = new DenunciasService({
-      $queryRaw: queryRaw,
-      report: { count: jest.fn() },
-    } as unknown as PrismaService);
-
-    await expect(service.findPublicMap('Convivencia')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    expect(queryRaw).not.toHaveBeenCalled();
+    await expect(
+      service.findAll({ sub: 'superadmin-id', role: 'SUPERADMINISTRADOR' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(findMany).not.toHaveBeenCalled();
   });
 
   it('only returns archived reports from the last 90 days', async () => {

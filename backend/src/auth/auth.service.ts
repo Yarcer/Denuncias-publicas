@@ -1,5 +1,7 @@
 import {
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -9,12 +11,36 @@ import * as argon2 from 'argon2';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginUserDto, RegisterUserDto } from './dto/register-user.dto';
+import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
+
+const anonymousAccountLimit = 3;
+const anonymousAccountWindowMs = 20 * 24 * 60 * 60 * 1000;
+const cleanupBatchSize = 500;
+
+function formatWaitDuration(milliseconds: number) {
+  let remainingMinutes = Math.max(1, Math.ceil(milliseconds / 60_000));
+  const days = Math.floor(remainingMinutes / (24 * 60));
+  remainingMinutes %= 24 * 60;
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
+  const parts: string[] = [];
+
+  if (days) parts.push(`${days} ${days === 1 ? 'día' : 'días'}`);
+  if (hours) parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`);
+  if (minutes) {
+    parts.push(`${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`);
+  }
+
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`;
+}
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private readonly ipAbuseProtection: IpAbuseProtectionService,
   ) {}
 
   async register(dto: RegisterUserDto) {
@@ -57,6 +83,10 @@ export class AuthService {
       throw new UnauthorizedException('La cuenta no está activa');
     }
 
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
     const isValid = await argon2.verify(user.passwordHash, dto.password);
     if (!isValid) {
       throw new UnauthorizedException('Credenciales inválidas');
@@ -80,28 +110,128 @@ export class AuthService {
     };
   }
 
-  async anonymousLogin() {
+  async anonymousLogin(ipAddress: string | undefined) {
+    const ipHash = this.ipAbuseProtection.hashIpAddress(ipAddress);
     const anonymousId = randomUUID();
-    let user;
+
     try {
-      user = await this.prisma.user.create({
-        data: {
-          email: `anon-${anonymousId}@anonymous.local`,
-          passwordHash: await argon2.hash(randomUUID()),
-          firstName: 'Visitante',
+      const user = await this.prisma.$transaction(async (transaction) => {
+        await this.ipAbuseProtection.acquireIpLock(
+          transaction,
+          'anonymous-account',
+          ipHash,
+        );
+        const now = new Date();
+        const recentAccountsWhere = {
           isAnonymous: true,
-          role: 'CIUDADANO',
-        },
+          anonymousIpHash: ipHash,
+          createdAt: {
+            gte: new Date(now.getTime() - anonymousAccountWindowMs),
+          },
+        };
+        const recentAccounts = await transaction.user.count({
+          where: recentAccountsWhere,
+        });
+
+        if (recentAccounts >= anonymousAccountLimit) {
+          const oldestRecentAccount = await transaction.user.findFirst({
+            where: recentAccountsWhere,
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true },
+          });
+          if (!oldestRecentAccount) {
+            throw new ServiceUnavailableException(
+              'No se pudo determinar cuándo podrás volver a crear una sesión anónima.',
+            );
+          }
+
+          const retryIn = formatWaitDuration(
+            oldestRecentAccount.createdAt.getTime() +
+              anonymousAccountWindowMs -
+              now.getTime(),
+          );
+          throw new HttpException(
+            {
+              message: `Se alcanzó el límite de sesiones anónimas para esta conexión. Podrás volver a intentarlo en ${retryIn}.`,
+            },
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+
+        return transaction.user.create({
+          data: {
+            email: `anon-${anonymousId}@anonymous.local`,
+            passwordHash: null,
+            firstName: 'Visitante',
+            isAnonymous: true,
+            anonymousIpHash: ipHash,
+            role: 'CIUDADANO',
+          },
+        });
       });
-    } catch {
+      return {
+        user: this.publicUser(user),
+        accessToken: this.signToken(user.id, user.email, user.role),
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new ServiceUnavailableException(
         'La base de datos no está disponible. Inicia PostgreSQL e inténtalo de nuevo.',
       );
     }
+  }
+
+  async cleanupExpiredAnonymousAccounts() {
+    const cutoff = new Date(Date.now() - anonymousAccountWindowMs);
+    const reportIpHashCutoff = new Date(Date.now() - 60 * 60 * 1000);
+    let deletedAccounts = 0;
+
+    while (true) {
+      const expiredAccounts = await this.prisma.user.findMany({
+        where: {
+          isAnonymous: true,
+          createdAt: { lt: cutoff },
+          reports: { none: {} },
+        },
+        select: { id: true },
+        orderBy: { createdAt: 'asc' },
+        take: cleanupBatchSize,
+      });
+
+      if (expiredAccounts.length === 0) break;
+
+      const deleted = await this.prisma.user.deleteMany({
+        where: {
+          id: { in: expiredAccounts.map(({ id }) => id) },
+          reports: { none: {} },
+        },
+      });
+      deletedAccounts += deleted.count;
+      if (deleted.count === 0) break;
+    }
+
+    const clearedAccountHashes = await this.prisma.user.updateMany({
+      where: {
+        isAnonymous: true,
+        anonymousIpHash: { not: null },
+        createdAt: { lt: cutoff },
+      },
+      data: { anonymousIpHash: null },
+    });
+    const clearedReportHashes = await this.prisma.report.updateMany({
+      where: {
+        reporterIpHash: { not: null },
+        createdAt: { lt: reportIpHashCutoff },
+      },
+      data: { reporterIpHash: null },
+    });
 
     return {
-      user: this.publicUser(user),
-      accessToken: this.signToken(user.id, user.email, user.role),
+      deletedAccounts,
+      clearedAccountHashes: clearedAccountHashes.count,
+      clearedReportHashes: clearedReportHashes.count,
     };
   }
 

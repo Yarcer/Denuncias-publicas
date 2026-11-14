@@ -4,6 +4,7 @@ import { validate } from './env.validation';
 const productionConfig = {
   DATABASE_URL: 'postgresql://user:password@host.example/db?sslmode=require',
   JWT_SECRET: 'a-production-secret-with-at-least-32-characters',
+  IP_HASH_SECRET: 'a-production-ip-hash-secret-with-at-least-32-characters',
   NODE_ENV: 'production',
   CORS_ORIGIN: 'https://denuncias-publicas.pages.dev',
   STORAGE_DRIVER: 'r2',
@@ -22,6 +23,15 @@ describe('production environment validation', () => {
     expect(() => validate({ ...productionConfig, JWT_SECRET: 'weak' })).toThrow(
       'JWT_SECRET must contain at least 32 characters',
     );
+  });
+
+  it('rejects a missing or weak IP hash secret', () => {
+    expect(() =>
+      validate({
+        ...productionConfig,
+        IP_HASH_SECRET: 'weak',
+      }),
+    ).toThrow('IP_HASH_SECRET must contain at least 32 characters');
   });
 
   it('rejects non-HTTPS CORS origins', () => {

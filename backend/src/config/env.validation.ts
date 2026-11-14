@@ -17,6 +17,10 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  IP_HASH_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
   JWT_EXPIRES_IN: string = '1h';
 
   @IsNumber()
@@ -109,6 +113,15 @@ export function validate(config: Record<string, unknown>) {
 
     if (validatedConfig.JWT_SECRET.length < 32) {
       productionErrors.push('JWT_SECRET must contain at least 32 characters');
+    }
+
+    if (
+      !validatedConfig.IP_HASH_SECRET ||
+      validatedConfig.IP_HASH_SECRET.length < 32
+    ) {
+      productionErrors.push(
+        'IP_HASH_SECRET must contain at least 32 characters',
+      );
     }
 
     try {

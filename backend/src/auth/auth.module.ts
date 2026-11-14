@@ -6,6 +6,8 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
+import { AnonymousAccountCleanupService } from './anonymous-account-cleanup.service';
 
 @Module({
   imports: [
@@ -28,7 +30,12 @@ import { JwtStrategy } from './jwt.strategy';
 
   controllers: [AuthController],
 
-  providers: [AuthService, JwtStrategy],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    IpAbuseProtectionService,
+    AnonymousAccountCleanupService,
+  ],
 
   exports: [AuthService],
 })

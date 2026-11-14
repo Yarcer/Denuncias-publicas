@@ -1,8 +1,12 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
@@ -16,8 +20,13 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
-import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
+import {
+  AssignReportDto,
+  ManageReportDto,
+  RejectionReason,
+} from './dto/manage-report.dto';
 import { determineReportPriority } from './report-priority';
+import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
 
 type UploadedImage = {
   buffer: Buffer;
@@ -48,6 +57,12 @@ const publicMapSubcategories = [
 ];
 const publicMapGridSizeDegrees = 0.02;
 const maxPublicMapZones = 300;
+export const rejectionReasonLabels: Record<RejectionReason, string> = {
+  [RejectionReason.DUPLICATE]: 'Reporte duplicado',
+  [RejectionReason.INSUFFICIENT_INFORMATION]: 'Información insuficiente',
+  [RejectionReason.ISSUE_NOT_FOUND]: 'No se encontró el problema',
+};
+
 
 function isPublicMapCategory(name?: string | null) {
   return publicMapCategoryNames.includes(name?.trim() ?? '');
@@ -58,13 +73,15 @@ function publicMapGridCenter(cell: number) {
 }
 
 const archivedReportRetentionMs = 90 * 24 * 60 * 60 * 1000;
+const reportCreationLimit = 5;
+const reportCreationWindowMs = 60 * 60 * 1000;
 const sharedReportOrganizations: {
   type: ReportType;
   names: readonly string[];
 }[] = [
-  { type: ReportType.URBANO, names: ['Municipalidad Demo', 'Intendencia'] },
-  { type: ReportType.POLICIAL, names: ['policia demo', 'Policía Municipal'] },
-];
+    { type: ReportType.URBANO, names: ['Municipalidad Demo', 'Intendencia'] },
+    { type: ReportType.POLICIAL, names: ['policia demo', 'Policía Municipal'] },
+  ];
 const reportOrganizationOverrides = [
   {
     type: ReportType.URBANO,
@@ -90,7 +107,11 @@ function normalizeOrganizationName(name: string) {
 
 @Injectable()
 export class DenunciasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly ipAbuseProtection?: IpAbuseProtectionService,
+  ) { }
 
   private readonly organizations: Record<CreateReportDto['type'], string> = {
     URBANO: 'Municipalidad Demo',
@@ -99,6 +120,15 @@ export class DenunciasService {
   };
 
   async findAll(user: AuthenticatedUser, status?: string) {
+    if (
+      user.role === Role.SUPERADMINISTRADOR ||
+      (user.role !== Role.CIUDADANO && !managementRoles.includes(user.role))
+    ) {
+      throw new ForbiddenException(
+        'No tienes permisos para consultar denuncias',
+      );
+    }
+
     const actor = managementRoles.includes(user.role)
       ? await this.getManagementEntity(user)
       : null;
@@ -109,25 +139,46 @@ export class DenunciasService {
       ...(user.role === 'CIUDADANO' ? { reporterId: user.sub } : {}),
       ...(actor
         ? {
-            OR: [
-              { entityName: actor.entityName },
-              { entityName: null },
-              ...sharedOrganizationWhere,
-              ...this.reportOrganizationFilters(actor.entityName),
-            ],
-          }
+          OR: [
+            { entityName: actor.entityName },
+            { entityName: null },
+            ...sharedOrganizationWhere,
+            ...this.reportOrganizationFilters(actor.entityName),
+          ],
+        }
         : {}),
       ...(status ? { status: status as never } : {}),
     };
     const items = await this.prisma.report.findMany({
       where,
-      include: { category: true },
+      include: {
+        category: true,
+        ...(user.role === Role.CIUDADANO
+          ? {
+            history: {
+              where: { toStatus: ReportStatus.RECHAZADO },
+              select: { comment: true },
+              orderBy: { createdAt: 'desc' as const },
+              take: 1,
+            },
+          }
+          : {}),
+      },
       orderBy: { createdAt: 'desc' },
     });
 
     const visibleItems =
-      user.role === 'CIUDADANO'
-        ? items.map((item) => this.withoutPriority(item))
+      user.role === Role.CIUDADANO
+        ? items.map((item) => {
+          const { history, ...report } = item as typeof item & {
+            history?: Array<{ comment: string | null }>;
+          };
+
+          return this.withoutPriority({
+            ...report,
+            rejectionReason: history?.[0]?.comment ?? null,
+          });
+        })
         : items;
 
     return {
@@ -230,17 +281,17 @@ export class DenunciasService {
     const statusWhere: Prisma.ReportWhereInput =
       status === 'archived'
         ? {
-            archivedAt: {
-              not: null,
-              gte: new Date(Date.now() - archivedReportRetentionMs),
-            },
-          }
+          archivedAt: {
+            not: null,
+            gte: new Date(Date.now() - archivedReportRetentionMs),
+          },
+        }
         : status
           ? { status: status as ReportStatus, archivedAt: null }
           : {
-              status: { notIn: terminalStatuses },
-              archivedAt: null,
-            };
+            status: { notIn: terminalStatuses },
+            archivedAt: null,
+          };
     const where: Prisma.ReportWhereInput = {
       ...statusWhere,
       OR: [
@@ -307,15 +358,15 @@ export class DenunciasService {
     const responsibleIds = [...new Set(items.map((item) => item.changedBy))];
     const responsibleUsers = responsibleIds.length
       ? await this.prisma.user.findMany({
-          where: { id: { in: responsibleIds } },
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            entityName: true,
-          },
-        })
+        where: { id: { in: responsibleIds } },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          entityName: true,
+        },
+      })
       : [];
     const usersById = new Map(
       responsibleUsers.map((responsible) => [responsible.id, responsible]),
@@ -334,9 +385,9 @@ export class DenunciasService {
     this.assertManagementRole(user);
     const actor = managementRoles.includes(user.role)
       ? await this.prisma.user.findUnique({
-          where: { id: user.sub },
-          select: { entityName: true },
-        })
+        where: { id: user.sub },
+        select: { entityName: true },
+      })
       : null;
 
     if (managementRoles.includes(user.role) && (!actor || !actor.entityName)) {
@@ -366,65 +417,93 @@ export class DenunciasService {
     return { items, count: items.length };
   }
 
-  async create(reporterId: string, dto: CreateReportDto) {
-    const reporter = await this.prisma.user.findUnique({
-      where: { id: reporterId },
-      select: { isAnonymous: true, role: true },
-    });
-    const category = await this.prisma.category.findUnique({
-      where: { id: dto.categoryId },
-      select: { name: true },
-    });
-    if (dto.publicMapConsent && !isPublicMapCategory(category?.name)) {
-      throw new BadRequestException(
-        'Esta categoría no puede publicarse en el mapa',
+  async create(
+    reporterId: string,
+    dto: CreateReportDto,
+    ipAddress: string | undefined,
+  ) {
+    const ipAbuseProtection = this.ipAbuseProtection;
+    if (!ipAbuseProtection) {
+      throw new ServiceUnavailableException(
+        'La protección de reportes por IP no está configurada',
       );
     }
-    const organizationOverride = reportOrganizationOverrides.find(
-      (route) =>
-        route.type === dto.type &&
-        normalizeOrganizationName(route.categoryName) ===
-          normalizeOrganizationName(category?.name ?? ''),
-    );
-    const entityName =
-      organizationOverride?.organizationName ?? this.organizations[dto.type];
-    const configuredOrganization = await this.prisma.user.findFirst({
-      where: {
-        entityName,
-        status: 'ACTIVO',
-        role: {
-          in: [Role.FUNCIONARIO, Role.FUNCIONARIO_ADMINISTRADOR],
+
+    const ipHash = ipAbuseProtection.hashIpAddress(ipAddress);
+
+    return this.prisma.$transaction(async (transaction) => {
+      await ipAbuseProtection.acquireIpLock(
+        transaction,
+        'report-creation',
+        ipHash,
+      );
+      const recentReports = await transaction.report.count({
+        where: {
+          reporterIpHash: ipHash,
+          createdAt: { gte: new Date(Date.now() - reportCreationWindowMs) },
         },
-      },
-      select: { id: true },
-    });
-    const priority = determineReportPriority(
-      dto.title,
-      dto.description,
-      reporter?.isAnonymous ?? false,
-    );
+      });
 
-    const report = await this.prisma.report.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        type: dto.type,
-        priority,
-        entityName: configuredOrganization ? entityName : null,
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        address: dto.address,
-        reference: dto.reference,
-        publicMapConsent: dto.publicMapConsent === true,
-        reporter: { connect: { id: reporterId } },
-        category: { connect: { id: dto.categoryId } },
-      },
-      include: { category: true },
-    });
+      if (recentReports >= reportCreationLimit) {
+        throw new HttpException(
+          'Se alcanzó el límite de reportes para esta conexión. Inténtalo más tarde.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
 
-    return reporter?.role === 'SUPERADMINISTRADOR'
-      ? report
-      : this.withoutPriority(report);
+      const reporter = await transaction.user.findUnique({
+        where: { id: reporterId },
+        select: { isAnonymous: true, role: true },
+      });
+      const category = await transaction.category.findUnique({
+        where: { id: dto.categoryId },
+        select: { name: true },
+      });
+      const organizationOverride = reportOrganizationOverrides.find(
+        (route) =>
+          route.type === dto.type &&
+          normalizeOrganizationName(route.categoryName) ===
+          normalizeOrganizationName(category?.name ?? ''),
+      );
+      const entityName =
+        organizationOverride?.organizationName ?? this.organizations[dto.type];
+      const configuredOrganization = await transaction.user.findFirst({
+        where: {
+          entityName,
+          status: 'ACTIVO',
+          role: {
+            in: [Role.FUNCIONARIO, Role.FUNCIONARIO_ADMINISTRADOR],
+          },
+        },
+        select: { id: true },
+      });
+      const priority = determineReportPriority(
+        dto.title,
+        dto.description,
+        reporter?.isAnonymous ?? false,
+      );
+
+      const report = await this.prisma.report.create({
+        data: {
+          title: dto.title,
+          description: dto.description,
+          type: dto.type,
+          priority,
+          entityName: configuredOrganization ? entityName : null,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          address: dto.address,
+          reference: dto.reference,
+          reporter: { connect: { id: reporterId } },
+          category: { connect: { id: dto.categoryId } },
+        },
+        include: { category: true },
+      });
+
+      return reporter?.role === 'SUPERADMINISTRADOR'
+        ? report
+        : this.withoutPriority(report);
+    });
   }
 
   async uploadEvidence(
@@ -688,7 +767,7 @@ export class DenunciasService {
           resolvedAt: dto.status === ReportStatus.RESUELTO ? new Date() : null,
           archivedAt:
             dto.status === ReportStatus.RESUELTO ||
-            dto.status === ReportStatus.RECHAZADO
+              dto.status === ReportStatus.RECHAZADO
               ? (report.archivedAt ?? new Date())
               : null,
         },
@@ -709,6 +788,10 @@ export class DenunciasService {
             fromStatus: report.status,
             toStatus: dto.status,
             changedBy: user.sub,
+            comment:
+              dto.status === ReportStatus.RECHAZADO && dto.rejectionReason
+                ? rejectionReasonLabels[dto.rejectionReason]
+                : null,
           },
         });
       }
@@ -736,11 +819,11 @@ export class DenunciasService {
     const where: Prisma.ReportWhereInput = {
       ...(fromDate || toExclusive
         ? {
-            createdAt: {
-              ...(fromDate ? { gte: fromDate } : {}),
-              ...(toExclusive ? { lt: toExclusive } : {}),
-            },
-          }
+          createdAt: {
+            ...(fromDate ? { gte: fromDate } : {}),
+            ...(toExclusive ? { lt: toExclusive } : {}),
+          },
+        }
         : {}),
     };
     const dateFilters = [
@@ -901,7 +984,7 @@ export class DenunciasService {
     if (
       !report.entityName ||
       normalizeOrganizationName(report.entityName) ===
-        normalizeOrganizationName(actorEntityName)
+      normalizeOrganizationName(actorEntityName)
     ) {
       return;
     }
@@ -1008,7 +1091,7 @@ export class DenunciasService {
       (route) =>
         route.type === report.type &&
         normalizeOrganizationName(route.categoryName) ===
-          normalizeOrganizationName(report.category?.name ?? ''),
+        normalizeOrganizationName(report.category?.name ?? ''),
     );
   }
 

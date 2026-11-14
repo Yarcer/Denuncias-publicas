@@ -7,6 +7,12 @@ export default () => ({
       (process.env.NODE_ENV === 'production' ? '' : 'dev_secret_change_me'),
     expiresIn: process.env.JWT_EXPIRES_IN || '1h',
   },
+  ipHashSecret:
+    process.env.IP_HASH_SECRET ||
+    process.env.JWT_SECRET ||
+    (process.env.NODE_ENV === 'production'
+      ? undefined
+      : 'dev-anonymous-ip-hash-secret-change-me'),
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   },

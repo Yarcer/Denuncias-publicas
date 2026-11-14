@@ -7,7 +7,7 @@ Una plataforma web pensada para que cualquier ciudadano pueda reportar problemas
 Denuncias Públicas conecta a la ciudadanía con las instituciones que deben resolver los problemas cotidianos: luminarias rotas, basura acumulada, baches, situaciones de riesgo, emergencias y mucho más. En lugar de que un reclamo se pierda entre llamadas y papeles, la plataforma lo registra, le asigna un identificador de seguimiento y lo deriva automáticamente al organismo que corresponde.
 
 El sistema está dividido en tres grandes experiencias, según quién lo use:
-
+ 
 - **Ciudadanía:** crea denuncias y sigue su estado.
 - **Entes públicos:** reciben y gestionan las denuncias de su área.
 - **Administración:** supervisa todo, controla usuarios y consulta estadísticas.

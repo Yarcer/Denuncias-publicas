@@ -31,11 +31,11 @@ Sube el proyecto a un repositorio privado de GitHub. No subas archivos `.env`, c
 
 1. Elige primero el nombre de tu sitio; luego usarás su URL pública completa como origen CORS en Render.
 2. En Render, crea un **Blueprint** desde el repositorio y acepta la configuración de `render.yaml`.
-3. Completa los campos `DATABASE_URL`, `CORS_ORIGIN`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY`.
+3. Completa los campos `DATABASE_URL`, `CORS_ORIGIN`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY`. Render genera `JWT_SECRET` y `IP_HASH_SECRET`; conserva este último estable para que el límite por IP siga siendo consistente entre despliegues.
 4. Para enviar confirmaciones de denuncias, configura además `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_USER` y `SMTP_PASSWORD` como secretos/variables de entorno. Usa las credenciales SMTP de un proveedor autorizado para enviar desde el dominio indicado en `SMTP_FROM`.
 5. Despliega la API. Render genera el secreto JWT automáticamente.
 6. Comprueba `https://<tu-api>.onrender.com/api/health`.
-`CORS_ORIGIN` debe ser el origen HTTPS exacto de la web publicada (`*.pages.dev` o `*.workers.dev`), sin ruta final. Las migraciones y categorías iniciales se preparan al iniciar la API. En producción el seed no crea usuarios demo; mantén una sola instancia mientras uses este comando de arranque.
+`CORS_ORIGIN` debe ser el origen HTTPS exacto de la web publicada (`*.pages.dev` o `*.workers.dev`), sin ruta final. Las migraciones y categorías iniciales se preparan al iniciar la API. Las sesiones anónimas están limitadas a 3 por IP en una ventana de 20 días; se eliminan al vencer si nunca crearon reportes. La creación de reportes está limitada a 5 por IP por hora. La API guarda HMAC de las IP, no las direcciones originales, y los elimina al vencer su ventana. En producción el seed no crea usuarios demo; mantén una sola instancia mientras uses este comando de arranque.
 
 ## 5. Desplegar el frontend
 
