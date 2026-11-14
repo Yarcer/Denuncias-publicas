@@ -125,21 +125,22 @@ function GestionUsuarios({
     setError('')
     setNotice('')
 
-    const payload = {
-      ...form,
-      ...(form.password ? {} : { password: undefined }),
-      firstName: form.firstName || undefined,
-      lastName: form.lastName || undefined,
-      entityName: form.entityName || undefined,
-      jurisdiction: form.jurisdiction || undefined,
-    }
-
     try {
       if (editingId) {
-        await api.patch(`/usuarios/${editingId}`, payload)
+        await api.patch(`/usuarios/${editingId}`, {
+          role: form.role,
+          entityName: form.entityName || undefined,
+          jurisdiction: form.jurisdiction || undefined,
+        })
         setNotice('Los cambios del usuario se guardaron.')
       } else {
-        await api.post('/usuarios/administrativos', payload)
+        await api.post('/usuarios/administrativos', {
+          ...form,
+          firstName: form.firstName || undefined,
+          lastName: form.lastName || undefined,
+          entityName: form.entityName || undefined,
+          jurisdiction: form.jurisdiction || undefined,
+        })
         setNotice('El usuario administrativo fue creado.')
       }
       setEditingId(null)
@@ -195,6 +196,7 @@ function GestionUsuarios({
               Nombre
               <input
                 value={form.firstName}
+                readOnly={Boolean(editingId)}
                 onChange={(event) => setForm({ ...form, firstName: event.target.value })}
                 autoComplete="given-name"
               />
@@ -203,6 +205,7 @@ function GestionUsuarios({
               Apellido
               <input
                 value={form.lastName}
+                readOnly={Boolean(editingId)}
                 onChange={(event) => setForm({ ...form, lastName: event.target.value })}
                 autoComplete="family-name"
               />
@@ -213,22 +216,25 @@ function GestionUsuarios({
                 type="email"
                 required
                 value={form.email}
+                readOnly={Boolean(editingId)}
                 onChange={(event) => setForm({ ...form, email: event.target.value })}
                 autoComplete="email"
               />
             </label>
-            <label className="admin-user-field-wide">
-              {editingId ? 'Nueva contraseña (opcional)' : 'Contraseña inicial'}
-              <input
-                type="password"
-                required={!editingId}
-                minLength={8}
-                value={form.password}
-                onChange={(event) => setForm({ ...form, password: event.target.value })}
-                autoComplete="new-password"
-                placeholder={editingId ? 'Dejar vacío para conservarla' : 'Mínimo 8 caracteres'}
-              />
-            </label>
+            {!editingId && (
+              <label className="admin-user-field-wide">
+                Contraseña inicial
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={form.password}
+                  onChange={(event) => setForm({ ...form, password: event.target.value })}
+                  autoComplete="new-password"
+                  placeholder="Mínimo 8 caracteres"
+                />
+              </label>
+            )}
             <label>
               Rol
               <select

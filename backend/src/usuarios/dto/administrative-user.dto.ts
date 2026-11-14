@@ -48,26 +48,11 @@ export class CreateAdministrativeUserDto {
 }
 
 export class UpdateAdministrativeUserDto {
-  @IsOptional()
-  @IsEmail()
-  email?: string;
 
-  @IsOptional()
-  @IsString()
-  @MinLength(8)
-  password?: string;
 
   @IsOptional()
   @IsIn(administrativeStaffRoles)
   role?: Role;
-
-  @IsOptional()
-  @IsString()
-  firstName?: string;
-
-  @IsOptional()
-  @IsString()
-  lastName?: string;
 
   @IsOptional()
   @IsIn(administrativeOrganizations)

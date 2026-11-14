@@ -14,11 +14,18 @@ import SolicitudesFuncionarios from './pages/SolicitudesFuncionarios';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 
-type AuthRoute = 'home' | 'login' | 'register' | 'anonymous' | 'management-login';
+type AuthRoute =
+  | 'home'
+  | 'login'
+  | 'register'
+  | 'anonymous'
+  | 'management-login'
+  | 'superadmin-login';
 
 function getAuthRoute(pathname = window.location.pathname): AuthRoute {
   if (pathname === '/') return 'home';
   if (pathname === '/gestion/login') return 'management-login';
+  if (pathname === '/superadmin/login') return 'superadmin-login';
   if (pathname === '/registro') return 'register';
   if (pathname === '/anonimo') return 'anonymous';
   return 'login';
@@ -1487,6 +1494,7 @@ function App() {
   );
   const registering = authRoute === 'register';
   const managementLogin = authRoute === 'management-login';
+  const superadminLogin = authRoute === 'superadmin-login';
   const [credentials, setCredentials] = useState({
     email: '',
     password: '',
@@ -1525,6 +1533,7 @@ function App() {
       register: '/registro',
       anonymous: '/anonimo',
       'management-login': '/gestion/login',
+      'superadmin-login': '/superadmin/login',
     };
 
     window.history.pushState({}, '', routePaths[route]);
@@ -1625,7 +1634,14 @@ function App() {
         registering ? '/auth/register' : '/auth/login',
         registering
           ? payload
-          : { ...payload, portal: managementLogin ? 'gestion' : 'ciudadano' },
+          : {
+            ...payload,
+            portal: superadminLogin
+              ? 'superadmin'
+              : managementLogin
+                ? 'gestion'
+                : 'ciudadano',
+          },
       );
 
       setSession(response.data.data.user, response.data.data.csrfToken);
@@ -1718,6 +1734,16 @@ function App() {
               >
                 Acceso para funcionarios
               </a>
+              <a
+                className="public-home-staff-link"
+                href="/superadmin/login"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateAuth('superadmin-login');
+                }}
+              >
+                Acceso superadministrador
+              </a>
 
               <EmergencyShortcuts />
               <PublicReportMap />
@@ -1736,10 +1762,10 @@ function App() {
               </a>
 
               <nav
-                className={`auth-route-nav ${managementLogin ? 'auth-route-nav-management' : ''}`}
+                className={`auth-route-nav ${managementLogin || superadminLogin ? 'auth-route-nav-management' : ''}`}
                 aria-label="Opciones de acceso"
               >
-                {managementLogin ? (
+                {managementLogin || superadminLogin ? (
                   <a
                     href="/login"
                     onClick={(event) => {
@@ -1797,7 +1823,46 @@ function App() {
                 )}
               </nav>
 
-              {!managementLogin && (
+              {!managementLogin && !superadminLogin && (
+                <a
+                  className="institutional-access-link"
+                  href="/gestion/login"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('management-login');
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-4h4v4" />
+                  </svg>
+                  <span>
+                    <strong>Acceso para funcionarios</strong>
+                    <small>Ingresar al portal del ente público</small>
+                  </span>
+                  <b aria-hidden="true">→</b>
+                </a>
+              )}
+              {managementLogin && (
+                <a
+                  className="institutional-access-link"
+                  href="/superadmin/login"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateAuth('superadmin-login');
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3 19 6v5c0 4.5-2.8 8-7 10-4.2-2-7-5.5-7-10V6l7-3Z" />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                  <span>
+                    <strong>Acceso superadministrador</strong>
+                    <small>Administración general del sistema</small>
+                  </span>
+                  <b aria-hidden="true">→</b>
+                </a>
+              )}
+              {superadminLogin && (
                 <a
                   className="institutional-access-link"
                   href="/gestion/login"
@@ -1837,25 +1902,31 @@ function App() {
               ) : (
                 <form className="auth-form auth-form-redesign" onSubmit={handleAuth}>
                   <span className="auth-section-label">
-                    {managementLogin
-                      ? 'PORTAL INSTITUCIONAL'
-                      : registering
-                        ? 'CUENTA CIUDADANA'
-                        : 'ACCESO CIUDADANO'}
+                    {superadminLogin
+                      ? 'ACCESO DE SUPERADMINISTRADOR'
+                      : managementLogin
+                        ? 'PORTAL INSTITUCIONAL'
+                        : registering
+                          ? 'CUENTA CIUDADANA'
+                          : 'ACCESO CIUDADANO'}
                   </span>
                   <h2>
                     {registering
                       ? 'Crear cuenta'
-                      : managementLogin
-                        ? 'Acceso de ente público'
-                        : 'Bienvenido/a'}
+                      : superadminLogin
+                        ? 'Acceso superadministrador'
+                        : managementLogin
+                          ? 'Acceso de ente público'
+                          : 'Bienvenido/a'}
                   </h2>
                   <p className="auth-form-intro">
-                    {managementLogin
-                      ? 'Ingresá con tu cuenta institucional para gestionar denuncias.'
-                      : registering
-                        ? ''
-                        : 'Ingresá para crear y seguir tus denuncias.'}
+                    {superadminLogin
+                      ? 'Ingresá con la cuenta de superadministrador para administrar el sistema.'
+                      : managementLogin
+                        ? 'Ingresá con tu cuenta institucional para gestionar denuncias.'
+                        : registering
+                          ? ''
+                          : 'Ingresá para crear y seguir tus denuncias.'}
                   </p>
 
                   {registering && (

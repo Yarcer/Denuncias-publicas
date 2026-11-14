@@ -105,24 +105,12 @@ export class UsuariosService {
     }
 
     const data = {
-      ...(dto.email !== undefined
-        ? { email: dto.email.trim().toLowerCase() }
-        : {}),
       ...(dto.role !== undefined ? { role: dto.role } : {}),
-      ...(dto.firstName !== undefined
-        ? { firstName: dto.firstName.trim() || null }
-        : {}),
-      ...(dto.lastName !== undefined
-        ? { lastName: dto.lastName.trim() || null }
-        : {}),
       ...(dto.entityName !== undefined
         ? { entityName: dto.entityName.trim() || null }
         : {}),
       ...(dto.jurisdiction !== undefined
         ? { jurisdiction: dto.jurisdiction.trim() || null }
-        : {}),
-      ...(dto.password
-        ? { passwordHash: await argon2.hash(dto.password) }
         : {}),
     };
 

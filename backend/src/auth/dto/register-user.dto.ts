@@ -36,6 +36,6 @@ export class LoginUserDto {
   password!: string;
 
   @IsOptional()
-  @IsIn(['ciudadano', 'gestion'])
-  portal?: 'ciudadano' | 'gestion';
+  @IsIn(['ciudadano', 'gestion', 'superadmin'])
+  portal?: 'ciudadano' | 'gestion' | 'superadmin';
 }

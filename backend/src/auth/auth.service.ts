@@ -62,13 +62,18 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    if (
-      (dto.portal === 'ciudadano' && user.role !== 'CIUDADANO') ||
-      (dto.portal === 'gestion' &&
-        user.role !== 'FUNCIONARIO' &&
-        user.role !== 'FUNCIONARIO_ADMINISTRADOR' &&
-        user.role !== 'SUPERADMINISTRADOR')
-    ) {
+    const portalAccess = {
+      ciudadano: user.role === 'CIUDADANO',
+      gestion:
+        user.role === 'FUNCIONARIO' ||
+        user.role === 'FUNCIONARIO_ADMINISTRADOR',
+      superadmin: user.role === 'SUPERADMINISTRADOR',
+    };
+    const hasPortalAccess = dto.portal
+      ? portalAccess[dto.portal]
+      : user.role !== 'SUPERADMINISTRADOR';
+
+    if (!hasPortalAccess) {
       throw new UnauthorizedException(
         'La cuenta no tiene acceso a este portal',
       );
