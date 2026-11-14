@@ -194,7 +194,7 @@ export class DenunciasService {
         'La subcategoría no está disponible en el mapa',
       );
     }
-    const [zones, resolvedCount] = await Promise.all([
+    const [zones, resolvedCount, totalCount, inProgressCount] = await Promise.all([
       this.prisma.$queryRaw<
         Array<{ latitudeCell: number; longitudeCell: number; count: number }>
       >(Prisma.sql`
@@ -218,6 +218,20 @@ export class DenunciasService {
       this.prisma.report.count({
         where: { status: ReportStatus.RESUELTO },
       }),
+      this.prisma.report.count(),
+      this.prisma.report.count({
+        where: {
+          status: {
+            in: [
+              ReportStatus.PENDIENTE,
+              ReportStatus.EN_REVISION,
+              ReportStatus.ASIGNADO,
+              ReportStatus.EN_PROCESO,
+            ],
+          },
+          archivedAt: null,
+        },
+      }),
     ]);
 
     return {
@@ -227,6 +241,8 @@ export class DenunciasService {
         count: zone.count,
       })),
       resolvedCount,
+      totalCount,
+      inProgressCount,
       subcategories: publicMapSubcategories,
     };
   }

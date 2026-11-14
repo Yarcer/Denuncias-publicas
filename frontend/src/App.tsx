@@ -232,7 +232,7 @@ function PublicHomePage({
 
       <footer className="public-home-footer">
         <span>Una herramienta para construir una mejor comunidad.</span>
-         <div className="public-home-social-links" aria-label="Redes sociales y contacto">
+        <div className="public-home-social-links" aria-label="Redes sociales y contacto">
           <a
             href="https://www.instagram.com/puntoreporte2026?dlrf=ZmpoN2FjcDF4anFn"
             target="_blank"
