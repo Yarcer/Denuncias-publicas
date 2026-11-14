@@ -1,8 +1,14 @@
+import * as argon2 from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
 import { AuthService } from './auth.service';
+
+jest.mock('argon2', () => ({
+  hash: jest.fn(),
+  verify: jest.fn(),
+}));
 
 describe('AuthService anonymous sessions', () => {
   type AnonymousAccountCountArgs = {
@@ -193,5 +199,51 @@ describe('AuthService anonymous sessions', () => {
       where: { reporterIpHash: { not: null } },
       data: { reporterIpHash: null },
     });
+  });
+
+  describe('AuthService login', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it.each([
+      'FUNCIONARIO',
+      'FUNCIONARIO_ADMINISTRADOR',
+      'SUPERADMINISTRADOR',
+    ] as const)(
+      'returns the generic invalid-credentials error for %s on the citizen portal',
+      async (role) => {
+        const verifyPassword = jest
+          .spyOn(argon2, 'verify')
+          .mockResolvedValue(true);
+        const loginService = new AuthService(
+          {
+            user: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'staff-id',
+                email: 'staff@example.com',
+                role,
+                status: 'ACTIVO',
+                passwordHash: 'stored-hash',
+              }),
+            },
+          } as unknown as PrismaService,
+          {} as JwtService,
+          {} as IpAbuseProtectionService,
+        );
+
+        await expect(
+          loginService.login({
+            email: 'staff@example.com',
+            password: 'valid-password',
+            portal: 'ciudadano',
+          }),
+        ).rejects.toThrow('Credenciales inválidas');
+        expect(verifyPassword).toHaveBeenCalledWith(
+          'stored-hash',
+          'valid-password',
+        );
+      },
+    );
   });
 });

@@ -188,7 +188,12 @@ export class DenunciasService {
     };
   }
 
-  async findPublicMap(subcategory?: string) {
+  async findPublicMap(category?: string, subcategory?: string) {
+    if (category && !publicMapCategoryNames.includes(category)) {
+      throw new BadRequestException(
+        'La categoría no está disponible en el mapa',
+      );
+    }
     if (subcategory && !publicMapSubcategories.includes(subcategory)) {
       throw new BadRequestException(
         'La subcategoría no está disponible en el mapa',
@@ -209,6 +214,7 @@ export class DenunciasService {
           AND report."publicMapConsent" = true
           AND category."name" IN (${Prisma.join(publicMapCategoryNames)})
           AND report."title" IN (${Prisma.join(publicMapSubcategories)})
+          ${category ? Prisma.sql`AND category."name" = ${category}` : Prisma.empty}
           ${subcategory ? Prisma.sql`AND report."title" = ${subcategory}` : Prisma.empty}
         GROUP BY "latitudeCell", "longitudeCell"
         HAVING COUNT(*) >= 1
@@ -243,6 +249,7 @@ export class DenunciasService {
       resolvedCount,
       totalCount,
       inProgressCount,
+      categories: publicMapCategoryNames,
       subcategories: publicMapSubcategories,
     };
   }

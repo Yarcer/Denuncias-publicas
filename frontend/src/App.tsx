@@ -199,9 +199,7 @@ function PublicHomePage({
             {anonymousLoginLoading ? 'Preparando formulario...' : 'Realizar reporte anónimo'}
           </button>
         </div>
-        <div className="public-home-map-frame">
-          <PublicReportMap />
-        </div>
+        <PublicReportMap />
       </section>
 
       <section className="public-home-benefits" aria-label="Cómo funciona PuntoReporte">
@@ -223,7 +221,7 @@ function PublicHomePage({
           <span className="public-home-benefit-number">03</span>
           <div>
             <h2>Seguimos el avance</h2>
-            <p>Con una cuenta, podés consultar tus reportes.</p>
+            <p>Con una cuenta, podés consultar el estado de tus reportes.</p>
           </div>
         </article>
       </section>
@@ -231,26 +229,49 @@ function PublicHomePage({
       <EmergencyShortcuts />
 
       <footer className="public-home-footer">
-        <span>Una herramienta para construir una mejor comunidad.</span>
-        <div className="public-home-social-links" aria-label="Redes sociales y contacto">
+        <div className="public-home-footer-links">
+          <span className="public-home-copyright">
+            © 2026 PuntoReporte. Todos los derechos reservados.
+          </span>
+          <nav className="public-home-contact-links" aria-label="Contacto">
+            <span>Contactanos:</span>
+            <a
+              className="public-home-social-link"
+              href="mailto:puntoreporte@gmail.com"
+              aria-label="Enviar mail a PuntoReporte"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="m4 7 8 6 8-6" />
+              </svg>
+              <span>puntoreporte@gmail.com</span>
+            </a>
+            <a
+              className="public-home-social-link"
+              href="https://www.instagram.com/puntoreporte2026/"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="PuntoReporte en Instagram"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="5" />
+                <circle cx="12" cy="12" r="4" />
+                <circle className="public-home-instagram-dot" cx="17.5" cy="6.5" r="1" />
+              </svg>
+              <span>Instagram</span>
+            </a>
+          </nav>
           <a
-            href="https://www.instagram.com/puntoreporte2026?dlrf=ZmpoN2FjcDF4anFn"
-            target="_blank"
-            rel="noreferrer"
+            className="public-home-staff-link"
+            href="/gestion/login"
+            onClick={(event) => {
+              event.preventDefault();
+              onNavigate('management-login');
+            }}
           >
-            Instagram
+            Acceso para funcionarios <span aria-hidden="true">→</span>
           </a>
-          <a href="mailto:puntoreporte@gmail.com">puntoreporte@gmail.com</a>
         </div>
-        <a
-          href="/gestion/login"
-          onClick={(event) => {
-            event.preventDefault();
-            onNavigate('management-login');
-          }}
-        >
-          Acceso para funcionarios <span aria-hidden="true">→</span>
-        </a>
       </footer>
     </main>
   );

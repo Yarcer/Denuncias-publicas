@@ -732,4 +732,38 @@ describe('DenunciasService', () => {
       }),
     );
   });
+
+  it('filters the public map by report category', async () => {
+    const queryRaw = jest.fn().mockResolvedValue([]);
+    const reportCount = jest.fn().mockResolvedValue(0);
+    const service = new DenunciasService({
+      report: { count: reportCount },
+      $queryRaw: queryRaw,
+    } as unknown as PrismaService);
+
+    const result = await service.findPublicMap('Infraestructura');
+
+    expect(result.categories).toEqual([
+      'Infraestructura',
+      'Limpieza',
+      'Saneamiento',
+    ]);
+    expect(queryRaw).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sql: expect.stringContaining('AND category."name" ='),
+        values: expect.arrayContaining(['Infraestructura']),
+      }),
+    );
+  });
+
+  it('rejects categories that are unavailable on the public map', async () => {
+    const service = new DenunciasService(
+      {} as unknown as PrismaService,
+      createIpAbuseProtection(),
+    );
+
+    await expect(service.findPublicMap('Convivencia')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
 });

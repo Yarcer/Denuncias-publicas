@@ -99,9 +99,7 @@ export class AuthService {
         user.role !== 'FUNCIONARIO_ADMINISTRADOR' &&
         user.role !== 'SUPERADMINISTRADOR')
     ) {
-      throw new UnauthorizedException(
-        'La cuenta no tiene acceso a este portal',
-      );
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
     return {

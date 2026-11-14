@@ -43,8 +43,11 @@ export class DenunciasController {
   @Get('public/mapa')
   @Header('Cache-Control', 'no-store')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  publicMap(@Query('subcategory') subcategory?: string) {
-    return this.denunciasService.findPublicMap(subcategory);
+  publicMap(
+    @Query('category') category?: string,
+    @Query('subcategory') subcategory?: string,
+  ) {
+    return this.denunciasService.findPublicMap(category, subcategory);
   }
 
   @Get()
