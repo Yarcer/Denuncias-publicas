@@ -13,6 +13,7 @@ import GestionUsuarios from './pages/GestionUsuarios';
 import SolicitudesFuncionarios from './pages/SolicitudesFuncionarios';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
+import PublicReportCategoryCarousel from './components/PublicReportCategoryCarousel';
 
 type AuthRoute =
   | 'home'
@@ -190,6 +191,8 @@ function PublicHomePage({
 
       <section className="public-home-hero" aria-labelledby="public-home-title">
         <div className="public-home-hero-copy">
+          <PublicReportCategoryCarousel />
+
           <span className="public-home-kicker">MELO · CERRO LARGO</span>
           <h1 id="public-home-title">
             Una ciudad mejor empieza con <span>tu voz.</span>

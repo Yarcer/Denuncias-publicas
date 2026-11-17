@@ -81,10 +81,19 @@ function PublicReportMap() {
     <div className="public-home-map-column">
       <section
         className="public-report-map-resolved-summary"
-        aria-label="Reportes resueltos hasta ahora"
+        aria-label="Reportes resueltos hasta el momento"
         aria-live="polite"
       >
-        <span>Reportes resueltos hasta ahora</span>
+        <span className="public-report-map-resolved-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="m5 12 4 4L19 6" />
+          </svg>
+        </span>
+
+        <span className="public-report-map-resolved-label">
+          Reportes resueltos hasta el momento
+        </span>
+
         <strong>{resolvedCount ?? '—'}</strong>
       </section>
       <div className="public-home-map-frame">
