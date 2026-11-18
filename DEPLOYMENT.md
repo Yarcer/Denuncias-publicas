@@ -34,8 +34,9 @@ Sube el proyecto a un repositorio privado de GitHub. No subas archivos `.env`, c
 2. En Render, crea un **Blueprint** desde el repositorio y acepta la configuración de `render.yaml`.
 3. Completa los campos `DATABASE_URL`, `DIRECT_URL`, `CORS_ORIGIN`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY`. Render genera `JWT_SECRET` y `IP_HASH_SECRET`; conserva este último estable para que el límite por IP siga siendo consistente entre despliegues.
 4. Para enviar confirmaciones de denuncias, configura además `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_USER` y `SMTP_PASSWORD` como secretos/variables de entorno. Usa las credenciales SMTP de un proveedor autorizado para enviar desde el dominio indicado en `SMTP_FROM`.
-5. Despliega la API. Render genera el secreto JWT automáticamente.
-6. Comprueba `https://<tu-api>.onrender.com/api/health`.
+5. Crea un widget de **Cloudflare Turnstile** para el dominio de Pages/Workers y guarda su **secret key** como `TURNSTILE_SECRET_KEY` en Render. No la pongas en el frontend ni en el repositorio.
+6. Despliega la API. Render genera el secreto JWT automáticamente.
+7. Comprueba `https://<tu-api>.onrender.com/api/health`.
 `CORS_ORIGIN` debe ser el origen HTTPS exacto de la web publicada (`*.pages.dev` o `*.workers.dev`), sin ruta final. Las migraciones y categorías iniciales se preparan al iniciar la API. Las sesiones anónimas están limitadas a 3 por IP en una ventana de 20 días; se eliminan al vencer si nunca crearon reportes. La creación de reportes está limitada a 5 por IP por hora. La API guarda HMAC de las IP, no las direcciones originales, y los elimina al vencer su ventana. En producción el seed no crea usuarios demo; mantén una sola instancia mientras uses este comando de arranque.
 
 ## 5. Desplegar el frontend
@@ -46,7 +47,7 @@ En Cloudflare Pages, crea el proyecto con el nombre elegido, conecta el reposito
 
 - **Build command:** `pnpm install --frozen-lockfile --prod=false && pnpm --filter frontend build`
 - **Build output directory:** `frontend/dist`
-- **Variable de entorno de producción:** `VITE_API_URL=https://<tu-api>.onrender.com/api`
+- **Variables de entorno de producción:** `VITE_API_URL=https://<tu-api>.onrender.com/api` y `VITE_TURNSTILE_SITE_KEY=<site key pública de Turnstile>`
 
 Tras el primer despliegue, configura `CORS_ORIGIN` en Render con el origen real de Pages (`https://<nombre>.pages.dev`) o Workers (`https://<nombre>.<subdominio>.workers.dev`) y vuelve a desplegar la API. Pages aplica automáticamente el fallback SPA; en Workers el fallback está definido por Wrangler.
 
@@ -59,10 +60,17 @@ Si el panel solo permite crear Workers, despliega el frontend estático como Wor
 - **Build command:** `pnpm install --frozen-lockfile --prod=false && pnpm build`
 - **Deploy command:** `pnpm exec wrangler deploy`
 - Agrega `VITE_API_URL=https://<tu-api>.onrender.com/api` en las variables de build del entorno **Production**.
+- Agrega `VITE_TURNSTILE_SITE_KEY=<site key pública de Turnstile>` en las variables de build del entorno **Production**.
 
 El Worker `denuncias-publicas` sirve el frontend compilado en `frontend/dist` y configura fallback SPA para las rutas de React. Si ya creaste un Worker con otro nombre, cambia `name` en `frontend/wrangler.jsonc` para que coincida.
 
-Los builds de producción fallan deliberadamente si falta `VITE_API_URL` o si no es una URL HTTPS terminada en `/api`.
+Los builds de producción fallan deliberadamente si falta `VITE_API_URL` o `VITE_TURNSTILE_SITE_KEY`, o si la URL de API no es HTTPS y termina en `/api`.
+
+### Configurar Turnstile
+
+En Cloudflare, crea un widget Turnstile y agrega el hostname exacto de tu sitio publicado (por ejemplo, `<nombre>.pages.dev` o `<nombre>.<subdominio>.workers.dev`). Usa la site key pública como `VITE_TURNSTILE_SITE_KEY` en el build del frontend y la secret key únicamente como `TURNSTILE_SECRET_KEY` en Render. En desarrollo local no es necesario configurar claves: frontend y backend usan automáticamente las claves públicas de prueba oficiales de Turnstile. No uses claves de prueba en producción.
+
+El desafío se solicita al crear una cuenta, entrar como visitante y enviar cada reporte. La API valida cada token con Cloudflare, verifica la acción esperada y en producción también el hostname; los tokens faltantes, inválidos, vencidos o no verificables no permiten completar la operación. No se aplica al inicio de sesión.
 
 ## Seguridad antes de recibir denuncias reales
 

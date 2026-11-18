@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
 import { AnonymousAccountCleanupService } from './anonymous-account-cleanup.service';
+import { TurnstileService } from '../common/services/turnstile.service';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AnonymousAccountCleanupService } from './anonymous-account-cleanup.serv
     JwtStrategy,
     IpAbuseProtectionService,
     AnonymousAccountCleanupService,
+    TurnstileService,
   ],
 
   exports: [AuthService],

@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Header,
   Param,
   Patch,
@@ -20,14 +21,12 @@ import type { Request, Response } from 'express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { ConfirmationMailService } from './confirmation-mail.service';
-import {
-  DenunciasService,
-  rejectionReasonLabels,
-} from './denuncias.service';
+import { DenunciasService, rejectionReasonLabels } from './denuncias.service';
 import { CreateReportDto, UpdateReportDto } from './dto/report.dto';
 import { AssignReportDto, ManageReportDto } from './dto/manage-report.dto';
 import { Throttle } from '@nestjs/throttler';
 import { ReportStatus } from '@prisma/client';
+import { TurnstileService } from '../common/services/turnstile.service';
 
 type AuthenticatedRequest = Request & {
   user: { sub: string; role: string; email?: string };
@@ -38,7 +37,8 @@ export class DenunciasController {
   constructor(
     private readonly denunciasService: DenunciasService,
     private readonly confirmationMailService: ConfirmationMailService,
-  ) { }
+    private readonly turnstileService: TurnstileService,
+  ) {}
 
   @Get('public/mapa')
   @Header('Cache-Control', 'no-store')
@@ -115,19 +115,25 @@ export class DenunciasController {
   @Post()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CIUDADANO')
-  async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateReportDto) {
+  async create(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateReportDto,
+    @Headers('x-turnstile-token') turnstileToken: string | undefined,
+  ) {
+    await this.turnstileService.verify(turnstileToken, 'create_report', req.ip);
     const report = await this.denunciasService.create(
       req.user.sub,
       dto,
       req.ip,
     );
-    const emailConfirmation = report.emailNotifications && req.user.email
-      ? await this.confirmationMailService.sendReportConfirmation({
-        email: req.user.email,
-        reportId: report.id,
-        title: report.title,
-      })
-      : 'skipped';
+    const emailConfirmation =
+      report.emailNotifications && req.user.email
+        ? await this.confirmationMailService.sendReportConfirmation({
+            email: req.user.email,
+            reportId: report.id,
+            title: report.title,
+          })
+        : 'skipped';
 
     return { ...report, emailConfirmation };
   }

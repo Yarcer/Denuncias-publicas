@@ -12,6 +12,7 @@ const productionConfig = {
   R2_BUCKET: 'private-evidence',
   R2_ACCESS_KEY_ID: 'access-key',
   R2_SECRET_ACCESS_KEY: 'secret-key',
+  TURNSTILE_SECRET_KEY: 'production-turnstile-secret',
 };
 
 describe('production environment validation', () => {
@@ -55,6 +56,21 @@ describe('production environment validation', () => {
     expect(() =>
       validate({ ...productionConfig, STORAGE_DRIVER: 'local' }),
     ).toThrow('STORAGE_DRIVER must be r2 in production');
+  });
+
+  it('requires a Turnstile secret in production', () => {
+    expect(() =>
+      validate({ ...productionConfig, TURNSTILE_SECRET_KEY: '' }),
+    ).toThrow('TURNSTILE_SECRET_KEY is required in production');
+  });
+
+  it('rejects the public Turnstile test secret in production', () => {
+    expect(() =>
+      validate({
+        ...productionConfig,
+        TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA',
+      }),
+    ).toThrow('TURNSTILE_SECRET_KEY must not use a Cloudflare test key');
   });
 });
 

@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -14,6 +20,7 @@ import SolicitudesFuncionarios from './pages/SolicitudesFuncionarios';
 import puntoReporteLogo from './assets/puntoreporte-logo.png';
 import plazaConstitucionMelo from './assets/plaza-constitucion-melo.jpg';
 import PublicReportCategoryCarousel from './components/PublicReportCategoryCarousel';
+import TurnstileWidget from './components/TurnstileWidget';
 
 type AuthRoute =
   | 'home'
@@ -152,14 +159,20 @@ function EmergencyShortcuts() {
 
 function PublicHomePage({
   onNavigate,
-  onAnonymousReport,
-  anonymousLoginLoading,
   error,
+  anonymousChallengeActive,
+  anonymousLoginLoading,
+  onAnonymousReport,
+  onAnonymousToken,
+  turnstileResetVersion,
 }: {
   onNavigate: (route: AuthRoute) => void;
-  onAnonymousReport: () => void;
-  anonymousLoginLoading: boolean;
   error: string;
+  anonymousChallengeActive: boolean;
+  anonymousLoginLoading: boolean;
+  onAnonymousReport: () => void;
+  onAnonymousToken: (token: string) => void;
+  turnstileResetVersion: number;
 }) {
   return (
     <main className="public-home-page">
@@ -207,8 +220,19 @@ function PublicHomePage({
             onClick={onAnonymousReport}
             disabled={anonymousLoginLoading}
           >
-            {anonymousLoginLoading ? 'Preparando formulario...' : 'Realizar reporte anónimo'}
+            {anonymousLoginLoading
+              ? 'Preparando formulario...'
+              : anonymousChallengeActive
+                ? 'Cancelar reporte anónimo'
+                : 'Realizar reporte anónimo'}
           </button>
+          {anonymousChallengeActive && (
+            <TurnstileWidget
+              action="anonymous_login"
+              onToken={onAnonymousToken}
+              resetVersion={turnstileResetVersion}
+            />
+          )}
         </div>
         <PublicReportMap />
       </section>
@@ -302,12 +326,20 @@ function PublicHomePage({
 
 function PublicAccessPage({
   onNavigate,
-  onAnonymousLogin,
   error,
+  anonymousChallengeActive,
+  anonymousLoginLoading,
+  onAnonymousReport,
+  onAnonymousToken,
+  turnstileResetVersion,
 }: {
   onNavigate: (route: AuthRoute) => void;
-  onAnonymousLogin: () => void;
   error: string;
+  anonymousChallengeActive: boolean;
+  anonymousLoginLoading: boolean;
+  onAnonymousReport: () => void;
+  onAnonymousToken: (token: string) => void;
+  turnstileResetVersion: number;
 }) {
   const options: { label: string; route: AuthRoute; description: string }[] = [
     { label: 'Iniciar sesión', route: 'login', description: 'Accedé a tu cuenta ciudadana.' },
@@ -343,10 +375,10 @@ function PublicAccessPage({
               onClick={(event) => {
                 event.preventDefault();
                 if (option.route === 'anonymous') {
-                  onAnonymousLogin();
-                } else {
-                  onNavigate(option.route);
+                  onAnonymousReport();
+                  return;
                 }
+                onNavigate(option.route);
               }}
             >
               <span>
@@ -357,6 +389,20 @@ function PublicAccessPage({
             </a>
           ))}
         </nav>
+        {anonymousChallengeActive && (
+          <>
+            <TurnstileWidget
+              action="anonymous_login"
+              onToken={onAnonymousToken}
+              resetVersion={turnstileResetVersion}
+            />
+            {anonymousLoginLoading && (
+              <p className="public-login-error" role="status">
+                Verificando y preparando el formulario...
+              </p>
+            )}
+          </>
+        )}
         {error && <p className="public-login-error" role="alert">{error}</p>}
       </section>
     </main>
@@ -460,6 +506,8 @@ function PublicRegisterPage({
   onSubmit,
   error,
   onNavigate,
+  onTurnstileToken,
+  turnstileResetVersion,
 }: {
   credentials: {
     firstName: string;
@@ -477,6 +525,8 @@ function PublicRegisterPage({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   error: string;
   onNavigate: (route: AuthRoute) => void;
+  onTurnstileToken: (token: string) => void;
+  turnstileResetVersion: number;
 }) {
   return (
     <main className="public-access-page">
@@ -564,6 +614,11 @@ function PublicRegisterPage({
           >
             {showPassword ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
           </button>
+          <TurnstileWidget
+            action="register"
+            onToken={onTurnstileToken}
+            resetVersion={turnstileResetVersion}
+          />
           {error && <p className="public-login-error" role="alert">{error}</p>}
           <button className="public-login-submit" type="submit">Crear mi cuenta</button>
         </form>
@@ -1834,6 +1889,11 @@ function App() {
   const [reports, setReports] = useState<Report[]>([]);
   const [error, setError] = useState('');
   const [anonymousLoginLoading, setAnonymousLoginLoading] = useState(false);
+  const [anonymousChallengeActive, setAnonymousChallengeActive] =
+    useState(false);
+  const anonymousLoginInFlightRef = useRef(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileResetVersion, setTurnstileResetVersion] = useState(0);
   const [menuCuentaAbierto, setMenuCuentaAbierto] = useState(false);
   const [menuCiudadanoAbierto, setMenuCiudadanoAbierto] = useState(false);
   const [actualizandoReportes, setActualizandoReportes] = useState(false);
@@ -1928,6 +1988,11 @@ function App() {
       return;
     }
 
+    if (registering && !turnstileToken) {
+      setError('Completá la verificación de seguridad antes de continuar.');
+      return;
+    }
+
     try {
       const payload = registering
         ? {
@@ -1953,25 +2018,43 @@ function App() {
                 ? 'superadmin'
                 : 'ciudadano',
           },
+        registering
+          ? { headers: { 'X-Turnstile-Token': turnstileToken } }
+          : undefined,
       );
 
       setSession(response.data.data.user, response.data.data.csrfToken);
     } catch (authError: unknown) {
       setError(getApiErrorMessage(authError, 'No se pudo iniciar sesión.'));
+    } finally {
+      if (registering) {
+        setTurnstileToken('');
+        setTurnstileResetVersion((version) => version + 1);
+      }
     }
   }
 
-  async function handleAnonymousLogin() {
+  async function handleAnonymousLogin(token: string) {
+    if (!token || anonymousLoginInFlightRef.current) return;
+    anonymousLoginInFlightRef.current = true;
     setError('');
     setAnonymousLoginLoading(true);
     try {
-      const response = await api.post('/auth/anonymous');
+      const response = await api.post(
+        '/auth/anonymous',
+        {},
+        { headers: { 'X-Turnstile-Token': token } },
+      );
       setVistaCiudadano('crear');
+      setAnonymousChallengeActive(false);
       setSession(response.data.data.user, response.data.data.csrfToken);
     } catch (anonymousError: unknown) {
       setError(getApiErrorMessage(anonymousError, 'No se pudo crear la sesión temporal.'));
     } finally {
+      anonymousLoginInFlightRef.current = false;
       setAnonymousLoginLoading(false);
+      setTurnstileToken('');
+      setTurnstileResetVersion((version) => version + 1);
     }
   }
 
@@ -1980,9 +2063,17 @@ function App() {
       return (
         <PublicHomePage
           onNavigate={navigateAuth}
-          onAnonymousReport={handleAnonymousLogin}
-          anonymousLoginLoading={anonymousLoginLoading}
           error={error}
+          anonymousChallengeActive={anonymousChallengeActive}
+          anonymousLoginLoading={anonymousLoginLoading}
+          onAnonymousReport={() => {
+            setError('');
+            setAnonymousChallengeActive((active) => !active);
+          }}
+          onAnonymousToken={(token) => {
+            if (token) void handleAnonymousLogin(token);
+          }}
+          turnstileResetVersion={turnstileResetVersion}
         />
       );
     }
@@ -1991,8 +2082,17 @@ function App() {
       return (
         <PublicAccessPage
           onNavigate={navigateAuth}
-          onAnonymousLogin={handleAnonymousLogin}
           error={error}
+          anonymousChallengeActive={anonymousChallengeActive}
+          anonymousLoginLoading={anonymousLoginLoading}
+          onAnonymousReport={() => {
+            setError('');
+            setAnonymousChallengeActive(true);
+          }}
+          onAnonymousToken={(token) => {
+            if (token) void handleAnonymousLogin(token);
+          }}
+          turnstileResetVersion={turnstileResetVersion}
         />
       );
     }
@@ -2025,6 +2125,8 @@ function App() {
           onSubmit={handleAuth}
           error={error}
           onNavigate={navigateAuth}
+          onTurnstileToken={setTurnstileToken}
+          turnstileResetVersion={turnstileResetVersion}
         />
       );
     }
@@ -2174,12 +2276,18 @@ function App() {
                     Podés continuar sin crear una cuenta. La sesión será temporal.
                   </p>
                   {error && <p className="error">{error}</p>}
+                  <TurnstileWidget
+                    action="anonymous_login"
+                    onToken={setTurnstileToken}
+                    resetVersion={turnstileResetVersion}
+                  />
                   <button
                     type="button"
                     className="auth-submit"
-                    onClick={handleAnonymousLogin}
+                    onClick={() => void handleAnonymousLogin(turnstileToken)}
+                    disabled={anonymousLoginLoading || !turnstileToken}
                   >
-                    Continuar como anónimo
+                    {anonymousLoginLoading ? 'Verificando...' : 'Continuar como anónimo'}
                   </button>
                   <small className="auth-helper-text">
                     Para consultar tus reportes luego, te recomendamos crear una cuenta.

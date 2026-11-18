@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Post,
   Req,
   Res,
@@ -15,6 +16,7 @@ import type { CookieOptions, Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { LoginUserDto, RegisterUserDto } from './dto/register-user.dto';
+import { TurnstileService } from '../common/services/turnstile.service';
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -29,14 +31,18 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
+    private readonly turnstileService: TurnstileService,
   ) {}
 
   @Post('register')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async register(
     @Body() dto: RegisterUserDto,
+    @Req() req: Request,
+    @Headers('x-turnstile-token') turnstileToken: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
+    await this.turnstileService.verify(turnstileToken, 'register', req.ip);
     return this.createSession(await this.authService.register(dto), response);
   }
 
@@ -53,8 +59,14 @@ export class AuthController {
   @Throttle({ default: { limit: 20, ttl: 60 * 60 * 1000 } })
   async anonymousLogin(
     @Req() req: Request,
+    @Headers('x-turnstile-token') turnstileToken: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
+    await this.turnstileService.verify(
+      turnstileToken,
+      'anonymous_login',
+      req.ip,
+    );
     return this.createSession(
       await this.authService.anonymousLogin(req.ip),
       response,

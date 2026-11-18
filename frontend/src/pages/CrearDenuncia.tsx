@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 import { getApiErrorMessage } from '../lib/api-error'
 import { formatReportIdentifier } from '../lib/report-id'
 import { useAuthStore } from '../stores/auth-store'
+import TurnstileWidget from '../components/TurnstileWidget'
 
 import {
   MapContainer,
@@ -127,6 +128,8 @@ function CrearDenuncia() {
   const [emailNotificationsResolvedOnly, setEmailNotificationsResolvedOnly] =
     useState(false)
   const [error, setError] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const [turnstileResetVersion, setTurnstileResetVersion] = useState(0)
   const [resultado, setResultado] = useState<{
     codigo: string
     detalles: string
@@ -349,6 +352,11 @@ function CrearDenuncia() {
       return
     }
 
+    if (!turnstileToken) {
+      setError('Completá la verificación de seguridad antes de enviar el reporte.')
+      return
+    }
+
     try {
       const categoriaSeleccionada = categories.find(
         (category) => category.id === categoriaId
@@ -366,6 +374,8 @@ function CrearDenuncia() {
         emailNotifications,
         emailNotificationsResolvedOnly:
           emailNotifications && emailNotificationsResolvedOnly,
+      }, {
+        headers: { 'X-Turnstile-Token': turnstileToken },
       })
 
       let fotoAdjuntada = true
@@ -421,6 +431,9 @@ function CrearDenuncia() {
       })
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'No se pudo registrar la denuncia.'))
+    } finally {
+      setTurnstileToken('')
+      setTurnstileResetVersion((version) => version + 1)
     }
   }
 
@@ -667,6 +680,12 @@ function CrearDenuncia() {
         )}
 
         {error && <p className="error">{error}</p>}
+
+        <TurnstileWidget
+          action="create_report"
+          onToken={setTurnstileToken}
+          resetVersion={turnstileResetVersion}
+        />
 
         <button type="submit">Enviar reporte</button>
       </form>

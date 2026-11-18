@@ -76,6 +76,10 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   SMTP_FROM?: string;
+
+  @IsString()
+  @IsOptional()
+  TURNSTILE_SECRET_KEY?: string;
 }
 
 export function validate(config: Record<string, unknown>) {
@@ -155,6 +159,17 @@ export function validate(config: Record<string, unknown>) {
 
     if (validatedConfig.STORAGE_DRIVER !== 'r2') {
       productionErrors.push('STORAGE_DRIVER must be r2 in production');
+    }
+
+    if (!validatedConfig.TURNSTILE_SECRET_KEY) {
+      productionErrors.push('TURNSTILE_SECRET_KEY is required in production');
+    } else if (
+      validatedConfig.TURNSTILE_SECRET_KEY ===
+      '1x0000000000000000000000000000000AA'
+    ) {
+      productionErrors.push(
+        'TURNSTILE_SECRET_KEY must not use a Cloudflare test key in production',
+      );
     }
 
     if (

@@ -59,3 +59,19 @@ La base del sistema ya está funcionando: autenticación, registro de denuncias,
 ## Sobre el proyecto
 
 Es un proyecto en desarrollo activo, construido como una aplicación web con frontend y backend separados, base de datos relacional y despliegue previsto en servicios gratuitos. La guía de publicación y las medidas de seguridad recomendadas están documentadas en el repositorio.
+
+## Desarrollo local para el equipo
+
+En desarrollo, Cloudflare Turnstile usa automáticamente sus claves de desarrollo; no hace falta configurar claves ni un `.env` del frontend. Para producción, configura las claves reales en Cloudflare Pages/Workers y Render.
+
+Requisitos: Node.js, pnpm y Docker Desktop. Desde la raíz del repositorio:
+
+```powershell
+pnpm install
+docker compose up -d denuncias-postgres
+pnpm --dir backend exec prisma migrate deploy
+pnpm --dir backend db:seed
+pnpm dev
+```
+
+Abrí `http://localhost:5173`. El backend usa `http://localhost:3000/api` y PostgreSQL se publica en el puerto local `5433`, según `docker-compose.yml`. Cada desarrollador necesita su propio `backend/.env` local con la configuración de su base de datos; ese archivo está ignorado por Git. No subas credenciales reales ni archivos `.env` al repositorio. Para producción, sigue [DEPLOYMENT.md](./DEPLOYMENT.md).

@@ -31,3 +31,5 @@ services:
         sync: false
       - key: R2_SECRET_ACCESS_KEY
         sync: false
+      - key: TURNSTILE_SECRET_KEY
+        sync: false

@@ -37,4 +37,11 @@ export default () => ({
     smtpPassword: process.env.SMTP_PASSWORD,
     from: process.env.SMTP_FROM,
   },
+  turnstile: {
+    secretKey:
+      process.env.TURNSTILE_SECRET_KEY ||
+      (process.env.NODE_ENV === 'production'
+        ? undefined
+        : '1x0000000000000000000000000000000AA'),
+  },
 });

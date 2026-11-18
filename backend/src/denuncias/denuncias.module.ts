@@ -5,6 +5,7 @@ import { DenunciasService } from './denuncias.service';
 import { ConfirmationMailService } from './confirmation-mail.service';
 import { EvidenceStorageService } from './evidence-storage.service';
 import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection.service';
+import { TurnstileService } from '../common/services/turnstile.service';
 
 @Module({
   controllers: [DenunciasController],
@@ -14,6 +15,7 @@ import { IpAbuseProtectionService } from '../common/services/ip-abuse-protection
     EvidenceStorageService,
     ConfirmationMailService,
     IpAbuseProtectionService,
+    TurnstileService,
   ],
 })
 export class DenunciasModule {}

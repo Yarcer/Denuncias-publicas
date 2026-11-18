@@ -10,6 +10,12 @@ export default defineConfig(({ mode }) => {
       throw new Error('VITE_API_URL must be configured for production builds')
     }
 
+    if (!env.VITE_TURNSTILE_SITE_KEY) {
+      throw new Error(
+        'VITE_TURNSTILE_SITE_KEY must be configured for production builds',
+      )
+    }
+
     const apiUrl = new URL(env.VITE_API_URL)
     if (apiUrl.protocol !== 'https:' || apiUrl.pathname.replace(/\/+$/, '') !== '/api') {
       throw new Error('VITE_API_URL must use HTTPS and end with /api')
